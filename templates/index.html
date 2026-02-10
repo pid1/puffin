@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Puffin - Baby Tracker</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐦</text></svg>">
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <header class="app-header">
+        <h1 class="logo">🐧 Puffin</h1>
+        <button id="theme-toggle" class="btn btn-icon" aria-label="Toggle dark mode">🌙</button>
+    </header>
+
+    <main class="container">
+        <!-- Active Feeding Timer -->
+        <section id="timer-section" class="timer-section hidden">
+            <div class="timer-display">
+                <div class="timer-digits" id="timer-digits">00:00:00</div>
+                <div class="timer-side" id="timer-side"></div>
+                <div class="timer-breast-times hidden" id="timer-breast-times"></div>
+            </div>
+            <div class="timer-actions">
+                <button id="timer-switch-btn" class="btn btn-primary btn-lg hidden">Switch</button>
+                <button id="timer-end-btn" class="btn btn-warning btn-lg">End Feeding</button>
+                <button id="timer-confirm-btn" class="btn btn-danger btn-lg hidden">Confirm End</button>
+                <button id="timer-cancel-btn" class="btn btn-secondary hidden">Cancel</button>
+            </div>
+        </section>
+
+        <!-- Quick Add Buttons -->
+        <section class="quick-actions">
+            <button class="btn btn-quick btn-diaper" data-modal="diaper-modal">Diaper 🧷</button>
+            <button class="btn btn-quick btn-feeding" data-modal="feeding-modal">Feeding 🍼</button>
+            <button class="btn btn-quick btn-health" data-modal="health-modal">Health 💊</button>
+        </section>
+
+        <!-- Dashboard Summary Cards -->
+        <section class="summary-cards" id="summary-cards">
+            <div class="card card-diaper">
+                <h3>Diapers Today</h3>
+                <div class="card-value" id="diaper-count">-</div>
+                <div class="card-detail" id="last-diaper">—</div>
+            </div>
+            <div class="card card-feeding">
+                <h3>Feedings Today</h3>
+                <div class="card-value" id="feeding-count">-</div>
+                <div class="card-detail" id="last-feeding">—</div>
+            </div>
+            <div class="card card-health">
+                <h3>Meds Today</h3>
+                <div class="card-value" id="med-count">-</div>
+                <div class="card-detail" id="last-temp">—</div>
+            </div>
+        </section>
+
+        <!-- Recent Activity Timeline -->
+        <section class="timeline-section">
+            <div class="timeline-header">
+                <h2>Recent Activity</h2>
+                <a href="/api/export?format=csv" class="btn btn-sm btn-secondary">Export CSV</a>
+            </div>
+            <div id="timeline" class="timeline">
+                <p class="empty-state">No activities yet today.</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Diaper Modal -->
+    <div id="diaper-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <h2>Log Diaper Change</h2>
+            <form id="diaper-form">
+                <div class="form-group">
+                    <label>Type</label>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-option" data-value="pee" data-field="diaper-type">💧 Pee</button>
+                        <button type="button" class="btn btn-option" data-value="poop" data-field="diaper-type">💩 Poop</button>
+                        <button type="button" class="btn btn-option" data-value="both" data-field="diaper-type">💧💩 Both</button>
+                    </div>
+                    <input type="hidden" name="type" id="diaper-type" required>
+                </div>
+                <div class="form-group">
+                    <label for="diaper-notes">Notes (optional)</label>
+                    <textarea name="notes" id="diaper-notes" rows="2"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-lg">Save</button>
+                    <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Feeding Modal -->
+    <div id="feeding-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <h2>Log Feeding</h2>
+            <div id="last-feeding-info" class="last-feeding-info hidden"></div>
+            <form id="feeding-form">
+                <div class="form-group" id="timer-toggle-row">
+                    <label>
+                        <input type="checkbox" id="start-timer" checked> Start timer
+                    </label>
+                </div>
+
+                <!-- Timer mode: pick type (bottle will disable timer and prompt ounces) -->
+                <div id="feeding-timer-mode">
+                    <div class="form-group">
+                        <label>Type</label>
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-option" data-value="breast_left" data-field="feeding-type">🤱 Left</button>
+                            <button type="button" class="btn btn-option" data-value="breast_right" data-field="feeding-type">🤱 Right</button>
+                            <button type="button" class="btn btn-option" data-value="bottle" data-field="feeding-type">🍼 Bottle</button>
+                        </div>
+                        <input type="hidden" id="feeding-type">
+                    </div>
+                    <div id="feeding-bottle-oz-timer" class="form-group hidden">
+                        <label for="feeding-bottle-oz-timer-input">Amount (oz)</label>
+                        <input type="number" id="feeding-bottle-oz-timer-input" min="0.5" max="12" step="0.5">
+                    </div>
+                </div>
+
+                <!-- Manual mode: per-type durations + bottle ounces -->
+                <div id="feeding-manual-mode" class="hidden">
+                    <div class="form-group">
+                        <label for="feeding-left-duration">🤱 Left breast (minutes)</label>
+                        <input type="number" id="feeding-left-duration" min="1" max="120">
+                    </div>
+                    <div class="form-group">
+                        <label for="feeding-right-duration">🤱 Right breast (minutes)</label>
+                        <input type="number" id="feeding-right-duration" min="1" max="120">
+                    </div>
+                    <div class="form-group">
+                        <label for="feeding-bottle-oz">🍼 Bottle (oz)</label>
+                        <input type="number" id="feeding-bottle-oz" min="0.5" max="12" step="0.5">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="feeding-notes">Notes (optional)</label>
+                    <textarea name="notes" id="feeding-notes" rows="2"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-lg" id="feeding-save-btn" disabled>Start</button>
+                    <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Health Modal -->
+    <div id="health-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <h2>Log Health</h2>
+            <div class="tab-bar">
+                <button class="tab active" data-tab="med-tab">💊 Medication</button>
+                <button class="tab" data-tab="temp-tab">🌡️ Temperature</button>
+            </div>
+            <div id="med-tab" class="tab-content active">
+                <form id="medication-form">
+                    <div class="form-group">
+                        <label for="med-name">Medication Name</label>
+                        <input type="text" name="medication_name" id="med-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="med-dosage">Dosage</label>
+                        <input type="text" name="dosage" id="med-dosage" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="med-notes">Notes (optional)</label>
+                        <textarea name="notes" id="med-notes" rows="2"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary btn-lg">Save</button>
+                        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                    </div>
+                </form>
+            </div>
+            <div id="temp-tab" class="tab-content">
+                <form id="temperature-form">
+                    <div class="form-group">
+                        <label for="temp-value">Temperature</label>
+                        <div class="input-group">
+                            <input type="number" name="temperature_celsius" id="temp-value" step="0.1" required>
+                            <select id="temp-unit">
+                                <option value="f">°F</option>
+                                <option value="c">°C</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="temp-location">Location</label>
+                        <select name="location" id="temp-location">
+                            <option value="">Select...</option>
+                            <option value="rectal">Rectal</option>
+                            <option value="oral">Oral</option>
+                            <option value="axillary">Underarm</option>
+                            <option value="temporal">Forehead</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="temp-notes">Notes (optional)</label>
+                        <textarea name="notes" id="temp-notes" rows="2"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary btn-lg">Save</button>
+                        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="edit-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <h2 id="edit-modal-title">Edit</h2>
+            <form id="edit-form">
+                <div id="edit-form-fields"></div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-lg">Save</button>
+                    <button type="button" class="btn btn-danger" id="edit-delete-btn">Delete</button>
+                    <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast notification -->
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
