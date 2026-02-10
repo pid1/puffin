@@ -59,6 +59,13 @@ function openModal(id) {
     document.getElementById(id).classList.remove('hidden');
     if (id === 'feeding-modal') {
         loadLastBreastFeeding();
+        loadNoteSuggestions('/api/feedings', 'feeding-note-suggestions', 'feeding-notes');
+    } else if (id === 'diaper-modal') {
+        loadNoteSuggestions('/api/diapers', 'diaper-note-suggestions', 'diaper-notes');
+    } else if (id === 'health-modal') {
+        loadMedSuggestions();
+        loadNoteSuggestions('/api/medications', 'med-note-suggestions', 'med-notes');
+        loadNoteSuggestions('/api/temperatures', 'temp-note-suggestions', 'temp-notes');
     }
 }
 
@@ -195,7 +202,6 @@ function showTimerUI() {
     const sideLabels = {
         breast_left: 'Left Breast',
         breast_right: 'Right Breast',
-        breast_both: 'Both Breasts',
         bottle: 'Bottle',
     };
     document.getElementById('timer-side').textContent = sideLabels[currentSide] || currentSide;
@@ -291,7 +297,7 @@ async function endTimer() {
 
         // Build toast message
         const sides = Object.entries(totals).filter(([, ms]) => ms >= 1000);
-        const sideLabels = { breast_left: 'Left', breast_right: 'Right', breast_both: 'Both' };
+        const sideLabels = { breast_left: 'Left', breast_right: 'Right' };
         if (sides.length === 1) {
             const dur = Math.max(1, Math.round(sides[0][1] / 60000));
             showToast(`Feeding logged: ${sideLabels[sides[0][0]] || sides[0][0]} ${dur}min`);
@@ -452,6 +458,75 @@ function initFeedingForm() {
     });
 
     updateMode();
+}
+
+/* ===== Auto-fill Suggestions ===== */
+let medDosageMap = {}; // medication_name -> most recent dosage
+
+async function loadMedSuggestions() {
+    try {
+        const meds = await api.get('/api/medications?limit=50');
+        const datalist = document.getElementById('med-name-suggestions');
+        medDosageMap = {};
+        const seen = new Set();
+        // meds are sorted newest-first, so first occurrence = most recent dosage
+        for (const m of meds) {
+            const name = m.medication_name;
+            if (!seen.has(name)) {
+                seen.add(name);
+                medDosageMap[name] = m.dosage;
+            }
+        }
+        datalist.innerHTML = [...seen].map(n => `<option value="${escapeAttr(n)}">`).join('');
+    } catch (e) {
+        console.error('Failed to load medication suggestions:', e);
+    }
+}
+
+function initMedAutoFill() {
+    const nameInput = document.getElementById('med-name');
+    const dosageInput = document.getElementById('med-dosage');
+    nameInput.addEventListener('input', () => {
+        const match = medDosageMap[nameInput.value];
+        if (match && !dosageInput.value) {
+            dosageInput.value = match;
+        }
+    });
+    // Also handle picking from datalist (fires 'change')
+    nameInput.addEventListener('change', () => {
+        const match = medDosageMap[nameInput.value];
+        if (match) {
+            dosageInput.value = match;
+        }
+    });
+}
+
+async function loadNoteSuggestions(endpoint, containerId, textareaId) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    try {
+        const entries = await api.get(`${endpoint}?limit=30`);
+        const uniqueNotes = [];
+        const seen = new Set();
+        for (const e of entries) {
+            if (e.notes && !seen.has(e.notes)) {
+                seen.add(e.notes);
+                uniqueNotes.push(e.notes);
+                if (uniqueNotes.length >= 5) break;
+            }
+        }
+        if (uniqueNotes.length === 0) return;
+        container.innerHTML = uniqueNotes.map(n =>
+            `<span class="note-chip" title="${escapeAttr(n)}">${escapeHtml(n)}</span>`
+        ).join('');
+        container.querySelectorAll('.note-chip').forEach((chip, i) => {
+            chip.addEventListener('click', () => {
+                document.getElementById(textareaId).value = uniqueNotes[i];
+            });
+        });
+    } catch (e) {
+        console.error('Failed to load note suggestions:', e);
+    }
 }
 
 /* ===== Form Submissions ===== */
@@ -623,6 +698,7 @@ async function openEditModal(type, id) {
         document.getElementById('edit-form-fields').innerHTML = buildEditFields(type, data);
         document.getElementById('edit-form').dataset.editType = type;
         document.getElementById('edit-form').dataset.editId = id;
+        document.getElementById('edit-form').dataset.originalTimestamp = toLocalDatetime(data.timestamp);
         initEditOptionButtons();
         openModal('edit-modal');
     } catch (err) {
@@ -663,14 +739,12 @@ function buildDiaperEditFields(data) {
 
 function buildFeedingEditFields(data) {
     const isBottle = data.feeding_type === 'bottle';
-    const showBoth = data.feeding_type === 'breast_both';
     return `
         <div class="form-group">
             <label>Type</label>
             <div class="btn-group">
                 <button type="button" class="btn btn-option ${data.feeding_type === 'breast_left' ? 'selected' : ''}" data-value="breast_left" data-field="edit-feeding-type">🤱 Left</button>
                 <button type="button" class="btn btn-option ${data.feeding_type === 'breast_right' ? 'selected' : ''}" data-value="breast_right" data-field="edit-feeding-type">🤱 Right</button>
-                ${showBoth ? '<button type="button" class="btn btn-option selected" data-value="breast_both" data-field="edit-feeding-type">🤱 Both</button>' : ''}
                 <button type="button" class="btn btn-option ${isBottle ? 'selected' : ''}" data-value="bottle" data-field="edit-feeding-type">🍼 Bottle</button>
             </div>
             <input type="hidden" id="edit-feeding-type" value="${data.feeding_type}">
@@ -754,7 +828,10 @@ function buildEditBody(type) {
     const notes = document.getElementById('edit-notes').value;
 
     const body = {};
-    if (timestamp) body.timestamp = new Date(timestamp).toISOString();
+    const originalTimestamp = document.getElementById('edit-form').dataset.originalTimestamp;
+    if (timestamp && timestamp !== originalTimestamp) {
+        body.timestamp = new Date(timestamp).toISOString();
+    }
     body.notes = notes;
 
     switch (type) {
@@ -954,6 +1031,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTimer();
     initFeedingForm();
     initForms();
+    initMedAutoFill();
     initEditForm();
     loadDashboard();
 

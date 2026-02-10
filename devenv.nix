@@ -17,7 +17,7 @@ in
   # Language support
   languages.python = {
     enable = true;
-    package = pkgs.python312;
+    package = pkgs.python313;
     uv.enable = true;
   };
 

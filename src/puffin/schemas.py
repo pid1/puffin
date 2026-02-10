@@ -15,7 +15,6 @@ class DiaperType(StrEnum):
 class FeedingType(StrEnum):
     breast_left = "breast_left"
     breast_right = "breast_right"
-    breast_both = "breast_both"
     bottle = "bottle"
 
 

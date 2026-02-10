@@ -423,6 +423,7 @@ body {
 
 .form-group input[type="text"],
 .form-group input[type="number"],
+.form-group input[type="datetime-local"],
 .form-group textarea,
 .form-group select {
     width: 100%;
@@ -436,6 +437,38 @@ body {
 }
 
 .form-group textarea { resize: vertical; }
+
+/* Note suggestion chips */
+.note-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.note-suggestions:empty { display: none; }
+
+.note-chip {
+    display: inline-block;
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.note-chip:hover {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+}
 
 .input-group {
     display: flex;

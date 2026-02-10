@@ -84,6 +84,7 @@
                 </div>
                 <div class="form-group">
                     <label for="diaper-notes">Notes (optional)</label>
+                    <div class="note-suggestions" id="diaper-note-suggestions"></div>
                     <textarea name="notes" id="diaper-notes" rows="2"></textarea>
                 </div>
                 <div class="form-actions">
@@ -142,6 +143,7 @@
 
                 <div class="form-group">
                     <label for="feeding-notes">Notes (optional)</label>
+                    <div class="note-suggestions" id="feeding-note-suggestions"></div>
                     <textarea name="notes" id="feeding-notes" rows="2"></textarea>
                 </div>
                 <div class="form-actions">
@@ -165,7 +167,8 @@
                 <form id="medication-form">
                     <div class="form-group">
                         <label for="med-name">Medication Name</label>
-                        <input type="text" name="medication_name" id="med-name" required>
+                        <input type="text" name="medication_name" id="med-name" list="med-name-suggestions" autocomplete="off" required>
+                        <datalist id="med-name-suggestions"></datalist>
                     </div>
                     <div class="form-group">
                         <label for="med-dosage">Dosage</label>
@@ -173,6 +176,7 @@
                     </div>
                     <div class="form-group">
                         <label for="med-notes">Notes (optional)</label>
+                        <div class="note-suggestions" id="med-note-suggestions"></div>
                         <textarea name="notes" id="med-notes" rows="2"></textarea>
                     </div>
                     <div class="form-actions">
@@ -205,6 +209,7 @@
                     </div>
                     <div class="form-group">
                         <label for="temp-notes">Notes (optional)</label>
+                        <div class="note-suggestions" id="temp-note-suggestions"></div>
                         <textarea name="notes" id="temp-notes" rows="2"></textarea>
                     </div>
                     <div class="form-actions">

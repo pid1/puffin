@@ -6,14 +6,14 @@ Simulates a baby born 14 days ago with:
 - 10-12 diaper changes per day
 - Daily vitamin D drops
 - Temperature checks in the first few days
-- Occasional Tylenol for circumcision recovery (days 1-3)
+- Occasional Tylenol for pain relief (days 1-3)
 
 Usage:
     python -m puffin.seed
 """
 
 import random
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from puffin.database import SessionLocal, init_db
 from puffin.models import DiaperChange, Feeding, Medication, TemperatureReading
@@ -21,7 +21,6 @@ from puffin.models import DiaperChange, Feeding, Medication, TemperatureReading
 # Seed for reproducibility
 random.seed(42)
 
-BIRTH_DATE = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=14)
 
 DIAPER_TYPES = ["pee", "poop", "both"]
 DIAPER_WEIGHTS = [0.45, 0.25, 0.30]  # pee most common
@@ -54,7 +53,7 @@ def _jitter(minutes: int) -> timedelta:
     return timedelta(minutes=random.randint(-minutes, minutes))
 
 
-def generate_feedings(day_offset: int, base_date: datetime) -> list[Feeding]:
+def generate_feedings(day_offset: int, base_date: datetime, now: datetime) -> list[Feeding]:
     """Generate feedings for a single day.
 
     Breast sessions may produce paired left/right entries to simulate the
@@ -69,7 +68,6 @@ def generate_feedings(day_offset: int, base_date: datetime) -> list[Feeding]:
     interval = timedelta(hours=24 / feeds_per_day)
 
     current_time = day_start + _jitter(30)
-    now = datetime.now()
     for _i in range(feeds_per_day):
         if current_time > now:
             break
@@ -110,15 +108,16 @@ def generate_feedings(day_offset: int, base_date: datetime) -> list[Feeding]:
                 )
 
                 second_time = current_time + timedelta(minutes=first_dur)
-                feedings.append(
-                    Feeding(
-                        timestamp=second_time,
-                        feeding_type=second_side,
-                        duration_minutes=second_dur,
-                        notes=None,
-                        created_at=second_time,
+                if second_time <= now:
+                    feedings.append(
+                        Feeding(
+                            timestamp=second_time,
+                            feeding_type=second_side,
+                            duration_minutes=second_dur,
+                            notes=None,
+                            created_at=second_time,
+                        )
                     )
-                )
             else:
                 # Single-breast session
                 side = random.choice(["breast_left", "breast_right"])
@@ -138,7 +137,7 @@ def generate_feedings(day_offset: int, base_date: datetime) -> list[Feeding]:
     return feedings
 
 
-def generate_diapers(day_offset: int, base_date: datetime) -> list[DiaperChange]:
+def generate_diapers(day_offset: int, base_date: datetime, now: datetime) -> list[DiaperChange]:
     """Generate diaper changes for a single day."""
     diapers = []
     day_start = base_date + timedelta(days=day_offset)
@@ -147,7 +146,6 @@ def generate_diapers(day_offset: int, base_date: datetime) -> list[DiaperChange]
     count = random.randint(10, 12) if day_offset < 7 else random.randint(8, 10)
     interval = timedelta(hours=24 / count)
 
-    now = datetime.now()
     current_time = day_start + timedelta(minutes=random.randint(0, 60))
     for _ in range(count):
         if current_time > now:
@@ -166,12 +164,10 @@ def generate_diapers(day_offset: int, base_date: datetime) -> list[DiaperChange]
     return diapers
 
 
-def generate_medications(day_offset: int, base_date: datetime) -> list[Medication]:
+def generate_medications(day_offset: int, base_date: datetime, now: datetime) -> list[Medication]:
     """Generate medication records for a single day."""
     meds = []
     day_start = base_date + timedelta(days=day_offset)
-
-    now = datetime.now()
 
     # Daily vitamin D drops (every day from day 1)
     if day_offset >= 1:
@@ -189,7 +185,7 @@ def generate_medications(day_offset: int, base_date: datetime) -> list[Medicatio
                 )
             )
 
-    # Tylenol for days 1-3 (circumcision recovery) — 2-3 doses per day
+    # Tylenol for days 1-3 (pain relief) — 2-3 doses per day
     if 1 <= day_offset <= 3:
         doses = random.randint(2, 3)
         for i in range(doses):
@@ -201,7 +197,7 @@ def generate_medications(day_offset: int, base_date: datetime) -> list[Medicatio
                     timestamp=t,
                     medication_name="Infant Tylenol",
                     dosage="1.25 ml",
-                    notes="Circumcision pain" if i == 0 else None,
+                    notes="Pain relief" if i == 0 else None,
                     created_at=t,
                 )
             )
@@ -209,12 +205,12 @@ def generate_medications(day_offset: int, base_date: datetime) -> list[Medicatio
     return meds
 
 
-def generate_temperatures(day_offset: int, base_date: datetime) -> list[TemperatureReading]:
+def generate_temperatures(
+    day_offset: int, base_date: datetime, now: datetime
+) -> list[TemperatureReading]:
     """Generate temperature readings for a single day."""
     temps = []
     day_start = base_date + timedelta(days=day_offset)
-
-    now = datetime.now()
 
     # Check temp more often in first 3 days, then occasionally
     if day_offset <= 2:
@@ -251,6 +247,9 @@ def seed():
     init_db()
     db = SessionLocal()
 
+    now = datetime.now(UTC)
+    birth_date = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=14)
+
     try:
         # Check if data already exists
         existing = db.query(Feeding).count()
@@ -262,10 +261,10 @@ def seed():
         total = {"feedings": 0, "diapers": 0, "medications": 0, "temperatures": 0}
 
         for day in range(15):  # 0 = birth day, 14 = today
-            feedings = generate_feedings(day, BIRTH_DATE)
-            diapers = generate_diapers(day, BIRTH_DATE)
-            medications = generate_medications(day, BIRTH_DATE)
-            temperatures = generate_temperatures(day, BIRTH_DATE)
+            feedings = generate_feedings(day, birth_date, now)
+            diapers = generate_diapers(day, birth_date, now)
+            medications = generate_medications(day, birth_date, now)
+            temperatures = generate_temperatures(day, birth_date, now)
 
             db.add_all(feedings)
             db.add_all(diapers)
@@ -284,8 +283,8 @@ def seed():
         print(f"  Diapers:      {total['diapers']}")
         print(f"  Medications:  {total['medications']}")
         print(f"  Temperatures: {total['temperatures']}")
-        print(f"\nBirth date: {BIRTH_DATE.strftime('%Y-%m-%d %H:%M')}")
-        print(f"Today:      {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        print(f"\nBirth date: {birth_date.strftime('%Y-%m-%d %H:%M')}")
+        print(f"Today:      {now.strftime('%Y-%m-%d %H:%M')}")
 
     finally:
         db.close()

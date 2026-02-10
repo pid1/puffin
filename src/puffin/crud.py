@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -9,7 +9,7 @@ from puffin.models import DiaperChange, Feeding, Medication, TemperatureReading
 
 
 def _period_count(db: Session, model, timestamp_col, period: str) -> int:
-    now = datetime.now()
+    now = datetime.now(UTC)
     if period == "today":
         start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     elif period == "week":
@@ -28,7 +28,7 @@ def _period_count(db: Session, model, timestamp_col, period: str) -> int:
 def create_diaper(
     db: Session, timestamp: datetime | None, type_: str, notes: str | None
 ) -> DiaperChange:
-    obj = DiaperChange(timestamp=timestamp or datetime.now(), type=type_, notes=notes)
+    obj = DiaperChange(timestamp=timestamp or datetime.now(UTC), type=type_, notes=notes)
     db.add(obj)
     db.commit()
     db.refresh(obj)
@@ -96,7 +96,7 @@ def create_feeding(
     notes: str | None,
 ) -> Feeding:
     obj = Feeding(
-        timestamp=timestamp or datetime.now(),
+        timestamp=timestamp or datetime.now(UTC),
         feeding_type=feeding_type,
         duration_minutes=duration_minutes,
         amount_oz=amount_oz,
@@ -168,7 +168,7 @@ def create_medication(
     notes: str | None,
 ) -> Medication:
     obj = Medication(
-        timestamp=timestamp or datetime.now(),
+        timestamp=timestamp or datetime.now(UTC),
         medication_name=medication_name,
         dosage=dosage,
         notes=notes,
@@ -239,7 +239,7 @@ def create_temperature(
     notes: str | None,
 ) -> TemperatureReading:
     obj = TemperatureReading(
-        timestamp=timestamp or datetime.now(),
+        timestamp=timestamp or datetime.now(UTC),
         temperature_celsius=temperature_celsius,
         location=location,
         notes=notes,
@@ -295,7 +295,7 @@ def delete_temperature(db: Session, temp_id: int) -> bool:
 
 
 def get_dashboard(db: Session) -> dict:
-    now = datetime.now()
+    now = datetime.now(UTC)
 
     # Stats
     d_stats = diaper_stats(db)
@@ -321,13 +321,11 @@ def get_dashboard(db: Session) -> dict:
     feeding_labels = {
         "breast_left": "Left Breast",
         "breast_right": "Right Breast",
-        "breast_both": "Both Breasts",
         "bottle": "Bottle",
     }
     feeding_emojis = {
         "breast_left": "\U0001f931",
         "breast_right": "\U0001f931",
-        "breast_both": "\U0001f931",
         "bottle": "\U0001f37c",
     }
 
