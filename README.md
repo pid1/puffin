@@ -62,8 +62,8 @@ See `AGENTS.md` for the complete command reference including background/agent-fr
 
 ## Tech Stack
 
-- **Backend**: Python 3.12 / FastAPI / SQLAlchemy / SQLite
-- **Frontend**: Vanilla HTML/CSS/JS (no build step)
+- **Backend**: Python 3.13 / FastAPI / SQLAlchemy / SQLite
+- **Frontend**: Vanilla HTML/CSS/JS
 - **Dev Environment**: Nix + devenv
 - **Package Manager**: uv
 - **Linter/Formatter**: ruff
