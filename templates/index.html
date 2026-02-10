@@ -59,7 +59,10 @@
         <section class="timeline-section">
             <div class="timeline-header">
                 <h2>Recent Activity</h2>
-                <a href="/api/export?format=csv" class="btn btn-sm btn-secondary">Export CSV</a>
+                <div class="export-buttons">
+                    <a href="/api/export?format=csv" class="btn btn-sm btn-secondary">Export CSV</a>
+                    <a href="/api/export?format=json" class="btn btn-sm btn-secondary">Export JSON</a>
+                </div>
             </div>
             <div id="timeline" class="timeline">
                 <p class="empty-state">No activities yet today.</p>

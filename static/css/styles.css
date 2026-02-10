@@ -282,6 +282,11 @@ body {
 
 .timeline-header h2 { font-size: 1.2rem; }
 
+.export-buttons {
+    display: flex;
+    gap: 8px;
+}
+
 .timeline {
     display: flex;
     flex-direction: column;
