@@ -27,5 +27,6 @@ def get_db():
 
 
 def init_db():
-    """Create all tables."""
+    """Create all tables, disposing stale connections first."""
+    engine.dispose()
     Base.metadata.create_all(bind=engine)

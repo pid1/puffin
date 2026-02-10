@@ -1,7 +1,7 @@
 /* ===== API Client ===== */
 const api = {
     async request(method, url, body = null) {
-        const opts = { method, headers: { 'Content-Type': 'application/json' } };
+        const opts = { method, cache: 'no-store', headers: { 'Content-Type': 'application/json' } };
         if (body) opts.body = JSON.stringify(body);
         const res = await fetch(url, opts);
         if (!res.ok && res.status !== 204) {
