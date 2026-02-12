@@ -24,6 +24,28 @@ Self-hosted, no accounts, no cloud — just a single SQLite database.
 - **Mobile-First** — Large touch targets, one-handed operation
 - **API Docs** — Interactive OpenAPI docs at `/docs`
 
+## Docker
+
+Puffin is published as a container image on GitHub Container Registry.
+
+```bash
+docker run -d \
+  --name puffin \
+  -p 8000:8000 \
+  -v puffin-data:/data \
+  ghcr.io/pid1/puffin:latest
+```
+
+Then open [http://localhost:8000](http://localhost:8000).
+
+### Volumes
+
+- `/data` — SQLite database (`puffin.db`). **Mount this to persist data across container restarts.**
+
+### Environment Variables
+
+- `PUFFIN_DB_PATH` — Path to the SQLite database file (default: `/data/puffin.db`). Normally you don't need to change this.
+
 ## Development
 
 ### Prerequisites
