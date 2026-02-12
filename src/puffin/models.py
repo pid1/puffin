@@ -2,10 +2,28 @@ from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, Float, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.types import TypeDecorator
 
 from puffin.database import Base
 
-_TZ_DATETIME = DateTime(timezone=True)
+
+class _UTCDateTime(TypeDecorator):
+    """A DateTime that guarantees UTC tzinfo after SQLite round-trips.
+
+    SQLite stores datetimes as naive strings, so timezone info is lost on read.
+    This decorator re-attaches UTC on every load.
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_result_value(self, value: datetime | None, dialect) -> datetime | None:
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value
+
+
+_TZ_DATETIME = _UTCDateTime()
 
 
 def _utcnow() -> datetime:
