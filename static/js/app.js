@@ -932,6 +932,106 @@ function initEditForm() {
     });
 }
 
+/* ===== Calendar Day View ===== */
+let currentDate = new Date();
+
+function toDateString(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function isSameDay(a, b) {
+    return a.getFullYear() === b.getFullYear() &&
+        a.getMonth() === b.getMonth() &&
+        a.getDate() === b.getDate();
+}
+
+function formatDateLabel(d) {
+    const now = new Date();
+    if (isSameDay(d, now)) return 'Today';
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    if (isSameDay(d, yesterday)) return 'Yesterday';
+    return d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+}
+
+function updateCalendarUI() {
+    const isToday = isSameDay(currentDate, new Date());
+    document.getElementById('cal-date-label').textContent = formatDateLabel(currentDate);
+    document.getElementById('cal-next').disabled = isToday;
+    const pill = document.getElementById('cal-today-pill');
+    pill.classList.toggle('hidden', isToday);
+}
+
+function prevDay() {
+    currentDate.setDate(currentDate.getDate() - 1);
+    updateCalendarUI();
+    loadDayActivities();
+}
+
+function nextDay() {
+    if (isSameDay(currentDate, new Date())) return;
+    currentDate.setDate(currentDate.getDate() + 1);
+    updateCalendarUI();
+    loadDayActivities();
+}
+
+function goToToday() {
+    currentDate = new Date();
+    updateCalendarUI();
+    loadDayActivities();
+}
+
+function initCalendar() {
+    document.getElementById('cal-prev').addEventListener('click', prevDay);
+    document.getElementById('cal-next').addEventListener('click', nextDay);
+    document.getElementById('cal-today-pill').addEventListener('click', goToToday);
+
+    // Date picker — hidden <input type="date"> triggered by tapping the date label
+    const picker = document.getElementById('cal-date-picker');
+    document.getElementById('cal-date-btn').addEventListener('click', () => {
+        picker.value = toDateString(currentDate);
+        picker.showPicker();
+    });
+    picker.addEventListener('change', () => {
+        if (!picker.value) return;
+        // Parse as local date
+        const [y, m, d] = picker.value.split('-').map(Number);
+        currentDate = new Date(y, m - 1, d);
+        updateCalendarUI();
+        loadDayActivities();
+    });
+
+    updateCalendarUI();
+}
+
+async function loadDayActivities() {
+    const timeline = document.getElementById('timeline');
+    try {
+        const dayStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+        const dayEnd = new Date(dayStart.getTime() + 86400000);
+        const activities = await api.get(`/api/activities?start=${dayStart.toISOString()}&end=${dayEnd.toISOString()}`);
+        if (activities.length === 0) {
+            timeline.innerHTML = '<p class="empty-state">No entries for this day.</p>';
+            return;
+        }
+        timeline.innerHTML = activities.map(a => `
+            <div class="timeline-item" onclick="openEditModal('${a.type}', ${a.id})">
+                <span class="timeline-emoji">${a.emoji || ''}</span>
+                <span class="timeline-label">${escapeHtml(a.label || a.summary)}</span>
+                ${a.detail ? `<span class="timeline-detail">${escapeHtml(a.detail)}</span>` : ''}
+                <span class="timeline-time">${formatTime(a.timestamp)}</span>
+                ${a.notes ? `<div class="timeline-notes">${escapeHtml(a.notes)}</div>` : ''}
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('Failed to load day activities:', err);
+        timeline.innerHTML = '<p class="empty-state">Failed to load activities.</p>';
+    }
+}
+
 /* ===== Dashboard Loading ===== */
 function formatTime(isoStr) {
     if (!isoStr) return '—';
@@ -967,45 +1067,8 @@ async function loadDashboard() {
         document.getElementById('last-temp').textContent =
             data.last_temperature ? `${data.last_temperature.temperature_celsius}°C` : 'No readings';
 
-        // Timeline — grouped by date
-        const timeline = document.getElementById('timeline');
-        if (data.recent_activities.length === 0) {
-            timeline.innerHTML = '<p class="empty-state">No activities yet today.</p>';
-            return;
-        }
-
-        // Group by date
-        const groups = {};
-        for (const a of data.recent_activities) {
-            const dateKey = new Date(a.timestamp).toLocaleDateString();
-            if (!groups[dateKey]) groups[dateKey] = [];
-            groups[dateKey].push(a);
-        }
-
-        const today = new Date().toLocaleDateString();
-        const yesterday = new Date(Date.now() - 86400000).toLocaleDateString();
-
-        let html = '';
-        for (const [dateKey, items] of Object.entries(groups)) {
-            let label;
-            if (dateKey === today) label = 'Today';
-            else if (dateKey === yesterday) label = 'Yesterday';
-            else {
-                const d = new Date(items[0].timestamp);
-                label = d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
-            }
-            html += `<div class="timeline-date">${escapeHtml(label)}</div>`;
-            html += items.map(a => `
-                <div class="timeline-item" onclick="openEditModal('${a.type}', ${a.id})">
-                    <span class="timeline-emoji">${a.emoji || ''}</span>
-                    <span class="timeline-label">${escapeHtml(a.label || a.summary)}</span>
-                    ${a.detail ? `<span class="timeline-detail">${escapeHtml(a.detail)}</span>` : ''}
-                    <span class="timeline-time">${formatTime(a.timestamp)}</span>
-                    ${a.notes ? `<div class="timeline-notes">${escapeHtml(a.notes)}</div>` : ''}
-                </div>
-            `).join('');
-        }
-        timeline.innerHTML = html;
+        // Refresh the calendar day view
+        loadDayActivities();
     } catch (err) {
         console.error('Failed to load dashboard:', err);
     }
@@ -1033,6 +1096,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initForms();
     initMedAutoFill();
     initEditForm();
+    initCalendar();
     loadDashboard();
 
     // Theme toggle

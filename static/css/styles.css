@@ -270,22 +270,60 @@ body {
     flex-wrap: wrap;
 }
 
-/* ===== Timeline ===== */
-.timeline-section { margin-bottom: 24px; }
+/* ===== Calendar Day View ===== */
+.calendar-section { margin-bottom: 24px; }
 
-.timeline-header {
+.calendar-nav {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    justify-content: center;
+    gap: 4px;
+    margin-bottom: 8px;
+    position: relative;
 }
 
-.timeline-header h2 { font-size: 1.2rem; }
+.calendar-arrow {
+    font-size: 1.6rem;
+    font-weight: 300;
+    padding: 8px 12px;
+    color: var(--primary);
+}
+
+.calendar-arrow:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.calendar-date {
+    background: none;
+    border: none;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    transition: background 0.15s ease;
+}
+
+.calendar-date:hover {
+    background: var(--bg-secondary);
+}
+
+#cal-today-pill {
+    display: block;
+    margin: 0 auto 12px;
+}
 
 .export-buttons {
     display: flex;
+    justify-content: center;
     gap: 8px;
+    margin-top: 16px;
 }
+
+/* ===== Timeline ===== */
 
 .timeline {
     display: flex;

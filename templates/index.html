@@ -55,17 +55,23 @@
             </div>
         </section>
 
-        <!-- Recent Activity Timeline -->
-        <section class="timeline-section">
-            <div class="timeline-header">
-                <h2>Recent Activity</h2>
-                <div class="export-buttons">
-                    <a href="/api/export?format=csv" class="btn btn-sm btn-secondary">Export CSV</a>
-                    <a href="/api/export?format=json" class="btn btn-sm btn-secondary">Export JSON</a>
-                </div>
+        <!-- Calendar Day View -->
+        <section class="calendar-section">
+            <div class="calendar-nav">
+                <button id="cal-prev" class="btn btn-icon calendar-arrow" aria-label="Previous day">&lsaquo;</button>
+                <button id="cal-date-btn" class="calendar-date" aria-label="Pick a date">
+                    <span id="cal-date-label">Today</span>
+                </button>
+                <button id="cal-next" class="btn btn-icon calendar-arrow" aria-label="Next day">&rsaquo;</button>
+                <input type="date" id="cal-date-picker" class="hidden">
             </div>
+<button id="cal-today-pill" class="btn btn-sm btn-secondary hidden">Jump back to today</button>
             <div id="timeline" class="timeline">
-                <p class="empty-state">No activities yet today.</p>
+                <p class="empty-state">No entries for this day.</p>
+            </div>
+            <div class="export-buttons">
+                <a href="/api/export?format=csv" class="btn btn-sm btn-secondary">Export CSV</a>
+                <a href="/api/export?format=json" class="btn btn-sm btn-secondary">Export JSON</a>
             </div>
         </section>
     </main>

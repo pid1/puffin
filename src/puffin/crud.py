@@ -291,6 +291,99 @@ def delete_temperature(db: Session, temp_id: int) -> bool:
     return True
 
 
+# --- Activities ---
+
+_DIAPER_LABELS = {"pee": "Pee", "poop": "Poop", "both": "Pee + Poop"}
+_DIAPER_EMOJIS = {"pee": "\U0001f4a7", "poop": "\U0001f4a9", "both": "\U0001f4a7\U0001f4a9"}
+_FEEDING_LABELS = {
+    "breast_left": "Left Breast",
+    "breast_right": "Right Breast",
+    "bottle": "Bottle",
+}
+_FEEDING_EMOJIS = {
+    "breast_left": "\U0001f931",
+    "breast_right": "\U0001f931",
+    "bottle": "\U0001f37c",
+}
+
+
+def get_activities(
+    db: Session,
+    start: datetime,
+    end: datetime,
+    limit: int = 200,
+) -> list[dict]:
+    """Return a merged, sorted list of all activity types in a time range."""
+    activities: list[dict] = []
+
+    for d in get_diapers(db, start_date=start, end_date=end, limit=limit):
+        activities.append(
+            {
+                "type": "diaper",
+                "subtype": d.type,
+                "timestamp": d.timestamp.isoformat(),
+                "id": d.id,
+                "emoji": _DIAPER_EMOJIS.get(d.type, "\U0001f9f7"),
+                "label": _DIAPER_LABELS.get(d.type, d.type),
+                "detail": "",
+                "summary": f"Diaper: {d.type}",
+                "notes": d.notes,
+            }
+        )
+    for f in get_feedings(db, start_date=start, end_date=end, limit=limit):
+        if f.amount_oz:
+            detail = f"{f.amount_oz} oz"
+        elif f.duration_minutes:
+            detail = f"{f.duration_minutes} min"
+        else:
+            detail = ""
+        activities.append(
+            {
+                "type": "feeding",
+                "subtype": f.feeding_type,
+                "timestamp": f.timestamp.isoformat(),
+                "id": f.id,
+                "emoji": _FEEDING_EMOJIS.get(f.feeding_type, "\U0001f37c"),
+                "label": _FEEDING_LABELS.get(f.feeding_type, f.feeding_type),
+                "detail": detail,
+                "summary": f"Feeding: {f.feeding_type}",
+                "notes": f.notes,
+            }
+        )
+    for m in get_medications(db, start_date=start, end_date=end, limit=limit):
+        activities.append(
+            {
+                "type": "medication",
+                "subtype": "medication",
+                "timestamp": m.timestamp.isoformat(),
+                "id": m.id,
+                "emoji": "\U0001f48a",
+                "label": m.medication_name,
+                "detail": m.dosage,
+                "summary": f"Med: {m.medication_name}",
+                "notes": m.notes,
+            }
+        )
+    for t in get_temperatures(db, start_date=start, end_date=end, limit=limit):
+        temp_f = round(t.temperature_celsius * 9 / 5 + 32, 1)
+        activities.append(
+            {
+                "type": "temperature",
+                "subtype": "temperature",
+                "timestamp": t.timestamp.isoformat(),
+                "id": t.id,
+                "emoji": "\U0001f321\ufe0f",
+                "label": "Temperature",
+                "detail": f"{temp_f}\u00b0F",
+                "summary": f"Temp: {temp_f}\u00b0F",
+                "notes": t.notes,
+            }
+        )
+
+    activities.sort(key=lambda a: a["timestamp"], reverse=True)
+    return activities
+
+
 # --- Dashboard ---
 
 
@@ -313,87 +406,9 @@ def get_dashboard(db: Session) -> dict:
         select(TemperatureReading).order_by(TemperatureReading.timestamp.desc()).limit(1)
     ).scalar_one_or_none()
 
-    # Recent activities (last 3 days, excluding future) — union all types
+    # Recent activities (last 3 days, excluding future)
     three_days_ago = now - timedelta(days=3)
-    activities = []
-    diaper_labels = {"pee": "Pee", "poop": "Poop", "both": "Pee + Poop"}
-    diaper_emojis = {"pee": "\U0001f4a7", "poop": "\U0001f4a9", "both": "\U0001f4a7\U0001f4a9"}
-    feeding_labels = {
-        "breast_left": "Left Breast",
-        "breast_right": "Right Breast",
-        "bottle": "Bottle",
-    }
-    feeding_emojis = {
-        "breast_left": "\U0001f931",
-        "breast_right": "\U0001f931",
-        "bottle": "\U0001f37c",
-    }
-
-    for d in get_diapers(db, start_date=three_days_ago, end_date=now, limit=200):
-        activities.append(
-            {
-                "type": "diaper",
-                "subtype": d.type,
-                "timestamp": d.timestamp.isoformat(),
-                "id": d.id,
-                "emoji": diaper_emojis.get(d.type, "\U0001f9f7"),
-                "label": diaper_labels.get(d.type, d.type),
-                "detail": "",
-                "summary": f"Diaper: {d.type}",
-                "notes": d.notes,
-            }
-        )
-    for f in get_feedings(db, start_date=three_days_ago, end_date=now, limit=200):
-        if f.amount_oz:
-            detail = f"{f.amount_oz} oz"
-        elif f.duration_minutes:
-            detail = f"{f.duration_minutes} min"
-        else:
-            detail = ""
-        activities.append(
-            {
-                "type": "feeding",
-                "subtype": f.feeding_type,
-                "timestamp": f.timestamp.isoformat(),
-                "id": f.id,
-                "emoji": feeding_emojis.get(f.feeding_type, "\U0001f37c"),
-                "label": feeding_labels.get(f.feeding_type, f.feeding_type),
-                "detail": detail,
-                "summary": f"Feeding: {f.feeding_type}",
-                "notes": f.notes,
-            }
-        )
-    for m in get_medications(db, start_date=three_days_ago, end_date=now, limit=200):
-        activities.append(
-            {
-                "type": "medication",
-                "subtype": "medication",
-                "timestamp": m.timestamp.isoformat(),
-                "id": m.id,
-                "emoji": "\U0001f48a",
-                "label": m.medication_name,
-                "detail": m.dosage,
-                "summary": f"Med: {m.medication_name}",
-                "notes": m.notes,
-            }
-        )
-    for t in get_temperatures(db, start_date=three_days_ago, end_date=now, limit=200):
-        temp_f = round(t.temperature_celsius * 9 / 5 + 32, 1)
-        activities.append(
-            {
-                "type": "temperature",
-                "subtype": "temperature",
-                "timestamp": t.timestamp.isoformat(),
-                "id": t.id,
-                "emoji": "\U0001f321\ufe0f",
-                "label": "Temperature",
-                "detail": f"{temp_f}\u00b0F",
-                "summary": f"Temp: {temp_f}\u00b0F",
-                "notes": t.notes,
-            }
-        )
-
-    activities.sort(key=lambda a: a["timestamp"], reverse=True)
+    activities = get_activities(db, start=three_days_ago, end=now)
 
     return {
         "diaper_stats": d_stats,
