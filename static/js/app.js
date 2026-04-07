@@ -537,8 +537,10 @@ function initForms() {
         const type = document.getElementById('diaper-type').value;
         if (!type) { showToast('Please select a diaper type'); return; }
         const notes = document.getElementById('diaper-notes').value || undefined;
+        const timestampInput = document.getElementById('diaper-timestamp').value;
+        const timestamp = timestampInput ? new Date(timestampInput).toISOString() : undefined;
         try {
-            await api.post('/api/diapers', { type, notes });
+            await api.post('/api/diapers', { type, notes, timestamp });
             closeModal('diaper-modal');
             showToast('Diaper change logged!');
             loadDashboard();
@@ -552,6 +554,8 @@ function initForms() {
         e.preventDefault();
         const useTimer = document.getElementById('start-timer').checked;
         const notes = document.getElementById('feeding-notes').value || undefined;
+        const timestampInput = document.getElementById('feeding-timestamp').value;
+        const timestamp = timestampInput ? new Date(timestampInput).toISOString() : undefined;
 
         if (useTimer) {
             // Timer mode — bottle becomes a quick log (no timer), breast starts timer
@@ -566,6 +570,7 @@ function initForms() {
                         feeding_type: 'bottle',
                         amount_oz: parseFloat(oz),
                         notes,
+                        timestamp,
                     });
                     closeModal('feeding-modal');
                     showToast('Feeding logged!');
@@ -601,6 +606,7 @@ function initForms() {
                     feeding_type: 'breast_left',
                     duration_minutes: parseInt(leftDur),
                     notes: notesAttached ? undefined : notes,
+                    timestamp,
                 }));
                 notesAttached = true;
             }
@@ -609,6 +615,7 @@ function initForms() {
                     feeding_type: 'breast_right',
                     duration_minutes: parseInt(rightDur),
                     notes: notesAttached ? undefined : notes,
+                    timestamp,
                 }));
                 notesAttached = true;
             }
@@ -617,6 +624,7 @@ function initForms() {
                     feeding_type: 'bottle',
                     amount_oz: parseFloat(bottleOz),
                     notes: notesAttached ? undefined : notes,
+                    timestamp,
                 }));
             }
             await Promise.all(promises);
@@ -634,8 +642,10 @@ function initForms() {
         const name = document.getElementById('med-name').value;
         const dosage = document.getElementById('med-dosage').value;
         const notes = document.getElementById('med-notes').value || undefined;
+        const timestampInput = document.getElementById('med-timestamp').value;
+        const timestamp = timestampInput ? new Date(timestampInput).toISOString() : undefined;
         try {
-            await api.post('/api/medications', { medication_name: name, dosage, notes });
+            await api.post('/api/medications', { medication_name: name, dosage, notes, timestamp });
             closeModal('health-modal');
             showToast('Medication logged!');
             loadDashboard();
@@ -651,6 +661,8 @@ function initForms() {
         const unit = document.getElementById('temp-unit').value;
         const location = document.getElementById('temp-location').value || undefined;
         const notes = document.getElementById('temp-notes').value || undefined;
+        const timestampInput = document.getElementById('temp-timestamp').value;
+        const timestamp = timestampInput ? new Date(timestampInput).toISOString() : undefined;
 
         // Convert F to C if needed
         if (unit === 'f') {
@@ -662,6 +674,7 @@ function initForms() {
                 temperature_celsius: Math.round(tempValue * 10) / 10,
                 location,
                 notes,
+                timestamp,
             });
             closeModal('health-modal');
             showToast('Temperature logged!');

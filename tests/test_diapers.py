@@ -12,6 +12,16 @@ def test_create_diaper_with_notes(client):
     assert resp.json()["notes"] == "Very full"
 
 
+def test_create_diaper_with_timestamp(client):
+    """Test creating a diaper with a custom timestamp for past events."""
+    custom_time = "2026-04-05T10:30:00Z"
+    resp = client.post("/api/diapers", json={"type": "pee", "timestamp": custom_time})
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["type"] == "pee"
+    assert data["timestamp"] == custom_time
+
+
 def test_create_diaper_invalid_type(client):
     resp = client.post("/api/diapers", json={"type": "invalid"})
     assert resp.status_code == 422
