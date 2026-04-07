@@ -1,4 +1,6 @@
+import os
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -8,10 +10,26 @@ from puffin.models import DiaperChange, Feeding, Medication, TemperatureReading
 # --- Generic helpers ---
 
 
+def _get_local_tz() -> ZoneInfo:
+    """Return the configured local timezone, defaulting to UTC.
+
+    Set the ``TZ`` environment variable to a valid IANA timezone name
+    (e.g. ``America/New_York``) so that "today" boundaries are computed
+    in the user's local time rather than UTC.
+    """
+    tz_name = os.environ.get("TZ", "UTC")
+    try:
+        return ZoneInfo(tz_name)
+    except (ZoneInfoNotFoundError, KeyError):
+        return ZoneInfo("UTC")
+
+
 def _period_count(db: Session, model, timestamp_col, period: str) -> int:
-    now = datetime.now(UTC)
+    local_tz = _get_local_tz()
+    now = datetime.now(local_tz)
     if period == "today":
-        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        local_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        start = local_midnight.astimezone(UTC)
     elif period == "week":
         start = now - timedelta(days=7)
     elif period == "month":
