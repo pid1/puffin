@@ -12,6 +12,23 @@ def test_create_medication(client):
     assert data["dosage"] == "2.5ml"
 
 
+def test_create_medication_with_timestamp(client):
+    """Test creating a medication with a custom timestamp for past events."""
+    custom_time = "2026-04-05T14:00:00Z"
+    resp = client.post(
+        "/api/medications",
+        json={
+            "medication_name": "Tylenol",
+            "dosage": "2.5ml",
+            "timestamp": custom_time,
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["medication_name"] == "Tylenol"
+    assert data["timestamp"] == custom_time
+
+
 def test_list_medications(client):
     client.post("/api/medications", json={"medication_name": "Tylenol", "dosage": "2.5ml"})
     resp = client.get("/api/medications")
@@ -57,6 +74,22 @@ def test_create_temperature(client):
     data = resp.json()
     assert data["temperature_celsius"] == 37.5
     assert data["location"] == "rectal"
+
+
+def test_create_temperature_with_timestamp(client):
+    """Test creating a temperature with a custom timestamp for past events."""
+    custom_time = "2026-04-05T09:00:00Z"
+    resp = client.post(
+        "/api/temperatures",
+        json={
+            "temperature_celsius": 37.5,
+            "timestamp": custom_time,
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["temperature_celsius"] == 37.5
+    assert data["timestamp"] == custom_time
 
 
 def test_list_temperatures(client):

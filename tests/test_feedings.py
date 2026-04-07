@@ -35,6 +35,19 @@ def test_create_bottle_feeding_with_oz(client):
     assert data["duration_minutes"] is None
 
 
+def test_create_feeding_with_timestamp(client):
+    """Test creating a feeding with a custom timestamp for past events."""
+    custom_time = "2026-04-05T08:00:00Z"
+    resp = client.post(
+        "/api/feedings",
+        json={"feeding_type": "bottle", "amount_oz": 4.0, "timestamp": custom_time},
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["feeding_type"] == "bottle"
+    assert data["timestamp"] == custom_time
+
+
 def test_create_feeding_invalid_type(client):
     resp = client.post("/api/feedings", json={"feeding_type": "invalid"})
     assert resp.status_code == 422

@@ -92,6 +92,10 @@
                     <input type="hidden" name="type" id="diaper-type" required>
                 </div>
                 <div class="form-group">
+                    <label for="diaper-timestamp">Time (optional)</label>
+                    <input type="datetime-local" id="diaper-timestamp">
+                </div>
+                <div class="form-group">
                     <label for="diaper-notes">Notes (optional)</label>
                     <div class="note-suggestions" id="diaper-note-suggestions"></div>
                     <textarea name="notes" id="diaper-notes" rows="2"></textarea>
@@ -151,6 +155,11 @@
                 </div>
 
                 <div class="form-group">
+                    <label for="feeding-timestamp">Time (optional)</label>
+                    <input type="datetime-local" id="feeding-timestamp">
+                </div>
+
+                <div class="form-group">
                     <label for="feeding-notes">Notes (optional)</label>
                     <div class="note-suggestions" id="feeding-note-suggestions"></div>
                     <textarea name="notes" id="feeding-notes" rows="2"></textarea>
@@ -184,6 +193,10 @@
                         <input type="text" name="dosage" id="med-dosage" required>
                     </div>
                     <div class="form-group">
+                        <label for="med-timestamp">Time (optional)</label>
+                        <input type="datetime-local" id="med-timestamp">
+                    </div>
+                    <div class="form-group">
                         <label for="med-notes">Notes (optional)</label>
                         <div class="note-suggestions" id="med-note-suggestions"></div>
                         <textarea name="notes" id="med-notes" rows="2"></textarea>
@@ -215,6 +228,10 @@
                             <option value="axillary">Underarm</option>
                             <option value="temporal">Forehead</option>
                         </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="temp-timestamp">Time (optional)</label>
+                        <input type="datetime-local" id="temp-timestamp">
                     </div>
                     <div class="form-group">
                         <label for="temp-notes">Notes (optional)</label>
