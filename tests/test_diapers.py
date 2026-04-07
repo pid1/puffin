@@ -27,6 +27,13 @@ def test_create_diaper_invalid_type(client):
     assert resp.status_code == 422
 
 
+def test_create_diaper_dry(client):
+    resp = client.post("/api/diapers", json={"type": "dry"})
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["type"] == "dry"
+
+
 def test_list_diapers(client):
     client.post("/api/diapers", json={"type": "pee"})
     client.post("/api/diapers", json={"type": "poop"})
