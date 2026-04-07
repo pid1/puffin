@@ -81,3 +81,72 @@ def test_feeding_stats(client):
     resp = client.get("/api/feedings/stats")
     assert resp.status_code == 200
     assert resp.json()["today"] == 1
+
+
+def test_feeding_stats_timezone_today(client, monkeypatch):
+    """Feedings recorded just after local midnight must count as today,
+    even when local midnight falls later than 00:00 UTC.
+
+    Simulate a UTC+14 timezone (Pacific/Kiritimati) where local midnight
+    is 14 hours *behind* UTC. A feeding timestamped at 00:30 local time
+    (i.e. the previous UTC calendar day at 10:30 UTC) should still be
+    counted as "today" in the local timezone.
+    """
+    from datetime import UTC, datetime, timedelta, timezone
+
+    # UTC+14 — local midnight is 14 hours behind UTC
+    local_tz_offset = timezone(timedelta(hours=14))
+
+    # Build a timestamp that is 00:30 in local time today
+    local_now = datetime.now(local_tz_offset)
+    local_midnight_plus_30m = local_now.replace(
+        hour=0, minute=30, second=0, microsecond=0
+    )
+    # Convert to UTC ISO string for the API
+    ts_utc = local_midnight_plus_30m.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    client.post(
+        "/api/feedings",
+        json={"feeding_type": "bottle", "timestamp": ts_utc},
+    )
+
+    # Patch TZ to the UTC+14 offset name so _get_local_tz uses the right zone.
+    # Python's zoneinfo needs a real IANA name; use "Etc/GMT-14" (note: Etc/GMT
+    # signs are inverted by POSIX convention, so GMT-14 = UTC+14).
+    monkeypatch.setenv("TZ", "Etc/GMT-14")
+
+    resp = client.get("/api/feedings/stats")
+    assert resp.status_code == 200
+    assert resp.json()["today"] == 1
+
+
+def test_feeding_stats_timezone_excludes_yesterday(client, monkeypatch):
+    """A feeding recorded just before local midnight must NOT count as today.
+
+    Uses ``Etc/GMT+5`` (always UTC-5, no DST) for consistent behaviour
+    regardless of when the test runs.
+    """
+    from datetime import UTC, datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    local_tz = ZoneInfo("Etc/GMT+5")  # UTC-5, no DST (POSIX sign convention)
+
+    # Build a timestamp that is 23:30 *yesterday* in local time
+    local_now = datetime.now(local_tz)
+    local_yesterday_2330 = local_now.replace(
+        hour=23, minute=30, second=0, microsecond=0
+    ) - timedelta(days=1)
+    ts_utc = local_yesterday_2330.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    client.post(
+        "/api/feedings",
+        json={"feeding_type": "bottle", "timestamp": ts_utc},
+    )
+
+    # Etc/GMT+5 = UTC-5 (fixed, no DST) so today starts at 05:00 UTC.
+    # The feeding is at 04:30 UTC — before local midnight — so today == 0.
+    monkeypatch.setenv("TZ", "Etc/GMT+5")
+
+    resp = client.get("/api/feedings/stats")
+    assert resp.status_code == 200
+    assert resp.json()["today"] == 0
