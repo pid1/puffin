@@ -1,5 +1,6 @@
 import os
 from datetime import UTC, datetime, timedelta
+from datetime import date as date_type
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import func, select
@@ -328,6 +329,27 @@ _FEEDING_EMOJIS = {
     "breast_right": "\U0001f931",
     "bottle": "\U0001f37c",
 }
+
+
+def _day_bounds(date_str: str) -> tuple[datetime, datetime]:
+    """Compute UTC start and end for a local calendar date (YYYY-MM-DD).
+
+    Uses ``_get_local_tz()`` so the day boundaries match the server's
+    configured timezone — the same timezone used by ``_period_count``.
+    """
+    local_tz = _get_local_tz()
+    y, m, d = map(int, date_str.split("-"))
+    today = date_type(y, m, d)
+    tomorrow = today + timedelta(days=1)
+    start = datetime(today.year, today.month, today.day, tzinfo=local_tz).astimezone(UTC)
+    end = datetime(tomorrow.year, tomorrow.month, tomorrow.day, tzinfo=local_tz).astimezone(UTC)
+    return start, end
+
+
+def get_activities_for_date(db: Session, date_str: str) -> list[dict]:
+    """Return activities for a local calendar date (YYYY-MM-DD)."""
+    start, end = _day_bounds(date_str)
+    return get_activities(db, start=start, end=end)
 
 
 def get_activities(

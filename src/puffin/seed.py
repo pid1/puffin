@@ -89,9 +89,7 @@ def generate_feedings(day_offset: int, base_date: datetime, now: datetime) -> li
             if random.random() < 0.65:
                 # Paired session: both breasts with individual durations
                 first_side = random.choice(["breast_left", "breast_right"])
-                second_side = (
-                    "breast_right" if first_side == "breast_left" else "breast_left"
-                )
+                second_side = "breast_right" if first_side == "breast_left" else "breast_left"
 
                 half = base_duration // 2
                 first_dur = random.randint(max(3, half - 3), half + 4)

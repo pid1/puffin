@@ -1068,9 +1068,8 @@ function initCalendar() {
 async function loadDayActivities() {
     const timeline = document.getElementById('timeline');
     try {
-        const dayStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-        const dayEnd = new Date(dayStart.getTime() + 86400000);
-        const activities = await api.get(`/api/activities?start=${dayStart.toISOString()}&end=${dayEnd.toISOString()}`);
+        const dateStr = toDateString(currentDate);
+        const activities = await api.get(`/api/activities?date=${dateStr}`);
         if (activities.length === 0) {
             timeline.innerHTML = '<p class="empty-state">No entries for this day.</p>';
             return;

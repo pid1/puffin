@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -12,8 +10,7 @@ router = APIRouter(prefix="/api/activities", tags=["activities"])
 
 @router.get("", response_model=list[ActivityItem])
 def list_activities(
-    start: datetime = Query(..., description="Start of day as ISO datetime"),
-    end: datetime = Query(..., description="End of day as ISO datetime"),
+    date: str = Query(..., description="Local date as YYYY-MM-DD", pattern=r"^\d{4}-\d{2}-\d{2}$"),
     db: Session = Depends(get_db),
 ):
-    return crud.get_activities(db, start=start, end=end)
+    return crud.get_activities_for_date(db, date_str=date)
