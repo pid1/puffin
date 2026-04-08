@@ -108,6 +108,12 @@ body {
     font-weight: 700;
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
 /* ===== Buttons ===== */
 .btn {
     display: inline-flex;
@@ -605,4 +611,14 @@ body {
     .timer-digits {
         font-size: 2.5rem;
     }
+}
+
+/* ===== Settings ===== */
+.settings-section-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
 }

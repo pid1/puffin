@@ -27,6 +27,33 @@ function showToast(msg) {
     toastTimeout = setTimeout(() => el.classList.add('hidden'), 2500);
 }
 
+/* ===== Breast Names ===== */
+const BREAST_LEFT_KEY = 'puffin-breast-left-name';
+const BREAST_RIGHT_KEY = 'puffin-breast-right-name';
+const DEFAULT_LEFT_NAME = 'Left';
+const DEFAULT_RIGHT_NAME = 'Right';
+
+function getBreastNames() {
+    return {
+        left: localStorage.getItem(BREAST_LEFT_KEY) || DEFAULT_LEFT_NAME,
+        right: localStorage.getItem(BREAST_RIGHT_KEY) || DEFAULT_RIGHT_NAME,
+    };
+}
+
+function updateBreastLabels() {
+    const names = getBreastNames();
+    // Feeding modal type buttons
+    const leftBtns = document.querySelectorAll('[data-value="breast_left"]');
+    leftBtns.forEach(btn => { btn.textContent = `🤱 ${names.left}`; });
+    const rightBtns = document.querySelectorAll('[data-value="breast_right"]');
+    rightBtns.forEach(btn => { btn.textContent = `🤱 ${names.right}`; });
+    // Manual mode labels
+    const leftLabel = document.querySelector('label[for="feeding-left-duration"]');
+    if (leftLabel) leftLabel.textContent = `🤱 ${names.left} breast (minutes)`;
+    const rightLabel = document.querySelector('label[for="feeding-right-duration"]');
+    if (rightLabel) rightLabel.textContent = `🤱 ${names.right} breast (minutes)`;
+}
+
 /* ===== Dark Mode ===== */
 function initTheme() {
     const saved = localStorage.getItem('puffin-theme');
@@ -162,7 +189,8 @@ function switchBreast() {
     localStorage.setItem(TIMER_KEY, JSON.stringify(state));
     showTimerUI();
 
-    const sideLabel = newSide === 'breast_left' ? 'Left' : 'Right';
+    const names = getBreastNames();
+    const sideLabel = newSide === 'breast_left' ? names.left : names.right;
     showToast(`Switched to ${sideLabel}`);
 }
 
@@ -227,9 +255,10 @@ function showTimerUI() {
     const currentSide = currentSeg.side;
     const canSwitch = !state.paused && (currentSide === 'breast_left' || currentSide === 'breast_right');
 
+    const names = getBreastNames();
     const sideLabels = {
-        breast_left: 'Left Breast',
-        breast_right: 'Right Breast',
+        breast_left: `${names.left} Breast`,
+        breast_right: `${names.right} Breast`,
         bottle: 'Bottle',
     };
     document.getElementById('timer-side').textContent = sideLabels[currentSide] || currentSide;
@@ -238,7 +267,7 @@ function showTimerUI() {
     const switchBtn = document.getElementById('timer-switch-btn');
     if (canSwitch) {
         switchBtn.classList.remove('hidden');
-        const otherLabel = currentSide === 'breast_left' ? 'Right' : 'Left';
+        const otherLabel = currentSide === 'breast_left' ? names.right : names.left;
         switchBtn.textContent = `Switch to ${otherLabel}`;
     } else {
         switchBtn.classList.add('hidden');
@@ -272,10 +301,14 @@ function showTimerUI() {
         // Per-breast times (only for switchable feeds)
         if (currentSide === 'breast_left' || currentSide === 'breast_right') {
             const bt = getBreastTimes(state.segments);
+            const leftAbbr = names.left.charAt(0).toUpperCase();
+            const rightAbbr = names.right.charAt(0).toUpperCase();
+            const leftLabel = leftAbbr === rightAbbr ? names.left : leftAbbr;
+            const rightLabel = leftAbbr === rightAbbr ? names.right : rightAbbr;
             breastTimesEl.innerHTML =
-                `<span class="${currentSide === 'breast_left' ? 'active-breast' : ''}">L: ${formatDurationShort(bt.breast_left)}</span>` +
+                `<span class="${currentSide === 'breast_left' ? 'active-breast' : ''}">${leftLabel}: ${formatDurationShort(bt.breast_left)}</span>` +
                 `<span class="breast-sep">•</span>` +
-                `<span class="${currentSide === 'breast_right' ? 'active-breast' : ''}">R: ${formatDurationShort(bt.breast_right)}</span>`;
+                `<span class="${currentSide === 'breast_right' ? 'active-breast' : ''}">${rightLabel}: ${formatDurationShort(bt.breast_right)}</span>`;
             breastTimesEl.classList.remove('hidden');
         } else {
             breastTimesEl.classList.add('hidden');
@@ -330,7 +363,8 @@ async function endTimer() {
 
         // Build toast message
         const sides = Object.entries(totals).filter(([, ms]) => ms >= 1000);
-        const sideLabels = { breast_left: 'Left', breast_right: 'Right' };
+        const names = getBreastNames();
+        const sideLabels = { breast_left: names.left, breast_right: names.right };
         if (sides.length === 1) {
             const dur = Math.max(1, Math.round(sides[0][1] / 60000));
             showToast(`Feeding logged: ${sideLabels[sides[0][0]] || sides[0][0]} ${dur}min`);
@@ -411,8 +445,9 @@ async function loadLastBreastFeeding() {
         }
 
         const parts = [];
-        if (lastLeft) parts.push(`L: ${lastLeft.duration_minutes || '?'}min`);
-        if (lastRight) parts.push(`R: ${lastRight.duration_minutes || '?'}min`);
+        const names = getBreastNames();
+        if (lastLeft) parts.push(`${names.left}: ${lastLeft.duration_minutes || '?'}min`);
+        if (lastRight) parts.push(`${names.right}: ${lastRight.duration_minutes || '?'}min`);
 
         const mostRecent = lastLeft && lastRight
             ? (new Date(lastLeft.timestamp) > new Date(lastRight.timestamp) ? lastLeft : lastRight)
@@ -797,12 +832,13 @@ function buildDiaperEditFields(data) {
 
 function buildFeedingEditFields(data) {
     const isBottle = data.feeding_type === 'bottle';
+    const names = getBreastNames();
     return `
         <div class="form-group">
             <label>Type</label>
             <div class="btn-group">
-                <button type="button" class="btn btn-option ${data.feeding_type === 'breast_left' ? 'selected' : ''}" data-value="breast_left" data-field="edit-feeding-type">🤱 Left</button>
-                <button type="button" class="btn btn-option ${data.feeding_type === 'breast_right' ? 'selected' : ''}" data-value="breast_right" data-field="edit-feeding-type">🤱 Right</button>
+                <button type="button" class="btn btn-option ${data.feeding_type === 'breast_left' ? 'selected' : ''}" data-value="breast_left" data-field="edit-feeding-type">🤱 ${escapeHtml(names.left)}</button>
+                <button type="button" class="btn btn-option ${data.feeding_type === 'breast_right' ? 'selected' : ''}" data-value="breast_right" data-field="edit-feeding-type">🤱 ${escapeHtml(names.right)}</button>
                 <button type="button" class="btn btn-option ${isBottle ? 'selected' : ''}" data-value="bottle" data-field="edit-feeding-type">🍼 Bottle</button>
             </div>
             <input type="hidden" id="edit-feeding-type" value="${data.feeding_type}">
@@ -1144,6 +1180,28 @@ function escapeAttr(str) {
     return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/* ===== Settings Modal ===== */
+function initSettings() {
+    document.getElementById('settings-btn').addEventListener('click', () => {
+        const names = getBreastNames();
+        document.getElementById('settings-left-name').value = names.left;
+        document.getElementById('settings-right-name').value = names.right;
+        openModal('settings-modal');
+    });
+
+    document.getElementById('settings-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const leftName = document.getElementById('settings-left-name').value.trim() || DEFAULT_LEFT_NAME;
+        const rightName = document.getElementById('settings-right-name').value.trim() || DEFAULT_RIGHT_NAME;
+        localStorage.setItem(BREAST_LEFT_KEY, leftName);
+        localStorage.setItem(BREAST_RIGHT_KEY, rightName);
+        closeModal('settings-modal');
+        updateBreastLabels();
+        if (getTimerState()) showTimerUI();
+        showToast('Settings saved!');
+    });
+}
+
 /* ===== Event Listeners ===== */
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
@@ -1155,6 +1213,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initMedAutoFill();
     initEditForm();
     initCalendar();
+    initSettings();
+    updateBreastLabels();
     loadDashboard();
 
     // Theme toggle
