@@ -74,8 +74,7 @@
                 <p class="empty-state">No entries for this day.</p>
             </div>
             <div class="export-buttons">
-                <a href="/api/export?format=csv" class="btn btn-sm btn-secondary">Export CSV</a>
-                <a href="/api/export?format=json" class="btn btn-sm btn-secondary">Export JSON</a>
+                <button id="export-btn" class="btn btn-sm btn-secondary">⬇️ Export</button>
             </div>
         </section>
     </main>
@@ -285,6 +284,37 @@
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary btn-lg">Save</button>
+                    <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div id="export-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <h2>Export Data</h2>
+            <form id="export-form">
+                <div class="form-group">
+                    <label>Format</label>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-option selected" data-value="csv" data-field="export-format">CSV</button>
+                        <button type="button" class="btn btn-option" data-value="json" data-field="export-format">JSON</button>
+                        <button type="button" class="btn btn-option" data-value="pdf" data-field="export-format">PDF</button>
+                    </div>
+                    <input type="hidden" id="export-format" value="csv">
+                </div>
+                <div class="form-group">
+                    <label for="export-start-date">Start Date (optional)</label>
+                    <input type="date" id="export-start-date">
+                </div>
+                <div class="form-group">
+                    <label for="export-end-date">End Date (optional)</label>
+                    <input type="date" id="export-end-date">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-lg">Download</button>
                     <button type="button" class="btn btn-secondary modal-close">Cancel</button>
                 </div>
             </form>

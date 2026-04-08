@@ -146,3 +146,53 @@ def test_export_json(client):
     data = resp.json()
     assert "diapers" in data
     assert len(data["diapers"]) == 1
+
+
+def test_export_pdf(client):
+    client.post("/api/diapers", json={"type": "pee"})
+    resp = client.get("/api/export?format=pdf")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+    assert resp.content[:4] == b"%PDF"
+
+
+def test_export_pdf_empty(client):
+    resp = client.get("/api/export?format=pdf")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+    assert resp.content[:4] == b"%PDF"
+
+
+def test_export_invalid_format(client):
+    resp = client.get("/api/export?format=xml")
+    assert resp.status_code == 422
+
+
+def test_export_csv_with_date_range(client):
+    client.post("/api/diapers", json={"type": "pee", "timestamp": "2026-01-01T10:00:00Z"})
+    client.post("/api/diapers", json={"type": "poop", "timestamp": "2026-01-15T10:00:00Z"})
+    url = "/api/export?format=csv&start_date=2026-01-10T00:00:00&end_date=2026-01-20T00:00:00"
+    resp = client.get(url)
+    assert resp.status_code == 200
+    content = resp.content.decode()
+    assert "poop" in content
+    assert "pee" not in content
+
+
+def test_export_json_with_date_range(client):
+    client.post("/api/diapers", json={"type": "pee", "timestamp": "2026-01-01T10:00:00Z"})
+    client.post("/api/diapers", json={"type": "poop", "timestamp": "2026-01-15T10:00:00Z"})
+    url = "/api/export?format=json&start_date=2026-01-10T00:00:00&end_date=2026-01-20T00:00:00"
+    resp = client.get(url)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["diapers"]) == 1
+    assert data["diapers"][0]["type"] == "poop"
+
+
+def test_export_pdf_with_date_range(client):
+    client.post("/api/diapers", json={"type": "pee", "timestamp": "2026-01-01T10:00:00Z"})
+    url = "/api/export?format=pdf&start_date=2026-01-10T00:00:00&end_date=2026-01-20T00:00:00"
+    resp = client.get(url)
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"

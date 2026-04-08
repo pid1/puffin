@@ -1201,6 +1201,27 @@ function initSettings() {
     });
 }
 
+/* ===== Export Modal ===== */
+function initExport() {
+    document.getElementById('export-btn').addEventListener('click', () => {
+        openModal('export-modal');
+    });
+
+    document.getElementById('export-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const fmt = document.getElementById('export-format').value || 'csv';
+        const start = document.getElementById('export-start-date').value;
+        const end = document.getElementById('export-end-date').value;
+
+        let url = `/api/export?format=${encodeURIComponent(fmt)}`;
+        if (start) url += `&start_date=${encodeURIComponent(start + 'T00:00:00')}`;
+        if (end) url += `&end_date=${encodeURIComponent(end + 'T23:59:59')}`;
+
+        window.location.href = url;
+        closeModal('export-modal');
+    });
+}
+
 /* ===== Event Listeners ===== */
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
@@ -1213,6 +1234,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initEditForm();
     initCalendar();
     initSettings();
+    initExport();
     updateBreastLabels();
     loadDashboard();
 
