@@ -73,10 +73,17 @@ def export_data(
         ["id", "timestamp", "feeding_type", "duration_minutes", "amount_oz", "notes", "created_at"]
     )
     for f in feedings:
-        writer.writerow([
-            f.id, f.timestamp, f.feeding_type,
-            f.duration_minutes, f.amount_oz, f.notes, f.created_at,
-        ])
+        writer.writerow(
+            [
+                f.id,
+                f.timestamp,
+                f.feeding_type,
+                f.duration_minutes,
+                f.amount_oz,
+                f.notes,
+                f.created_at,
+            ]
+        )
 
     writer.writerow([])
     writer.writerow(["--- Medications ---"])

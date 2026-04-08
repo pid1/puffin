@@ -99,9 +99,7 @@ def test_feeding_stats_timezone_today(client, monkeypatch):
 
     # Build a timestamp that is 00:30 in local time today
     local_now = datetime.now(local_tz_offset)
-    local_midnight_plus_30m = local_now.replace(
-        hour=0, minute=30, second=0, microsecond=0
-    )
+    local_midnight_plus_30m = local_now.replace(hour=0, minute=30, second=0, microsecond=0)
     # Convert to UTC ISO string for the API
     ts_utc = local_midnight_plus_30m.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
