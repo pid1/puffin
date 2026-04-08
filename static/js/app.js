@@ -150,7 +150,7 @@ function startTimer(side) {
 
 function switchBreast() {
     const state = getTimerState();
-    if (!state || !state.active) return;
+    if (!state || !state.active || state.paused) return;
 
     const current = state.segments[state.segments.length - 1];
     const now = new Date().toISOString();
@@ -164,6 +164,34 @@ function switchBreast() {
 
     const sideLabel = newSide === 'breast_left' ? 'Left' : 'Right';
     showToast(`Switched to ${sideLabel}`);
+}
+
+function pauseTimer() {
+    const state = getTimerState();
+    if (!state || !state.active || state.paused) return;
+
+    const now = new Date().toISOString();
+    const currentSeg = state.segments[state.segments.length - 1];
+    if (!currentSeg.endTime) {
+        currentSeg.endTime = now;
+    }
+    state.paused = true;
+    localStorage.setItem(TIMER_KEY, JSON.stringify(state));
+    showTimerUI();
+    showToast('Timer paused');
+}
+
+function resumeTimer() {
+    const state = getTimerState();
+    if (!state || !state.active || !state.paused) return;
+
+    const lastSeg = state.segments[state.segments.length - 1];
+    const now = new Date().toISOString();
+    state.segments.push({ side: lastSeg.side, startTime: now, endTime: null });
+    state.paused = false;
+    localStorage.setItem(TIMER_KEY, JSON.stringify(state));
+    showTimerUI();
+    showToast('Timer resumed');
 }
 
 function getBreastTimes(segments) {
@@ -197,7 +225,7 @@ function showTimerUI() {
 
     const currentSeg = state.segments[state.segments.length - 1];
     const currentSide = currentSeg.side;
-    const canSwitch = currentSide === 'breast_left' || currentSide === 'breast_right';
+    const canSwitch = !state.paused && (currentSide === 'breast_left' || currentSide === 'breast_right');
 
     const sideLabels = {
         breast_left: 'Left Breast',
@@ -215,6 +243,11 @@ function showTimerUI() {
     } else {
         switchBtn.classList.add('hidden');
     }
+
+    // Show pause or resume button
+    const pauseBtn = document.getElementById('timer-pause-btn');
+    pauseBtn.classList.remove('hidden');
+    pauseBtn.textContent = state.paused ? 'Resume' : 'Pause';
 
     // Reset end/confirm UI
     document.getElementById('timer-end-btn').classList.remove('hidden');
@@ -237,7 +270,7 @@ function showTimerUI() {
         document.getElementById('timer-digits').textContent = `${h}:${m}:${s}`;
 
         // Per-breast times (only for switchable feeds)
-        if (canSwitch) {
+        if (currentSide === 'breast_left' || currentSide === 'breast_right') {
             const bt = getBreastTimes(state.segments);
             breastTimesEl.innerHTML =
                 `<span class="${currentSide === 'breast_left' ? 'active-breast' : ''}">L: ${formatDurationShort(bt.breast_left)}</span>` +
@@ -250,8 +283,8 @@ function showTimerUI() {
     }
 
     updateDisplay();
-    if (timerInterval) clearInterval(timerInterval);
-    timerInterval = setInterval(updateDisplay, 1000);
+    clearInterval(timerInterval);
+    timerInterval = state.paused ? null : setInterval(updateDisplay, 1000);
 }
 
 async function endTimer() {
@@ -319,10 +352,20 @@ function initTimer() {
 
     document.getElementById('timer-switch-btn').addEventListener('click', switchBreast);
 
+    document.getElementById('timer-pause-btn').addEventListener('click', () => {
+        const pauseBtn = document.getElementById('timer-pause-btn');
+        if (pauseBtn.textContent === 'Resume') {
+            resumeTimer();
+        } else {
+            pauseTimer();
+        }
+    });
+
     document.getElementById('timer-end-btn').addEventListener('click', () => {
-        // Two-step confirmation — hide switch too
+        // Two-step confirmation — hide switch and pause too
         document.getElementById('timer-end-btn').classList.add('hidden');
         document.getElementById('timer-switch-btn').classList.add('hidden');
+        document.getElementById('timer-pause-btn').classList.add('hidden');
         document.getElementById('timer-confirm-btn').classList.remove('hidden');
         document.getElementById('timer-cancel-btn').classList.remove('hidden');
     });
@@ -333,13 +376,14 @@ function initTimer() {
 
     document.getElementById('timer-cancel-btn').addEventListener('click', () => {
         document.getElementById('timer-end-btn').classList.remove('hidden');
-        // Re-show switch button if applicable
+        // Re-show switch and pause buttons if applicable
         const state = getTimerState();
         if (state) {
             const currentSide = state.segments[state.segments.length - 1].side;
-            if (currentSide === 'breast_left' || currentSide === 'breast_right') {
+            if (!state.paused && (currentSide === 'breast_left' || currentSide === 'breast_right')) {
                 document.getElementById('timer-switch-btn').classList.remove('hidden');
             }
+            document.getElementById('timer-pause-btn').classList.remove('hidden');
         }
         document.getElementById('timer-confirm-btn').classList.add('hidden');
         document.getElementById('timer-cancel-btn').classList.add('hidden');
