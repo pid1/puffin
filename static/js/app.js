@@ -780,6 +780,7 @@ function buildDiaperEditFields(data) {
                 <button type="button" class="btn btn-option ${data.type === 'pee' ? 'selected' : ''}" data-value="pee" data-field="edit-diaper-type">💧 Pee</button>
                 <button type="button" class="btn btn-option ${data.type === 'poop' ? 'selected' : ''}" data-value="poop" data-field="edit-diaper-type">💩 Poop</button>
                 <button type="button" class="btn btn-option ${data.type === 'both' ? 'selected' : ''}" data-value="both" data-field="edit-diaper-type">💧💩 Both</button>
+                <button type="button" class="btn btn-option ${data.type === 'dry' ? 'selected' : ''}" data-value="dry" data-field="edit-diaper-type">🧷 Dry</button>
             </div>
             <input type="hidden" id="edit-diaper-type" value="${data.type}">
         </div>

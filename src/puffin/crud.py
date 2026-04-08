@@ -311,8 +311,13 @@ def delete_temperature(db: Session, temp_id: int) -> bool:
 
 # --- Activities ---
 
-_DIAPER_LABELS = {"pee": "Pee", "poop": "Poop", "both": "Pee + Poop"}
-_DIAPER_EMOJIS = {"pee": "\U0001f4a7", "poop": "\U0001f4a9", "both": "\U0001f4a7\U0001f4a9"}
+_DIAPER_LABELS = {"pee": "Pee", "poop": "Poop", "both": "Pee + Poop", "dry": "Dry"}
+_DIAPER_EMOJIS = {
+    "pee": "\U0001f4a7",
+    "poop": "\U0001f4a9",
+    "both": "\U0001f4a7\U0001f4a9",
+    "dry": "\U0001f9f7",
+}
 _FEEDING_LABELS = {
     "breast_left": "Left Breast",
     "breast_right": "Right Breast",

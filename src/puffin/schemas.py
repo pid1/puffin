@@ -10,6 +10,7 @@ class DiaperType(StrEnum):
     pee = "pee"
     poop = "poop"
     both = "both"
+    dry = "dry"
 
 
 class FeedingType(StrEnum):
