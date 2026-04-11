@@ -39,7 +39,7 @@ def _run_migrations(bind=None) -> None:
     """
     target = bind if bind is not None else engine
     with target.connect() as conn:
-        existing_cols = {c["name"] for c in inspect(target).get_columns("feedings")}
+        existing_cols = {c["name"] for c in inspect(conn).get_columns("feedings")}
         if "session_id" not in existing_cols:
             conn.execute(text("ALTER TABLE feedings ADD COLUMN session_id TEXT"))
             conn.commit()

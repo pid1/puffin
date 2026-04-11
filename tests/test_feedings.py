@@ -224,13 +224,15 @@ def test_migration_adds_session_id_column(setup_db):
         conn.commit()
 
     # Confirm the column is absent before migration
-    pre_cols = {c["name"] for c in inspect(old_engine).get_columns("feedings")}
+    with old_engine.connect() as conn:
+        pre_cols = {c["name"] for c in inspect(conn).get_columns("feedings")}
     assert "session_id" not in pre_cols
 
     # Run the migration against the old-schema engine via the explicit parameter
     _run_migrations(bind=old_engine)
 
-    post_cols = {c["name"] for c in inspect(old_engine).get_columns("feedings")}
+    with old_engine.connect() as conn:
+        post_cols = {c["name"] for c in inspect(conn).get_columns("feedings")}
     assert "session_id" in post_cols
 
     # Running the migration a second time must be idempotent (no error)
