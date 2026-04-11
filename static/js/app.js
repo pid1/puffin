@@ -1113,7 +1113,7 @@ async function loadDayActivities() {
         timeline.innerHTML = activities.map(a => `
             <div class="timeline-item" onclick="openEditModal('${a.type}', ${a.id})">
                 <span class="timeline-emoji">${a.emoji || ''}</span>
-                <span class="timeline-label">${escapeHtml(a.label || a.summary)}</span>
+                <span class="timeline-label">${escapeHtml(getActivityLabel(a))}</span>
                 ${a.detail ? `<span class="timeline-detail">${escapeHtml(a.detail)}</span>` : ''}
                 <span class="timeline-time">${formatTime(a.timestamp)}</span>
                 ${a.notes ? `<div class="timeline-notes">${escapeHtml(a.notes)}</div>` : ''}
@@ -1165,6 +1165,15 @@ async function loadDashboard() {
     } catch (err) {
         console.error('Failed to load dashboard:', err);
     }
+}
+
+function getActivityLabel(a) {
+    if (a.type === 'feeding') {
+        const names = getBreastNames();
+        if (a.subtype === 'breast_left') return `${names.left} Breast`;
+        if (a.subtype === 'breast_right') return `${names.right} Breast`;
+    }
+    return a.label || a.summary;
 }
 
 function escapeHtml(str) {
