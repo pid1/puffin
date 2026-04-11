@@ -83,6 +83,41 @@ def test_feeding_stats(client):
     assert resp.json()["today"] == 1
 
 
+def test_feeding_stats_paired_session_counts_as_one(client):
+    """Paired breast feedings sharing a session_id must count as a single session."""
+    session_id = "test-session-abc"
+    client.post(
+        "/api/feedings",
+        json={"feeding_type": "breast_left", "duration_minutes": 8, "session_id": session_id},
+    )
+    client.post(
+        "/api/feedings",
+        json={"feeding_type": "breast_right", "duration_minutes": 6, "session_id": session_id},
+    )
+    resp = client.get("/api/feedings/stats")
+    assert resp.status_code == 200
+    assert resp.json()["today"] == 1  # two records but one session
+
+
+def test_feeding_stats_mixed_sessions(client):
+    """Individual and paired feedings are counted correctly together."""
+    session_id = "test-session-xyz"
+    # One paired breast session
+    client.post(
+        "/api/feedings",
+        json={"feeding_type": "breast_left", "duration_minutes": 8, "session_id": session_id},
+    )
+    client.post(
+        "/api/feedings",
+        json={"feeding_type": "breast_right", "duration_minutes": 6, "session_id": session_id},
+    )
+    # One individual bottle feed
+    client.post("/api/feedings", json={"feeding_type": "bottle", "amount_oz": 3.0})
+    resp = client.get("/api/feedings/stats")
+    assert resp.status_code == 200
+    assert resp.json()["today"] == 2  # one paired session + one bottle
+
+
 def test_feeding_stats_timezone_today(client, monkeypatch):
     """Feedings recorded just after local midnight must count as today,
     even when local midnight falls later than 00:00 UTC.

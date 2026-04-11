@@ -345,16 +345,19 @@ async function endTimer() {
     }
 
     try {
-        // Save one entry per breast used
+        // Save one entry per breast used; link paired breasts with a shared session_id
+        const activeSides = Object.entries(totals).filter(([, ms]) => ms >= 1000);
+        const sessionId = activeSides.length > 1 ? crypto.randomUUID() : null;
         const promises = [];
-        for (const [side, totalMs] of Object.entries(totals)) {
-            if (totalMs < 1000) continue; // Skip segments shorter than 1s
+        for (const [side, totalMs] of activeSides) {
             const durationMinutes = Math.max(1, Math.round(totalMs / 60000));
-            promises.push(api.post('/api/feedings', {
+            const body = {
                 timestamp: starts[side],
                 feeding_type: side,
                 duration_minutes: durationMinutes,
-            }));
+            };
+            if (sessionId) body.session_id = sessionId;
+            promises.push(api.post('/api/feedings', body));
         }
         await Promise.all(promises);
 
@@ -680,22 +683,28 @@ function initForms() {
         try {
             const promises = [];
             let notesAttached = false;
+            // Link paired breast feedings with a shared session_id
+            const manualSessionId = (leftDur && rightDur) ? crypto.randomUUID() : null;
             if (leftDur) {
-                promises.push(api.post('/api/feedings', {
+                const body = {
                     feeding_type: 'breast_left',
                     duration_minutes: parseInt(leftDur),
                     notes: notesAttached ? undefined : notes,
                     timestamp,
-                }));
+                };
+                if (manualSessionId) body.session_id = manualSessionId;
+                promises.push(api.post('/api/feedings', body));
                 notesAttached = true;
             }
             if (rightDur) {
-                promises.push(api.post('/api/feedings', {
+                const body = {
                     feeding_type: 'breast_right',
                     duration_minutes: parseInt(rightDur),
                     notes: notesAttached ? undefined : notes,
                     timestamp,
-                }));
+                };
+                if (manualSessionId) body.session_id = manualSessionId;
+                promises.push(api.post('/api/feedings', body));
                 notesAttached = true;
             }
             if (bottleOz) {

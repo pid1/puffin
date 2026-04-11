@@ -60,6 +60,7 @@ class FeedingCreate(BaseModel):
     duration_minutes: int | None = None
     amount_oz: float | None = None
     notes: str | None = None
+    session_id: str | None = None
 
 
 class FeedingUpdate(BaseModel):
@@ -79,6 +80,7 @@ class FeedingResponse(BaseModel):
     duration_minutes: int | None
     amount_oz: float | None
     notes: str | None
+    session_id: str | None
     created_at: datetime
 
 
