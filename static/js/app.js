@@ -282,6 +282,7 @@ function showTimerUI() {
     document.getElementById('timer-end-btn').classList.remove('hidden');
     document.getElementById('timer-confirm-btn').classList.add('hidden');
     document.getElementById('timer-cancel-btn').classList.add('hidden');
+    document.getElementById('timer-discard-btn').classList.remove('hidden');
 
     const breastTimesEl = document.getElementById('timer-breast-times');
 
@@ -318,6 +319,13 @@ function showTimerUI() {
     updateDisplay();
     clearInterval(timerInterval);
     timerInterval = state.paused ? null : setInterval(updateDisplay, 1000);
+}
+
+function cancelTimer() {
+    localStorage.removeItem(TIMER_KEY);
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    showTimerUI();
+    showToast('Feeding session cancelled');
 }
 
 async function endTimer() {
@@ -400,6 +408,7 @@ function initTimer() {
         document.getElementById('timer-end-btn').classList.add('hidden');
         document.getElementById('timer-switch-btn').classList.add('hidden');
         document.getElementById('timer-pause-btn').classList.add('hidden');
+        document.getElementById('timer-discard-btn').classList.add('hidden');
         document.getElementById('timer-confirm-btn').classList.remove('hidden');
         document.getElementById('timer-cancel-btn').classList.remove('hidden');
     });
@@ -421,6 +430,11 @@ function initTimer() {
         }
         document.getElementById('timer-confirm-btn').classList.add('hidden');
         document.getElementById('timer-cancel-btn').classList.add('hidden');
+        document.getElementById('timer-discard-btn').classList.remove('hidden');
+    });
+
+    document.getElementById('timer-discard-btn').addEventListener('click', () => {
+        cancelTimer();
     });
 }
 
