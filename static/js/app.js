@@ -1,3 +1,16 @@
+/* ===== UUID Helper ===== */
+function generateUUID() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    // Fallback for non-secure contexts (HTTP)
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
 /* ===== API Client ===== */
 const api = {
     async request(method, url, body = null) {
@@ -355,7 +368,7 @@ async function endTimer() {
     try {
         // Save one entry per breast used; link paired breasts with a shared session_id
         const activeSides = Object.entries(totals).filter(([, ms]) => ms >= 1000);
-        const sessionId = activeSides.length > 1 ? crypto.randomUUID() : null;
+        const sessionId = activeSides.length > 1 ? generateUUID() : null;
         const promises = [];
         for (const [side, totalMs] of activeSides) {
             const durationMinutes = Math.max(1, Math.round(totalMs / 60000));
@@ -698,7 +711,7 @@ function initForms() {
             const promises = [];
             let notesAttached = false;
             // Link paired breast feedings with a shared session_id
-            const manualSessionId = (leftDur && rightDur) ? crypto.randomUUID() : null;
+            const manualSessionId = (leftDur && rightDur) ? generateUUID() : null;
             if (leftDur) {
                 const body = {
                     feeding_type: 'breast_left',
