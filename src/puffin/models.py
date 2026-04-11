@@ -53,6 +53,7 @@ class Feeding(Base):
     duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     amount_oz: Mapped[float | None] = mapped_column(Float, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    session_id: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(_TZ_DATETIME, default=_utcnow)
 
     __table_args__ = (Index("idx_feeding_timestamp", "timestamp"),)

@@ -19,6 +19,7 @@ def create_feeding(data: FeedingCreate, db: Session = Depends(get_db)):
         duration_minutes=data.duration_minutes,
         amount_oz=data.amount_oz,
         notes=data.notes,
+        session_id=data.session_id,
     )
 
 

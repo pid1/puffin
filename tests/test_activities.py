@@ -18,6 +18,40 @@ def test_list_activities_basic(client):
     assert "diaper" in types
 
 
+def test_list_activities_paired_session_merged(client):
+    """Paired breast feedings with the same session_id appear as a single activity."""
+    from datetime import UTC, datetime
+
+    session_id = "test-activity-session-456"
+    client.post(
+        "/api/feedings",
+        json={
+            "feeding_type": "breast_left",
+            "duration_minutes": 8,
+            "session_id": session_id,
+        },
+    )
+    client.post(
+        "/api/feedings",
+        json={
+            "feeding_type": "breast_right",
+            "duration_minutes": 6,
+            "session_id": session_id,
+        },
+    )
+
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
+    resp = client.get(f"/api/activities?date={today}")
+    assert resp.status_code == 200
+    data = resp.json()
+    feeding_activities = [a for a in data if a["type"] == "feeding"]
+    assert len(feeding_activities) == 1
+    assert feeding_activities[0]["subtype"] == "breast_both"
+    assert feeding_activities[0]["label"] == "Both Breasts"
+    assert "Left" in feeding_activities[0]["detail"]
+    assert "Right" in feeding_activities[0]["detail"]
+
+
 def test_list_activities_empty(client):
     """No activities for a date far in the past."""
     resp = client.get("/api/activities?date=2000-01-01")

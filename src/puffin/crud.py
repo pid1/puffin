@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from datetime import date as date_type
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import func, select
+from sqlalchemy import String, cast, func, select
 from sqlalchemy.orm import Session
 
 from puffin.models import DiaperChange, Feeding, Medication, TemperatureReading
@@ -113,6 +113,7 @@ def create_feeding(
     duration_minutes: int | None,
     amount_oz: float | None,
     notes: str | None,
+    session_id: str | None = None,
 ) -> Feeding:
     obj = Feeding(
         timestamp=timestamp or datetime.now(UTC),
@@ -120,6 +121,7 @@ def create_feeding(
         duration_minutes=duration_minutes,
         amount_oz=amount_oz,
         notes=notes,
+        session_id=session_id,
     )
     db.add(obj)
     db.commit()
@@ -168,11 +170,31 @@ def delete_feeding(db: Session, feeding_id: int) -> bool:
     return True
 
 
+def _feeding_session_count(db: Session, start: datetime) -> int:
+    """Count unique feeding sessions from *start* to now.
+
+    Breast feedings that share a ``session_id`` are counted as one session.
+    Feedings without a ``session_id`` (e.g. bottle feeds) are each counted
+    individually by falling back to their row ``id``.
+    """
+    session_key = func.coalesce(Feeding.session_id, cast(Feeding.id, String))
+    stmt = select(func.count(func.distinct(session_key))).where(
+        Feeding.timestamp >= start
+    )
+    return db.execute(stmt).scalar() or 0
+
+
 def feeding_stats(db: Session) -> dict[str, int]:
+    local_tz = _get_local_tz()
+    now = datetime.now(local_tz)
+    local_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = local_midnight.astimezone(UTC)
+    week_start = (now - timedelta(days=7)).astimezone(UTC)
+    month_start = (now - timedelta(days=30)).astimezone(UTC)
     return {
-        "today": _period_count(db, Feeding, Feeding.timestamp, "today"),
-        "week": _period_count(db, Feeding, Feeding.timestamp, "week"),
-        "month": _period_count(db, Feeding, Feeding.timestamp, "month"),
+        "today": _feeding_session_count(db, today_start),
+        "week": _feeding_session_count(db, week_start),
+        "month": _feeding_session_count(db, month_start),
     }
 
 
@@ -324,6 +346,11 @@ _FEEDING_LABELS = {
     "breast_right": "Right Breast",
     "bottle": "Bottle",
 }
+_FEEDING_LABELS_SHORT = {
+    "breast_left": "Left",
+    "breast_right": "Right",
+    "bottle": "Bottle",
+}
 _FEEDING_EMOJIS = {
     "breast_left": "\U0001f931",
     "breast_right": "\U0001f931",
@@ -375,24 +402,58 @@ def get_activities(
                 "notes": d.notes,
             }
         )
-    for f in get_feedings(db, start_date=start, end_date=end, limit=limit):
-        if f.amount_oz:
-            detail = f"{f.amount_oz} oz"
-        elif f.duration_minutes:
-            detail = f"{f.duration_minutes} min"
+    feedings = get_feedings(db, start_date=start, end_date=end, limit=limit)
+
+    # Separate individually-logged feedings from paired (session_id) ones
+    session_groups: dict[str, list] = {}
+    for f in feedings:
+        if f.session_id:
+            session_groups.setdefault(f.session_id, []).append(f)
         else:
-            detail = ""
+            if f.amount_oz:
+                detail = f"{f.amount_oz} oz"
+            elif f.duration_minutes:
+                detail = f"{f.duration_minutes} min"
+            else:
+                detail = ""
+            activities.append(
+                {
+                    "type": "feeding",
+                    "subtype": f.feeding_type,
+                    "timestamp": f.timestamp.isoformat(),
+                    "id": f.id,
+                    "emoji": _FEEDING_EMOJIS.get(f.feeding_type, "\U0001f37c"),
+                    "label": _FEEDING_LABELS.get(f.feeding_type, f.feeding_type),
+                    "detail": detail,
+                    "summary": f"Feeding: {f.feeding_type}",
+                    "notes": f.notes,
+                }
+            )
+
+    # Merge paired breast feedings into a single activity item
+    for _sid, group in session_groups.items():
+        group.sort(key=lambda f: f.timestamp)  # oldest first
+        first = group[0]
+        parts = []
+        for f in group:
+            short = _FEEDING_LABELS_SHORT.get(f.feeding_type, f.feeding_type)
+            if f.duration_minutes:
+                parts.append(f"{short}: {f.duration_minutes}min")
+            else:
+                parts.append(short)
+        detail = " · ".join(parts)
+        notes = next((f.notes for f in group if f.notes), None)
         activities.append(
             {
                 "type": "feeding",
-                "subtype": f.feeding_type,
-                "timestamp": f.timestamp.isoformat(),
-                "id": f.id,
-                "emoji": _FEEDING_EMOJIS.get(f.feeding_type, "\U0001f37c"),
-                "label": _FEEDING_LABELS.get(f.feeding_type, f.feeding_type),
+                "subtype": "breast_both",
+                "timestamp": first.timestamp.isoformat(),
+                "id": first.id,
+                "emoji": "\U0001f931",
+                "label": "Both Breasts",
                 "detail": detail,
-                "summary": f"Feeding: {f.feeding_type}",
-                "notes": f.notes,
+                "summary": "Feeding: Both Breasts",
+                "notes": notes,
             }
         )
     for m in get_medications(db, start_date=start, end_date=end, limit=limit):
