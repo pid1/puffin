@@ -183,3 +183,74 @@ def test_feeding_stats_timezone_excludes_yesterday(client, monkeypatch):
     resp = client.get("/api/feedings/stats")
     assert resp.status_code == 200
     assert resp.json()["today"] == 0
+
+
+def test_migration_adds_session_id_column(setup_db):
+    """_run_migrations should add session_id to feedings tables that pre-date PR #13.
+
+    Simulates a database that was created before the session_id column existed
+    by building the schema with explicit DDL (no session_id), then verifies that
+    _run_migrations() adds the column and that the feedings endpoints work.
+    """
+    from fastapi.testclient import TestClient
+    from sqlalchemy import create_engine, inspect, text
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    from puffin.database import _run_migrations, get_db
+    from puffin.main import app
+
+    # Build a fresh in-memory DB using explicit DDL that mirrors the pre-PR13
+    # schema (feedings table without session_id).
+    old_engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    with old_engine.connect() as conn:
+        conn.execute(text(
+            """
+            CREATE TABLE feedings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp DATETIME NOT NULL,
+                feeding_type VARCHAR NOT NULL,
+                duration_minutes INTEGER,
+                amount_oz FLOAT,
+                notes TEXT,
+                created_at DATETIME
+            )
+            """
+        ))
+        conn.commit()
+
+    # Confirm the column is absent before migration
+    pre_cols = {c["name"] for c in inspect(old_engine).get_columns("feedings")}
+    assert "session_id" not in pre_cols
+
+    # Run the migration against the old-schema engine via the explicit parameter
+    _run_migrations(bind=old_engine)
+
+    post_cols = {c["name"] for c in inspect(old_engine).get_columns("feedings")}
+    assert "session_id" in post_cols
+
+    # Running the migration a second time must be idempotent (no error)
+    _run_migrations(bind=old_engine)
+
+    # The feedings stats endpoint should work through the migrated engine
+    old_session = sessionmaker(autocommit=False, autoflush=False, bind=old_engine)
+
+    def override_get_db():
+        db = old_session()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as c:
+            resp = c.get("/api/feedings/stats")
+            assert resp.status_code == 200
+            assert resp.json()["today"] == 0
+    finally:
+        app.dependency_overrides.clear()
