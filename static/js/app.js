@@ -296,6 +296,8 @@ function showTimerUI() {
     document.getElementById('timer-confirm-btn').classList.add('hidden');
     document.getElementById('timer-cancel-btn').classList.add('hidden');
     document.getElementById('timer-discard-btn').classList.remove('hidden');
+    document.getElementById('timer-discard-confirm-btn').classList.add('hidden');
+    document.getElementById('timer-discard-back-btn').classList.add('hidden');
 
     const breastTimesEl = document.getElementById('timer-breast-times');
 
@@ -450,7 +452,31 @@ function initTimer() {
     });
 
     document.getElementById('timer-discard-btn').addEventListener('click', () => {
+        document.getElementById('timer-end-btn').classList.add('hidden');
+        document.getElementById('timer-switch-btn').classList.add('hidden');
+        document.getElementById('timer-pause-btn').classList.add('hidden');
+        document.getElementById('timer-discard-btn').classList.add('hidden');
+        document.getElementById('timer-discard-confirm-btn').classList.remove('hidden');
+        document.getElementById('timer-discard-back-btn').classList.remove('hidden');
+    });
+
+    document.getElementById('timer-discard-confirm-btn').addEventListener('click', () => {
         cancelTimer();
+    });
+
+    document.getElementById('timer-discard-back-btn').addEventListener('click', () => {
+        document.getElementById('timer-end-btn').classList.remove('hidden');
+        const state = getTimerState();
+        if (state) {
+            const currentSide = state.segments[state.segments.length - 1].side;
+            if (!state.paused && (currentSide === 'breast_left' || currentSide === 'breast_right')) {
+                document.getElementById('timer-switch-btn').classList.remove('hidden');
+            }
+            document.getElementById('timer-pause-btn').classList.remove('hidden');
+        }
+        document.getElementById('timer-discard-confirm-btn').classList.add('hidden');
+        document.getElementById('timer-discard-back-btn').classList.add('hidden');
+        document.getElementById('timer-discard-btn').classList.remove('hidden');
     });
 }
 
