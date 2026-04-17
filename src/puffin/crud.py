@@ -449,6 +449,7 @@ def get_activities(
                 "subtype": "breast_both",
                 "timestamp": first.timestamp.isoformat(),
                 "id": first.id,
+                "secondary_id": group[1].id if len(group) > 1 else None,
                 "emoji": "\U0001f931",
                 "label": "Both Breasts",
                 "detail": detail,
