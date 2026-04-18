@@ -833,7 +833,7 @@ function toLocalDatetime(isoStr) {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-async function openEditModal(type, id) {
+async function openEditModal(type, id, secondaryId = null) {
     const endpoints = {
         diaper: `/api/diapers/${id}`,
         feeding: `/api/feedings/${id}`,
@@ -841,18 +841,32 @@ async function openEditModal(type, id) {
         temperature: `/api/temperatures/${id}`,
     };
     try {
-        const data = await api.get(endpoints[type]);
+        let data, secondaryData = null;
+        if (type === 'feeding' && secondaryId) {
+            [data, secondaryData] = await Promise.all([
+                api.get(`/api/feedings/${id}`),
+                api.get(`/api/feedings/${secondaryId}`),
+            ]);
+        } else {
+            data = await api.get(endpoints[type]);
+        }
         const titles = {
             diaper: 'Edit Diaper Change',
-            feeding: 'Edit Feeding',
+            feeding: secondaryData ? 'Edit Both Breasts' : 'Edit Feeding',
             medication: 'Edit Medication',
             temperature: 'Edit Temperature',
         };
         document.getElementById('edit-modal-title').textContent = titles[type];
-        document.getElementById('edit-form-fields').innerHTML = buildEditFields(type, data);
-        document.getElementById('edit-form').dataset.editType = type;
-        document.getElementById('edit-form').dataset.editId = id;
-        document.getElementById('edit-form').dataset.originalTimestamp = toLocalDatetime(data.timestamp);
+        document.getElementById('edit-form-fields').innerHTML = buildEditFields(type, data, secondaryData);
+        const form = document.getElementById('edit-form');
+        form.dataset.editType = type;
+        form.dataset.editId = id;
+        form.dataset.originalTimestamp = toLocalDatetime(data.timestamp);
+        if (secondaryData) {
+            form.dataset.editSecondaryId = secondaryId;
+        } else {
+            delete form.dataset.editSecondaryId;
+        }
         initEditOptionButtons();
         openModal('edit-modal');
     } catch (err) {
@@ -860,10 +874,10 @@ async function openEditModal(type, id) {
     }
 }
 
-function buildEditFields(type, data) {
+function buildEditFields(type, data, secondaryData = null) {
     switch (type) {
         case 'diaper': return buildDiaperEditFields(data);
-        case 'feeding': return buildFeedingEditFields(data);
+        case 'feeding': return buildFeedingEditFields(data, secondaryData);
         case 'medication': return buildMedicationEditFields(data);
         case 'temperature': return buildTemperatureEditFields(data);
     }
@@ -892,7 +906,33 @@ function buildDiaperEditFields(data) {
     `;
 }
 
-function buildFeedingEditFields(data) {
+function buildFeedingEditFields(data, secondaryData = null) {
+    if (secondaryData) {
+        const leftData = data.feeding_type === 'breast_left' ? data : secondaryData;
+        const rightData = data.feeding_type === 'breast_right' ? data : secondaryData;
+        const names = getBreastNames();
+        const notes = leftData.notes || rightData.notes || '';
+        return `
+            <input type="hidden" id="edit-left-id" value="${leftData.id}">
+            <input type="hidden" id="edit-right-id" value="${rightData.id}">
+            <div class="form-group">
+                <label for="edit-left-duration">🤱 ${escapeHtml(names.left)} (minutes)</label>
+                <input type="number" id="edit-left-duration" min="1" max="120" value="${leftData.duration_minutes || ''}">
+            </div>
+            <div class="form-group">
+                <label for="edit-right-duration">🤱 ${escapeHtml(names.right)} (minutes)</label>
+                <input type="number" id="edit-right-duration" min="1" max="120" value="${rightData.duration_minutes || ''}">
+            </div>
+            <div class="form-group">
+                <label for="edit-timestamp">Time</label>
+                <input type="datetime-local" id="edit-timestamp" value="${toLocalDatetime(leftData.timestamp)}">
+            </div>
+            <div class="form-group">
+                <label for="edit-notes">Notes</label>
+                <textarea id="edit-notes" rows="2">${escapeHtml(notes)}</textarea>
+            </div>
+        `;
+    }
     const isBottle = data.feeding_type === 'bottle';
     const names = getBreastNames();
     return `
@@ -1057,7 +1097,29 @@ function initEditForm() {
             temperature: `/api/temperatures/${id}`,
         };
         try {
-            await api.put(endpoints[type], buildEditBody(type));
+            const leftIdEl = document.getElementById('edit-left-id');
+            const rightIdEl = document.getElementById('edit-right-id');
+            if (type === 'feeding' && leftIdEl && rightIdEl) {
+                const timestamp = document.getElementById('edit-timestamp').value;
+                const notes = document.getElementById('edit-notes').value;
+                const originalTimestamp = form.dataset.originalTimestamp;
+                const baseBody = { notes };
+                if (timestamp && timestamp !== originalTimestamp) {
+                    baseBody.timestamp = new Date(timestamp).toISOString();
+                }
+                const leftDur = document.getElementById('edit-left-duration').value;
+                const rightDur = document.getElementById('edit-right-duration').value;
+                const leftBody = { ...baseBody };
+                if (leftDur) leftBody.duration_minutes = parseInt(leftDur);
+                const rightBody = { ...baseBody };
+                if (rightDur) rightBody.duration_minutes = parseInt(rightDur);
+                await Promise.all([
+                    api.put(`/api/feedings/${leftIdEl.value}`, leftBody),
+                    api.put(`/api/feedings/${rightIdEl.value}`, rightBody),
+                ]);
+            } else {
+                await api.put(endpoints[type], buildEditBody(type));
+            }
             closeModal('edit-modal');
             showToast('Updated!');
             loadDashboard();
@@ -1067,10 +1129,14 @@ function initEditForm() {
     });
 
     document.getElementById('edit-delete-btn').addEventListener('click', async () => {
-        if (!confirm('Delete this entry?')) return;
         const form = document.getElementById('edit-form');
         const type = form.dataset.editType;
         const id = form.dataset.editId;
+        const leftIdEl = document.getElementById('edit-left-id');
+        const rightIdEl = document.getElementById('edit-right-id');
+        const isBoth = type === 'feeding' && leftIdEl && rightIdEl;
+        const msg = isBoth ? 'Delete both breast feeding records?' : 'Delete this entry?';
+        if (!confirm(msg)) return;
         const endpoints = {
             diaper: `/api/diapers/${id}`,
             feeding: `/api/feedings/${id}`,
@@ -1078,7 +1144,14 @@ function initEditForm() {
             temperature: `/api/temperatures/${id}`,
         };
         try {
-            await api.del(endpoints[type]);
+            if (isBoth) {
+                await Promise.all([
+                    api.del(`/api/feedings/${leftIdEl.value}`),
+                    api.del(`/api/feedings/${rightIdEl.value}`),
+                ]);
+            } else {
+                await api.del(endpoints[type]);
+            }
             closeModal('edit-modal');
             showToast('Deleted!');
             loadDashboard();
@@ -1172,15 +1245,18 @@ async function loadDayActivities() {
             timeline.innerHTML = '<p class="empty-state">No entries for this day.</p>';
             return;
         }
-        timeline.innerHTML = activities.map(a => `
-            <div class="timeline-item" onclick="openEditModal('${a.type}', ${a.id})">
+        timeline.innerHTML = activities.map(a => {
+            const secondaryArg = a.secondary_id != null ? `, ${a.secondary_id}` : '';
+            return `
+            <div class="timeline-item" onclick="openEditModal('${a.type}', ${a.id}${secondaryArg})">
                 <span class="timeline-emoji">${a.emoji || ''}</span>
                 <span class="timeline-label">${escapeHtml(getActivityLabel(a))}</span>
                 ${a.detail ? `<span class="timeline-detail">${escapeHtml(a.detail)}</span>` : ''}
                 <span class="timeline-time">${formatTime(a.timestamp)}</span>
                 ${a.notes ? `<div class="timeline-notes">${escapeHtml(a.notes)}</div>` : ''}
             </div>
-        `).join('');
+        `;
+        }).join('');
     } catch (err) {
         console.error('Failed to load day activities:', err);
         timeline.innerHTML = '<p class="empty-state">Failed to load activities.</p>';

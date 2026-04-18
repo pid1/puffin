@@ -154,6 +154,7 @@ class ActivityItem(BaseModel):
     subtype: str
     timestamp: str
     id: int
+    secondary_id: int | None = None
     emoji: str = ""
     label: str = ""
     detail: str = ""
