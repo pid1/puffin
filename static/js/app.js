@@ -1209,20 +1209,20 @@ function updateCalendarUI() {
 function prevDay() {
     currentDate.setDate(currentDate.getDate() - 1);
     updateCalendarUI();
-    loadDayActivities();
+    loadDashboard();
 }
 
 function nextDay() {
     if (isSameDay(currentDate, new Date())) return;
     currentDate.setDate(currentDate.getDate() + 1);
     updateCalendarUI();
-    loadDayActivities();
+    loadDashboard();
 }
 
 function goToToday() {
     currentDate = new Date();
     updateCalendarUI();
-    loadDayActivities();
+    loadDashboard();
 }
 
 function initCalendar() {
@@ -1242,7 +1242,7 @@ function initCalendar() {
         const [y, m, d] = picker.value.split('-').map(Number);
         currentDate = new Date(y, m - 1, d);
         updateCalendarUI();
-        loadDayActivities();
+        loadDashboard();
     });
 
     updateCalendarUI();
@@ -1296,7 +1296,14 @@ function timeAgo(isoStr) {
 
 async function loadDashboard() {
     try {
-        const data = await api.get('/api/dashboard');
+        const dateStr = toDateString(currentDate);
+        const data = await api.get(`/api/dashboard?date=${dateStr}`);
+
+        // Summary card titles reflect the displayed day
+        const isToday = isSameDay(currentDate, new Date());
+        document.getElementById('diaper-title').textContent = isToday ? 'Diapers Today' : 'Diapers';
+        document.getElementById('feeding-title').textContent = isToday ? 'Feedings Today' : 'Feedings';
+        document.getElementById('med-title').textContent = isToday ? 'Meds Today' : 'Meds';
 
         // Summary cards
         document.getElementById('diaper-count').textContent = data.diaper_stats.today;

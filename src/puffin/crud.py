@@ -184,6 +184,24 @@ def _feeding_session_count(db: Session, start: datetime) -> int:
     return db.execute(stmt).scalar() or 0
 
 
+def _count_range(db: Session, model, timestamp_col, start: datetime, end: datetime) -> int:
+    stmt = (
+        select(func.count())
+        .select_from(model)
+        .where(timestamp_col >= start, timestamp_col < end)
+    )
+    return db.execute(stmt).scalar() or 0
+
+
+def _feeding_session_count_range(db: Session, start: datetime, end: datetime) -> int:
+    session_key = func.coalesce(Feeding.session_id, cast(Feeding.id, String))
+    stmt = select(func.count(func.distinct(session_key))).where(
+        Feeding.timestamp >= start,
+        Feeding.timestamp < end,
+    )
+    return db.execute(stmt).scalar() or 0
+
+
 def feeding_stats(db: Session) -> dict[str, int]:
     local_tz = _get_local_tz()
     now = datetime.now(local_tz)
@@ -494,13 +512,19 @@ def get_activities(
 # --- Dashboard ---
 
 
-def get_dashboard(db: Session) -> dict:
+def get_dashboard(db: Session, date_str: str | None = None) -> dict:
     now = datetime.now(UTC)
 
     # Stats
     d_stats = diaper_stats(db)
     f_stats = feeding_stats(db)
     med_today = _period_count(db, Medication, Medication.timestamp, "today")
+
+    if date_str:
+        start, end = _day_bounds(date_str)
+        d_stats["today"] = _count_range(db, DiaperChange, DiaperChange.timestamp, start, end)
+        f_stats["today"] = _feeding_session_count_range(db, start, end)
+        med_today = _count_range(db, Medication, Medication.timestamp, start, end)
 
     # Last entries
     last_diaper = db.execute(
