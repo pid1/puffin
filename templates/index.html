@@ -191,9 +191,16 @@
             <div id="med-tab" class="tab-content active">
                 <form id="medication-form">
                     <div class="form-group">
-                        <label for="med-name">Medication Name</label>
-                        <input type="text" name="medication_name" id="med-name" list="med-name-suggestions" autocomplete="off" required>
-                        <datalist id="med-name-suggestions"></datalist>
+                        <label>Medication Name</label>
+                        <div class="med-autocomplete" id="med-autocomplete">
+                            <div class="med-chip-display hidden" id="med-chip-display">
+                                <span class="med-chip-text" id="med-chip-text"></span>
+                                <button type="button" class="med-chip-dismiss" id="med-chip-dismiss" aria-label="Clear">×</button>
+                            </div>
+                            <input type="text" id="med-name-input" class="med-name-input" autocomplete="off" placeholder="Type medication name…">
+                            <div class="med-dropdown hidden" id="med-dropdown" role="listbox"></div>
+                        </div>
+                        <input type="hidden" id="med-name" name="medication_name">
                     </div>
                     <div class="form-group">
                         <label>Dosage</label>

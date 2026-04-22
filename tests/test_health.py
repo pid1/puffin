@@ -301,3 +301,56 @@ def test_export_pdf_with_date_range(client):
     resp = client.get(url)
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/pdf"
+
+
+# --- Saved medication names ---
+
+
+def test_saved_names_empty(client):
+    resp = client.get("/api/medications/saved-names")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_saved_names_added_on_create(client):
+    client.post(
+        "/api/medications",
+        json={"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"},
+    )
+    resp = client.get("/api/medications/saved-names")
+    assert resp.status_code == 200
+    assert resp.json() == ["Tylenol"]
+
+
+def test_saved_names_sorted_case_insensitively(client):
+    for name in ["vitamin C", "Tylenol", "ibuprofen"]:
+        client.post(
+            "/api/medications",
+            json={"medication_name": name, "dosage_quantity": 1.0, "dosage_unit": "mL"},
+        )
+    resp = client.get("/api/medications/saved-names")
+    assert resp.status_code == 200
+    assert resp.json() == ["ibuprofen", "Tylenol", "vitamin C"]
+
+
+def test_saved_names_no_case_insensitive_duplicates(client):
+    for name in ["Vitamin D", "vitamin d", "VITAMIN D"]:
+        client.post(
+            "/api/medications",
+            json={"medication_name": name, "dosage_quantity": 1.0, "dosage_unit": "tablet(s)"},
+        )
+    resp = client.get("/api/medications/saved-names")
+    assert resp.status_code == 200
+    names = resp.json()
+    assert len(names) == 1
+    # First casing submitted is preserved
+    assert names[0] == "Vitamin D"
+
+
+def test_saved_names_preserves_original_casing(client):
+    client.post(
+        "/api/medications",
+        json={"medication_name": "vitamin C", "dosage_quantity": 1.0, "dosage_unit": "tablet(s)"},
+    )
+    resp = client.get("/api/medications/saved-names")
+    assert resp.json() == ["vitamin C"]

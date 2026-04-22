@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import String, cast, func, select
 from sqlalchemy.orm import Session
 
-from puffin.models import DiaperChange, Feeding, Medication, TemperatureReading
+from puffin.models import DiaperChange, Feeding, Medication, SavedMedication, TemperatureReading
 
 # --- Generic helpers ---
 
@@ -287,6 +287,22 @@ def medication_stats(db: Session) -> dict[str, int]:
         "week": _period_count(db, Medication, Medication.timestamp, "week"),
         "month": _period_count(db, Medication, Medication.timestamp, "month"),
     }
+
+
+def get_saved_medications(db: Session) -> list[str]:
+    """Return saved medication names sorted case-insensitively A→Z."""
+    stmt = select(SavedMedication.name).order_by(func.lower(SavedMedication.name))
+    return list(db.execute(stmt).scalars().all())
+
+
+def add_saved_medication(db: Session, name: str) -> bool:
+    """Add name to saved list if no case-insensitive match exists. Returns True if added."""
+    stmt = select(SavedMedication).where(func.lower(SavedMedication.name) == name.lower())
+    if db.execute(stmt).scalar_one_or_none() is not None:
+        return False
+    db.add(SavedMedication(name=name))
+    db.commit()
+    return True
 
 
 # --- Temperature Readings ---
