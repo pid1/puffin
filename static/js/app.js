@@ -103,7 +103,8 @@ function openModal(id) {
     } else if (id === 'diaper-modal') {
         loadNoteSuggestions('/api/diapers', 'diaper-note-suggestions', 'diaper-notes');
     } else if (id === 'health-modal') {
-        loadMedSuggestions();
+        loadSavedMedNames();
+        loadMedDosageMap();
         loadNoteSuggestions('/api/medications', 'med-note-suggestions', 'med-notes');
         loadNoteSuggestions('/api/temperatures', 'temp-note-suggestions', 'temp-notes');
     }
@@ -116,6 +117,9 @@ function closeModal(id) {
     forms.forEach(f => f.reset());
     // Clear selected buttons
     document.getElementById(id).querySelectorAll('.btn-option.selected').forEach(b => b.classList.remove('selected'));
+    if (id === 'health-modal') {
+        resetMedAutocomplete();
+    }
     // Reset feeding modal to timer mode
     if (id === 'feeding-modal') {
         document.getElementById('feeding-timer-mode').classList.remove('hidden');
@@ -607,47 +611,132 @@ function initFeedingForm() {
     updateMode();
 }
 
-/* ===== Auto-fill Suggestions ===== */
-let medDosageMap = {}; // medication_name -> { dosage_quantity, dosage_unit }
+/* ===== Medication Autocomplete ===== */
+let savedMedNames = []; // sorted A→Z from /api/medications/saved-names
+let medDosageMap = {};  // name -> { dosage_quantity, dosage_unit } from recent logs
 
-async function loadMedSuggestions() {
+async function loadSavedMedNames() {
     try {
-        const meds = await api.get('/api/medications?limit=50');
-        const datalist = document.getElementById('med-name-suggestions');
-        medDosageMap = {};
-        const seen = new Set();
-        // meds are sorted newest-first, so first occurrence = most recent dosage
-        for (const m of meds) {
-            const name = m.medication_name;
-            if (!seen.has(name)) {
-                seen.add(name);
-                medDosageMap[name] = { dosage_quantity: m.dosage_quantity, dosage_unit: m.dosage_unit };
-            }
-        }
-        datalist.innerHTML = [...seen].map(n => `<option value="${escapeAttr(n)}">`).join('');
+        savedMedNames = await api.get('/api/medications/saved-names');
     } catch (e) {
-        console.error('Failed to load medication suggestions:', e);
+        console.error('Failed to load saved medication names:', e);
+        savedMedNames = [];
     }
 }
 
-function initMedAutoFill() {
-    const nameInput = document.getElementById('med-name');
+async function loadMedDosageMap() {
+    try {
+        const meds = await api.get('/api/medications?limit=50');
+        medDosageMap = {};
+        const seen = new Set();
+        for (const m of meds) {
+            const name = m.medication_name;
+            if (!seen.has(name.toLowerCase())) {
+                seen.add(name.toLowerCase());
+                medDosageMap[name.toLowerCase()] = { dosage_quantity: m.dosage_quantity, dosage_unit: m.dosage_unit };
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load medication dosage map:', e);
+    }
+}
+
+function resetMedAutocomplete() {
+    const chipDisplay = document.getElementById('med-chip-display');
+    const nameInput = document.getElementById('med-name-input');
+    const hiddenInput = document.getElementById('med-name');
+    const dropdown = document.getElementById('med-dropdown');
+    chipDisplay.classList.add('hidden');
+    nameInput.classList.remove('hidden');
+    nameInput.value = '';
+    hiddenInput.value = '';
+    dropdown.classList.add('hidden');
+    dropdown.innerHTML = '';
+}
+
+function selectMedName(name) {
+    const chipDisplay = document.getElementById('med-chip-display');
+    const chipText = document.getElementById('med-chip-text');
+    const nameInput = document.getElementById('med-name-input');
+    const hiddenInput = document.getElementById('med-name');
+    const dropdown = document.getElementById('med-dropdown');
+
+    chipText.textContent = name;
+    hiddenInput.value = name;
+    chipDisplay.classList.remove('hidden');
+    nameInput.classList.add('hidden');
+    dropdown.classList.add('hidden');
+    dropdown.innerHTML = '';
+
+    // Auto-fill dosage if fields are empty
     const qtyInput = document.getElementById('med-dosage-qty');
     const unitSelect = document.getElementById('med-dosage-unit');
-    nameInput.addEventListener('input', () => {
-        const match = medDosageMap[nameInput.value];
-        if (match && !qtyInput.value) {
-            qtyInput.value = match.dosage_quantity;
-            unitSelect.value = match.dosage_unit;
-        }
+    const match = medDosageMap[name.toLowerCase()];
+    if (match && !qtyInput.value) {
+        qtyInput.value = match.dosage_quantity;
+        unitSelect.value = match.dosage_unit;
+    }
+}
+
+function renderMedDropdown(query) {
+    const dropdown = document.getElementById('med-dropdown');
+    const q = query.trim().toLowerCase();
+    let matches;
+    if (q === '') {
+        matches = savedMedNames;
+    } else {
+        matches = savedMedNames.filter(n => n.toLowerCase().includes(q));
+    }
+
+    const items = [];
+    for (const name of matches) {
+        items.push(`<div class="med-dropdown-item" role="option" data-name="${escapeAttr(name)}">${escapeHtml(name)}</div>`);
+    }
+
+    // Show "+ Add" only when query is non-empty and no exact case-insensitive match exists
+    const hasExact = savedMedNames.some(n => n.toLowerCase() === q);
+    if (q !== '' && !hasExact) {
+        items.push(`<div class="med-dropdown-item add-new" role="option" data-add="${escapeAttr(query.trim())}">+ Add &ldquo;${escapeHtml(query.trim())}&rdquo;</div>`);
+    }
+
+    if (items.length === 0) {
+        dropdown.classList.add('hidden');
+        return;
+    }
+
+    dropdown.innerHTML = items.join('');
+    dropdown.classList.remove('hidden');
+
+    dropdown.querySelectorAll('.med-dropdown-item').forEach(el => {
+        el.addEventListener('mousedown', (e) => {
+            e.preventDefault(); // prevent blur before click
+            const name = el.dataset.name || el.dataset.add;
+            selectMedName(name);
+        });
     });
-    // Also handle picking from datalist (fires 'change')
-    nameInput.addEventListener('change', () => {
-        const match = medDosageMap[nameInput.value];
-        if (match) {
-            qtyInput.value = match.dosage_quantity;
-            unitSelect.value = match.dosage_unit;
-        }
+}
+
+function initMedAutocomplete() {
+    const nameInput = document.getElementById('med-name-input');
+    const dropdown = document.getElementById('med-dropdown');
+    const dismissBtn = document.getElementById('med-chip-dismiss');
+
+    nameInput.addEventListener('focus', () => {
+        renderMedDropdown(nameInput.value);
+    });
+
+    nameInput.addEventListener('input', () => {
+        renderMedDropdown(nameInput.value);
+    });
+
+    nameInput.addEventListener('blur', () => {
+        // Small delay so mousedown on dropdown items can fire first
+        setTimeout(() => dropdown.classList.add('hidden'), 150);
+    });
+
+    dismissBtn.addEventListener('click', () => {
+        resetMedAutocomplete();
+        document.getElementById('med-name-input').focus();
     });
 }
 
@@ -795,7 +884,12 @@ function initForms() {
     // Medication form
     document.getElementById('medication-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const name = document.getElementById('med-name').value;
+        const name = document.getElementById('med-name').value.trim();
+        if (!name) {
+            showToast('Please select or add a medication name');
+            document.getElementById('med-name-input').focus();
+            return;
+        }
         const dosageQtyRaw = document.getElementById('med-dosage-qty').value;
         const dosage_unit = document.getElementById('med-dosage-unit').value;
         const notes = document.getElementById('med-notes').value || undefined;
@@ -1419,7 +1513,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTimer();
     initFeedingForm();
     initForms();
-    initMedAutoFill();
+    initMedAutocomplete();
     initEditForm();
     initCalendar();
     initSettings();

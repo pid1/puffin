@@ -519,6 +519,98 @@ body {
     border-color: var(--primary);
 }
 
+/* Medication name autocomplete */
+.med-autocomplete {
+    position: relative;
+}
+
+.med-name-input {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 1rem;
+    font-family: inherit;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.med-name-input:focus {
+    border-color: var(--primary);
+}
+
+.med-chip-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--primary);
+    color: #fff;
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    min-height: 42px;
+}
+
+.med-chip-display.hidden { display: none; }
+
+.med-chip-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.med-chip-dismiss {
+    background: none;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    font-size: 1.2rem;
+    line-height: 1;
+    padding: 0 2px;
+    opacity: 0.85;
+    flex-shrink: 0;
+}
+
+.med-chip-dismiss:hover { opacity: 1; }
+
+.med-dropdown {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    z-index: 200;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    max-height: 220px;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+}
+
+.med-dropdown.hidden { display: none; }
+
+.med-dropdown-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    transition: background 0.1s ease;
+}
+
+.med-dropdown-item:hover,
+.med-dropdown-item.focused {
+    background: var(--bg-secondary);
+}
+
+.med-dropdown-item.add-new {
+    color: var(--primary);
+    font-weight: 500;
+    border-top: 1px solid var(--border);
+}
+
 .input-group {
     display: flex;
     gap: 8px;

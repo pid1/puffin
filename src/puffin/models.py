@@ -86,3 +86,11 @@ class TemperatureReading(Base):
     created_at: Mapped[datetime] = mapped_column(_TZ_DATETIME, default=_utcnow)
 
     __table_args__ = (Index("idx_temperature_timestamp", "timestamp"),)
+
+
+class SavedMedication(Base):
+    __tablename__ = "saved_medications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(_TZ_DATETIME, default=_utcnow)

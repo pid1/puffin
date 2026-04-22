@@ -24,7 +24,7 @@ router = APIRouter(tags=["health"])
 
 @router.post("/api/medications", response_model=MedicationResponse, status_code=201)
 def create_medication(data: MedicationCreate, db: Session = Depends(get_db)):
-    return crud.create_medication(
+    result = crud.create_medication(
         db,
         timestamp=data.timestamp,
         medication_name=data.medication_name,
@@ -32,6 +32,13 @@ def create_medication(data: MedicationCreate, db: Session = Depends(get_db)):
         dosage_unit=data.dosage_unit.value,
         notes=data.notes,
     )
+    crud.add_saved_medication(db, data.medication_name)
+    return result
+
+
+@router.get("/api/medications/saved-names", response_model=list[str])
+def list_saved_medication_names(db: Session = Depends(get_db)):
+    return crud.get_saved_medications(db)
 
 
 @router.get("/api/medications", response_model=list[MedicationResponse])

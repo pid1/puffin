@@ -117,6 +117,25 @@ def _run_migrations(bind=None) -> None:
                 )
             conn.commit()
 
+        # Seed saved_medications from existing medication log entries (first casing wins)
+        if insp.has_table("saved_medications"):
+            saved_count = conn.execute(text("SELECT COUNT(*) FROM saved_medications")).scalar()
+            if saved_count == 0:
+                rows = conn.execute(
+                    text("SELECT medication_name FROM medications ORDER BY timestamp ASC, id ASC")
+                ).fetchall()
+                seen_lower: set[str] = set()
+                for (name,) in rows:
+                    lower = name.lower()
+                    if lower not in seen_lower:
+                        seen_lower.add(lower)
+                        conn.execute(
+                            text("INSERT OR IGNORE INTO saved_medications (name) VALUES (:name)"),
+                            {"name": name},
+                        )
+                if seen_lower:
+                    conn.commit()
+
 
 def init_db():
     """Create all tables, disposing stale connections first."""
