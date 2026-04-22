@@ -17,8 +17,11 @@ _PDF_MAX_CELL_LENGTH = 40  # max characters per cell before truncation
 
 
 @router.get("/dashboard", response_model=DashboardSummary)
-def get_dashboard(db: Session = Depends(get_db)):
-    return crud.get_dashboard(db)
+def get_dashboard(
+    date: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    db: Session = Depends(get_db),
+):
+    return crud.get_dashboard(db, date_str=date)
 
 
 @router.get("/export")
