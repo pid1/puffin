@@ -486,28 +486,40 @@ async function loadLastBreastFeeding() {
     try {
         const feedings = await api.get('/api/feedings?limit=20');
         const now = Date.now();
-        let lastLeft = null, lastRight = null;
+
+        // Find the most recent breast feeding session. Feedings sharing a session_id
+        // were recorded together and belong to the same session; feedings with no
+        // session_id are each their own standalone session.
+        let lastSessionId = undefined;
+        let lastSessionFeedings = [];
         for (const f of feedings) {
-            // Skip future-dated entries (e.g. from seed data)
             if (new Date(f.timestamp).getTime() > now) continue;
-            if (!lastLeft && f.feeding_type === 'breast_left') lastLeft = f;
-            if (!lastRight && f.feeding_type === 'breast_right') lastRight = f;
-            if (lastLeft && lastRight) break;
+            if (f.feeding_type !== 'breast_left' && f.feeding_type !== 'breast_right') continue;
+
+            if (lastSessionFeedings.length === 0) {
+                lastSessionFeedings.push(f);
+                lastSessionId = f.session_id;
+            } else if (lastSessionId && f.session_id === lastSessionId) {
+                lastSessionFeedings.push(f);
+            } else {
+                break;
+            }
         }
 
-        if (!lastLeft && !lastRight) {
+        if (lastSessionFeedings.length === 0) {
             infoEl.classList.add('hidden');
             return;
         }
 
         const parts = [];
         const names = getBreastNames();
+        const lastLeft = lastSessionFeedings.find(f => f.feeding_type === 'breast_left');
+        const lastRight = lastSessionFeedings.find(f => f.feeding_type === 'breast_right');
         if (lastLeft) parts.push(`${names.left}: ${lastLeft.duration_minutes || '?'}min`);
         if (lastRight) parts.push(`${names.right}: ${lastRight.duration_minutes || '?'}min`);
 
-        const mostRecent = lastLeft && lastRight
-            ? (new Date(lastLeft.timestamp) > new Date(lastRight.timestamp) ? lastLeft : lastRight)
-            : (lastLeft || lastRight);
+        const mostRecent = lastSessionFeedings.reduce((a, b) =>
+            new Date(a.timestamp) > new Date(b.timestamp) ? a : b);
 
         infoEl.innerHTML =
             `<strong>Last session:</strong> ${parts.join(' • ')}` +
