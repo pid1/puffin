@@ -65,7 +65,8 @@ class Medication(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     timestamp: Mapped[datetime] = mapped_column(_TZ_DATETIME, nullable=False, default=_utcnow)
     medication_name: Mapped[str] = mapped_column(String, nullable=False)
-    dosage: Mapped[str] = mapped_column(String, nullable=False)
+    dosage_quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    dosage_unit: Mapped[str] = mapped_column(String, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(_TZ_DATETIME, default=_utcnow)
 

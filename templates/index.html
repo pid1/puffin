@@ -196,8 +196,20 @@
                         <datalist id="med-name-suggestions"></datalist>
                     </div>
                     <div class="form-group">
-                        <label for="med-dosage">Dosage</label>
-                        <input type="text" name="dosage" id="med-dosage" required>
+                        <label>Dosage</label>
+                        <div class="input-group">
+                            <input type="number" name="dosage_quantity" id="med-dosage-qty" step="0.01" min="0.01" placeholder="e.g. 1.5" required>
+                            <select name="dosage_unit" id="med-dosage-unit" required>
+                                <option value="">Unit...</option>
+                                <option value="mL">mL</option>
+                                <option value="tsp(s)">tsp(s)</option>
+                                <option value="tbsp(s)">tbsp(s)</option>
+                                <option value="drop(s)">drop(s)</option>
+                                <option value="spray(s)">spray(s)</option>
+                                <option value="tablet(s)">tablet(s)</option>
+                                <option value="unit(s)">unit(s)</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="med-timestamp">Time (optional)</label>

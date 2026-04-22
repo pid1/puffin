@@ -13,6 +13,7 @@ from puffin.schemas import (
     TemperatureCreate,
     TemperatureResponse,
     TemperatureUpdate,
+    DosageUnit,
 )
 
 router = APIRouter(tags=["health"])
@@ -27,7 +28,8 @@ def create_medication(data: MedicationCreate, db: Session = Depends(get_db)):
         db,
         timestamp=data.timestamp,
         medication_name=data.medication_name,
-        dosage=data.dosage,
+        dosage_quantity=data.dosage_quantity,
+        dosage_unit=data.dosage_unit.value,
         notes=data.notes,
     )
 
@@ -65,8 +67,10 @@ def update_medication(medication_id: int, data: MedicationUpdate, db: Session = 
         updates["timestamp"] = data.timestamp
     if data.medication_name is not None:
         updates["medication_name"] = data.medication_name
-    if data.dosage is not None:
-        updates["dosage"] = data.dosage
+    if data.dosage_quantity is not None:
+        updates["dosage_quantity"] = data.dosage_quantity
+    if data.dosage_unit is not None:
+        updates["dosage_unit"] = data.dosage_unit.value
     if data.notes is not None:
         updates["notes"] = data.notes
     obj = crud.update_medication(db, medication_id, **updates)

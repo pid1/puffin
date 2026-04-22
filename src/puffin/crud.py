@@ -223,13 +223,15 @@ def create_medication(
     db: Session,
     timestamp: datetime | None,
     medication_name: str,
-    dosage: str,
+    dosage_quantity: float,
+    dosage_unit: str,
     notes: str | None,
 ) -> Medication:
     obj = Medication(
         timestamp=timestamp or datetime.now(UTC),
         medication_name=medication_name,
-        dosage=dosage,
+        dosage_quantity=dosage_quantity,
+        dosage_unit=dosage_unit,
         notes=notes,
     )
     db.add(obj)
@@ -484,7 +486,7 @@ def get_activities(
                 "id": m.id,
                 "emoji": "\U0001f48a",
                 "label": m.medication_name,
-                "detail": m.dosage,
+                "detail": f"{m.dosage_quantity:.2f} {m.dosage_unit}",
                 "summary": f"Med: {m.medication_name}",
                 "notes": m.notes,
             }

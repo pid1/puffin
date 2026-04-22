@@ -113,7 +113,7 @@ def export_data(
             [
                 _fmt_ts(m.timestamp),
                 m.medication_name,
-                m.dosage,
+                f"{m.dosage_quantity:.2f} {m.dosage_unit}",
                 m.notes or "",
             ]
             for m in medications
@@ -165,9 +165,9 @@ def export_data(
 
     writer.writerow([])
     writer.writerow(["--- Medications ---"])
-    writer.writerow(["id", "timestamp", "medication_name", "dosage", "notes", "created_at"])
+    writer.writerow(["id", "timestamp", "medication_name", "dosage_quantity", "dosage_unit", "notes", "created_at"])
     for m in medications:
-        writer.writerow([m.id, m.timestamp, m.medication_name, m.dosage, m.notes, m.created_at])
+        writer.writerow([m.id, m.timestamp, m.medication_name, m.dosage_quantity, m.dosage_unit, m.notes, m.created_at])
 
     writer.writerow([])
     writer.writerow(["--- Temperature Readings ---"])
