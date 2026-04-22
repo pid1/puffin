@@ -1,7 +1,8 @@
+from decimal import Decimal
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 # --- Enums ---
 
@@ -24,6 +25,16 @@ class TemperatureLocation(StrEnum):
     oral = "oral"
     axillary = "axillary"
     temporal = "temporal"
+
+
+class DosageUnit(StrEnum):
+    mL = "mL"
+    tsp = "tsp(s)"
+    tbsp = "tbsp(s)"
+    drop = "drop(s)"
+    spray = "spray(s)"
+    tablet = "tablet(s)"
+    unit = "unit(s)"
 
 
 # --- Diaper Schemas ---
@@ -87,18 +98,40 @@ class FeedingResponse(BaseModel):
 # --- Medication Schemas ---
 
 
+def _validate_dosage_quantity(v: float) -> float:
+    if Decimal(str(v)).as_tuple().exponent < -2:
+        raise ValueError("Quantity must have at most 2 decimal places")
+    if v <= 0:
+        raise ValueError("Quantity must be greater than zero")
+    return v
+
+
 class MedicationCreate(BaseModel):
     timestamp: datetime | None = None
     medication_name: str
-    dosage: str
+    dosage_quantity: float
+    dosage_unit: DosageUnit
     notes: str | None = None
+
+    @field_validator("dosage_quantity")
+    @classmethod
+    def check_dosage_quantity(cls, v: float) -> float:
+        return _validate_dosage_quantity(v)
 
 
 class MedicationUpdate(BaseModel):
     timestamp: datetime | None = None
     medication_name: str | None = None
-    dosage: str | None = None
+    dosage_quantity: float | None = None
+    dosage_unit: DosageUnit | None = None
     notes: str | None = None
+
+    @field_validator("dosage_quantity")
+    @classmethod
+    def check_dosage_quantity(cls, v: float | None) -> float | None:
+        if v is None:
+            return v
+        return _validate_dosage_quantity(v)
 
 
 class MedicationResponse(BaseModel):
@@ -107,7 +140,8 @@ class MedicationResponse(BaseModel):
     id: int
     timestamp: datetime
     medication_name: str
-    dosage: str
+    dosage_quantity: float
+    dosage_unit: str
     notes: str | None
     created_at: datetime
 

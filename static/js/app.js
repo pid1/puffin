@@ -608,7 +608,7 @@ function initFeedingForm() {
 }
 
 /* ===== Auto-fill Suggestions ===== */
-let medDosageMap = {}; // medication_name -> most recent dosage
+let medDosageMap = {}; // medication_name -> { dosage_quantity, dosage_unit }
 
 async function loadMedSuggestions() {
     try {
@@ -621,7 +621,7 @@ async function loadMedSuggestions() {
             const name = m.medication_name;
             if (!seen.has(name)) {
                 seen.add(name);
-                medDosageMap[name] = m.dosage;
+                medDosageMap[name] = { dosage_quantity: m.dosage_quantity, dosage_unit: m.dosage_unit };
             }
         }
         datalist.innerHTML = [...seen].map(n => `<option value="${escapeAttr(n)}">`).join('');
@@ -632,18 +632,21 @@ async function loadMedSuggestions() {
 
 function initMedAutoFill() {
     const nameInput = document.getElementById('med-name');
-    const dosageInput = document.getElementById('med-dosage');
+    const qtyInput = document.getElementById('med-dosage-qty');
+    const unitSelect = document.getElementById('med-dosage-unit');
     nameInput.addEventListener('input', () => {
         const match = medDosageMap[nameInput.value];
-        if (match && !dosageInput.value) {
-            dosageInput.value = match;
+        if (match && !qtyInput.value) {
+            qtyInput.value = match.dosage_quantity;
+            unitSelect.value = match.dosage_unit;
         }
     });
     // Also handle picking from datalist (fires 'change')
     nameInput.addEventListener('change', () => {
         const match = medDosageMap[nameInput.value];
         if (match) {
-            dosageInput.value = match;
+            qtyInput.value = match.dosage_quantity;
+            unitSelect.value = match.dosage_unit;
         }
     });
 }
@@ -793,12 +796,22 @@ function initForms() {
     document.getElementById('medication-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const name = document.getElementById('med-name').value;
-        const dosage = document.getElementById('med-dosage').value;
+        const dosageQtyRaw = document.getElementById('med-dosage-qty').value;
+        const dosage_unit = document.getElementById('med-dosage-unit').value;
         const notes = document.getElementById('med-notes').value || undefined;
         const timestampInput = document.getElementById('med-timestamp').value;
         const timestamp = timestampInput ? new Date(timestampInput).toISOString() : undefined;
+        const dosage_quantity = parseFloat(parseFloat(dosageQtyRaw).toFixed(2));
+        if (isNaN(dosage_quantity) || dosage_quantity <= 0) {
+            showToast('Quantity must be a positive number');
+            return;
+        }
+        if (!dosage_unit) {
+            showToast('Please select a unit');
+            return;
+        }
         try {
-            await api.post('/api/medications', { medication_name: name, dosage, notes, timestamp });
+            await api.post('/api/medications', { medication_name: name, dosage_quantity, dosage_unit, notes, timestamp });
             closeModal('health-modal');
             showToast('Medication logged!');
             loadDashboard();
@@ -977,14 +990,23 @@ function buildFeedingEditFields(data, secondaryData = null) {
 }
 
 function buildMedicationEditFields(data) {
+    const units = ['mL', 'tsp(s)', 'tbsp(s)', 'drop(s)', 'spray(s)', 'tablet(s)', 'unit(s)'];
+    const unitOptions = units.map(u =>
+        `<option value="${u}" ${data.dosage_unit === u ? 'selected' : ''}>${u}</option>`
+    ).join('');
     return `
         <div class="form-group">
             <label for="edit-med-name">Medication Name</label>
             <input type="text" id="edit-med-name" value="${escapeAttr(data.medication_name)}" required>
         </div>
         <div class="form-group">
-            <label for="edit-med-dosage">Dosage</label>
-            <input type="text" id="edit-med-dosage" value="${escapeAttr(data.dosage)}" required>
+            <label>Dosage</label>
+            <div class="input-group">
+                <input type="number" id="edit-med-dosage-qty" step="0.01" min="0.01" value="${data.dosage_quantity}" required>
+                <select id="edit-med-dosage-unit" required>
+                    ${unitOptions}
+                </select>
+            </div>
         </div>
         <div class="form-group">
             <label for="edit-timestamp">Time</label>
@@ -1059,7 +1081,8 @@ function buildEditBody(type) {
         }
         case 'medication':
             body.medication_name = document.getElementById('edit-med-name').value;
-            body.dosage = document.getElementById('edit-med-dosage').value;
+            body.dosage_quantity = parseFloat(parseFloat(document.getElementById('edit-med-dosage-qty').value).toFixed(2));
+            body.dosage_unit = document.getElementById('edit-med-dosage-unit').value;
             break;
         case 'temperature': {
             let tempValue = parseFloat(document.getElementById('edit-temp-value').value);

@@ -3,13 +3,15 @@ def test_create_medication(client):
         "/api/medications",
         json={
             "medication_name": "Tylenol",
-            "dosage": "2.5ml",
+            "dosage_quantity": 2.5,
+            "dosage_unit": "mL",
         },
     )
     assert resp.status_code == 201
     data = resp.json()
     assert data["medication_name"] == "Tylenol"
-    assert data["dosage"] == "2.5ml"
+    assert data["dosage_quantity"] == 2.5
+    assert data["dosage_unit"] == "mL"
 
 
 def test_create_medication_with_timestamp(client):
@@ -19,7 +21,8 @@ def test_create_medication_with_timestamp(client):
         "/api/medications",
         json={
             "medication_name": "Tylenol",
-            "dosage": "2.5ml",
+            "dosage_quantity": 2.5,
+            "dosage_unit": "mL",
             "timestamp": custom_time,
         },
     )
@@ -29,8 +32,68 @@ def test_create_medication_with_timestamp(client):
     assert data["timestamp"] == custom_time
 
 
+def test_create_medication_integer_quantity(client):
+    resp = client.post(
+        "/api/medications",
+        json={"medication_name": "Vitamin D", "dosage_quantity": 1, "dosage_unit": "tablet(s)"},
+    )
+    assert resp.status_code == 201
+    assert resp.json()["dosage_quantity"] == 1.0
+
+
+def test_create_medication_two_decimal_quantity(client):
+    resp = client.post(
+        "/api/medications",
+        json={"medication_name": "Ibuprofen", "dosage_quantity": 2.25, "dosage_unit": "mL"},
+    )
+    assert resp.status_code == 201
+    assert resp.json()["dosage_quantity"] == 2.25
+
+
+def test_create_medication_invalid_quantity_too_many_decimals(client):
+    resp = client.post(
+        "/api/medications",
+        json={"medication_name": "Tylenol", "dosage_quantity": 1.555, "dosage_unit": "mL"},
+    )
+    assert resp.status_code == 422
+
+
+def test_create_medication_invalid_quantity_zero(client):
+    resp = client.post(
+        "/api/medications",
+        json={"medication_name": "Tylenol", "dosage_quantity": 0, "dosage_unit": "mL"},
+    )
+    assert resp.status_code == 422
+
+
+def test_create_medication_invalid_quantity_negative(client):
+    resp = client.post(
+        "/api/medications",
+        json={"medication_name": "Tylenol", "dosage_quantity": -1.5, "dosage_unit": "mL"},
+    )
+    assert resp.status_code == 422
+
+
+def test_create_medication_invalid_unit(client):
+    resp = client.post(
+        "/api/medications",
+        json={"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "oz"},
+    )
+    assert resp.status_code == 422
+
+
+def test_create_medication_all_valid_units(client):
+    for unit in ["mL", "tsp(s)", "tbsp(s)", "drop(s)", "spray(s)", "tablet(s)", "unit(s)"]:
+        resp = client.post(
+            "/api/medications",
+            json={"medication_name": "Med", "dosage_quantity": 1.0, "dosage_unit": unit},
+        )
+        assert resp.status_code == 201, f"Failed for unit: {unit}"
+        assert resp.json()["dosage_unit"] == unit
+
+
 def test_list_medications(client):
-    client.post("/api/medications", json={"medication_name": "Tylenol", "dosage": "2.5ml"})
+    client.post("/api/medications", json={"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"})
     resp = client.get("/api/medications")
     assert resp.status_code == 200
     assert len(resp.json()) == 1
@@ -41,13 +104,27 @@ def test_update_medication(client):
         "/api/medications",
         json={
             "medication_name": "Tylenol",
-            "dosage": "2.5ml",
+            "dosage_quantity": 2.5,
+            "dosage_unit": "mL",
         },
     )
     mid = create_resp.json()["id"]
-    resp = client.put(f"/api/medications/{mid}", json={"dosage": "5ml"})
+    resp = client.put(f"/api/medications/{mid}", json={"dosage_quantity": 5.0, "dosage_unit": "mL"})
     assert resp.status_code == 200
-    assert resp.json()["dosage"] == "5ml"
+    assert resp.json()["dosage_quantity"] == 5.0
+    assert resp.json()["dosage_unit"] == "mL"
+
+
+def test_update_medication_unit_only(client):
+    create_resp = client.post(
+        "/api/medications",
+        json={"medication_name": "Tylenol", "dosage_quantity": 1.0, "dosage_unit": "mL"},
+    )
+    mid = create_resp.json()["id"]
+    resp = client.put(f"/api/medications/{mid}", json={"dosage_unit": "tsp(s)"})
+    assert resp.status_code == 200
+    assert resp.json()["dosage_unit"] == "tsp(s)"
+    assert resp.json()["dosage_quantity"] == 1.0
 
 
 def test_delete_medication(client):
@@ -55,7 +132,8 @@ def test_delete_medication(client):
         "/api/medications",
         json={
             "medication_name": "Tylenol",
-            "dosage": "2.5ml",
+            "dosage_quantity": 2.5,
+            "dosage_unit": "mL",
         },
     )
     mid = create_resp.json()["id"]
@@ -132,11 +210,38 @@ def test_dashboard_empty(client):
     assert data["last_diaper"] is None
 
 
+def test_medication_detail_in_activities(client):
+    client.post(
+        "/api/medications",
+        json={"medication_name": "Vitamin D", "dosage_quantity": 1.5, "dosage_unit": "mL"},
+    )
+    resp = client.get("/api/dashboard")
+    assert resp.status_code == 200
+    activities = resp.json()["recent_activities"]
+    med_activity = next(a for a in activities if a["type"] == "medication")
+    assert med_activity["detail"] == "1.50 mL"
+    assert med_activity["label"] == "Vitamin D"
+
+
 def test_export_csv(client):
     client.post("/api/diapers", json={"type": "pee"})
     resp = client.get("/api/export?format=csv")
     assert resp.status_code == 200
     assert "text/csv" in resp.headers["content-type"]
+
+
+def test_export_csv_medication_columns(client):
+    client.post(
+        "/api/medications",
+        json={"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"},
+    )
+    resp = client.get("/api/export?format=csv")
+    assert resp.status_code == 200
+    content = resp.content.decode()
+    assert "dosage_quantity" in content
+    assert "dosage_unit" in content
+    assert "2.5" in content
+    assert "mL" in content
 
 
 def test_export_json(client):

@@ -1,8 +1,57 @@
 import os
+import re
 from pathlib import Path
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
+_DOSAGE_UNIT_MAP = {
+    "ml": "mL",
+    "mL": "mL",
+    "tsp": "tsp(s)",
+    "tsps": "tsp(s)",
+    "teaspoon": "tsp(s)",
+    "teaspoons": "tsp(s)",
+    "tbsp": "tbsp(s)",
+    "tbsps": "tbsp(s)",
+    "tablespoon": "tbsp(s)",
+    "tablespoons": "tbsp(s)",
+    "drop": "drop(s)",
+    "drops": "drop(s)",
+    "spray": "spray(s)",
+    "sprays": "spray(s)",
+    "tablet": "tablet(s)",
+    "tablets": "tablet(s)",
+    "tab": "tablet(s)",
+    "unit": "unit(s)",
+    "units": "unit(s)",
+}
+
+
+def _parse_dosage(dosage: str) -> tuple[float, str]:
+    """Attempt to parse a free-text dosage string into (quantity, unit).
+
+    Used during the data migration from the old single dosage field.
+    Returns (0.0, 'unit(s)') when the string cannot be parsed.
+    """
+    if not dosage:
+        return 0.0, "unit(s)"
+    dosage = dosage.strip()
+    m = re.match(r"^(\d+(?:\.\d{1,2})?)\s*([a-zA-Z]+)", dosage)
+    if m:
+        try:
+            qty = round(float(m.group(1)), 2)
+            unit = _DOSAGE_UNIT_MAP.get(m.group(2), _DOSAGE_UNIT_MAP.get(m.group(2).lower(), "unit(s)"))
+            return qty, unit
+        except ValueError:
+            pass
+    m = re.match(r"^(\d+(?:\.\d{1,2})?)$", dosage)
+    if m:
+        try:
+            return round(float(m.group(1)), 2), "unit(s)"
+        except ValueError:
+            pass
+    return 0.0, "unit(s)"
 
 DB_PATH = os.environ.get(
     "PUFFIN_DB_PATH",
@@ -42,6 +91,30 @@ def _run_migrations(bind=None) -> None:
         existing_cols = {c["name"] for c in inspect(conn).get_columns("feedings")}
         if "session_id" not in existing_cols:
             conn.execute(text("ALTER TABLE feedings ADD COLUMN session_id TEXT"))
+            conn.commit()
+
+        insp = inspect(conn)
+        if not insp.has_table("medications"):
+            return
+        med_cols = {c["name"] for c in insp.get_columns("medications")}
+        if "dosage_quantity" not in med_cols:
+            conn.execute(
+                text("ALTER TABLE medications ADD COLUMN dosage_quantity REAL NOT NULL DEFAULT 0.0")
+            )
+            conn.execute(
+                text("ALTER TABLE medications ADD COLUMN dosage_unit TEXT NOT NULL DEFAULT 'unit(s)'")
+            )
+            conn.commit()
+            # Attempt to migrate existing free-text dosage values
+            rows = conn.execute(text("SELECT id, dosage FROM medications")).fetchall()
+            for row_id, dosage_text in rows:
+                qty, unit = _parse_dosage(dosage_text or "")
+                conn.execute(
+                    text(
+                        "UPDATE medications SET dosage_quantity = :qty, dosage_unit = :unit WHERE id = :id"
+                    ),
+                    {"qty": qty, "unit": unit, "id": row_id},
+                )
             conn.commit()
 
 
