@@ -20,6 +20,7 @@ def create_feeding(data: FeedingCreate, db: Session = Depends(get_db)):
         amount_oz=data.amount_oz,
         notes=data.notes,
         session_id=data.session_id,
+        bottle_type=data.bottle_type.value if data.bottle_type else None,
     )
 
 
@@ -62,6 +63,8 @@ def update_feeding(feeding_id: int, data: FeedingUpdate, db: Session = Depends(g
         updates["amount_oz"] = data.amount_oz
     if data.notes is not None:
         updates["notes"] = data.notes
+    if data.bottle_type is not None:
+        updates["bottle_type"] = data.bottle_type.value
     obj = crud.update_feeding(db, feeding_id, **updates)
     if not obj:
         raise HTTPException(status_code=404, detail="Feeding not found")

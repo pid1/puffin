@@ -46,6 +46,30 @@ const BREAST_RIGHT_KEY = 'puffin-breast-right-name';
 const DEFAULT_LEFT_NAME = 'Left';
 const DEFAULT_RIGHT_NAME = 'Right';
 
+/* ===== Bottle Type ===== */
+const BOTTLE_TYPE_KEY = 'puffin-bottle-type-default';
+const DEFAULT_BOTTLE_TYPE = 'breastmilk';
+
+function getDefaultBottleType() {
+    return localStorage.getItem(BOTTLE_TYPE_KEY) || DEFAULT_BOTTLE_TYPE;
+}
+
+function updateBottleTypeLabels() {
+    const defaultType = getDefaultBottleType();
+    const selects = [
+        document.getElementById('feeding-bottle-type-timer-select'),
+        document.getElementById('feeding-bottle-type-manual-select'),
+    ];
+    for (const sel of selects) {
+        if (!sel) continue;
+        sel.querySelector('option[value="breastmilk"]').textContent =
+            'Breastmilk' + (defaultType === 'breastmilk' ? ' (default)' : '');
+        sel.querySelector('option[value="formula"]').textContent =
+            'Formula' + (defaultType === 'formula' ? ' (default)' : '');
+        sel.value = defaultType;
+    }
+}
+
 function getBreastNames() {
     return {
         left: localStorage.getItem(BREAST_LEFT_KEY) || DEFAULT_LEFT_NAME,
@@ -100,6 +124,7 @@ function openModal(id) {
     if (id === 'feeding-modal') {
         loadLastBreastFeeding();
         loadNoteSuggestions('/api/feedings', 'feeding-note-suggestions', 'feeding-notes');
+        updateBottleTypeLabels();
     } else if (id === 'diaper-modal') {
         loadNoteSuggestions('/api/diapers', 'diaper-note-suggestions', 'diaper-notes');
     } else if (id === 'health-modal') {
@@ -804,10 +829,12 @@ function initForms() {
             if (feedingType === 'bottle') {
                 const oz = document.getElementById('feeding-bottle-oz-timer-input').value;
                 if (!oz) { showToast('Please enter ounces'); return; }
+                const bottleType = document.getElementById('feeding-bottle-type-timer-select').value;
                 try {
                     await api.post('/api/feedings', {
                         feeding_type: 'bottle',
                         amount_oz: parseFloat(oz),
+                        bottle_type: bottleType,
                         notes,
                         timestamp,
                     });
@@ -865,9 +892,11 @@ function initForms() {
                 notesAttached = true;
             }
             if (bottleOz) {
+                const bottleType = document.getElementById('feeding-bottle-type-manual-select').value;
                 promises.push(api.post('/api/feedings', {
                     feeding_type: 'bottle',
                     amount_oz: parseFloat(bottleOz),
+                    bottle_type: bottleType,
                     notes: notesAttached ? undefined : notes,
                     timestamp,
                 }));
@@ -1054,6 +1083,7 @@ function buildFeedingEditFields(data, secondaryData = null) {
     }
     const isBottle = data.feeding_type === 'bottle';
     const names = getBreastNames();
+    const bottleTypeVal = data.bottle_type || 'breastmilk';
     return `
         <div class="form-group">
             <label>Type</label>
@@ -1071,6 +1101,13 @@ function buildFeedingEditFields(data, secondaryData = null) {
         <div class="form-group" id="edit-oz-group" ${isBottle ? '' : 'style="display:none"'}>
             <label for="edit-amount-oz">Amount (oz)</label>
             <input type="number" id="edit-amount-oz" min="0.5" max="12" step="0.5" value="${data.amount_oz || ''}">
+        </div>
+        <div class="form-group" id="edit-bottle-type-group" ${isBottle ? '' : 'style="display:none"'}>
+            <label for="edit-bottle-type">Bottle Type</label>
+            <select id="edit-bottle-type">
+                <option value="breastmilk" ${bottleTypeVal === 'breastmilk' ? 'selected' : ''}>Breastmilk</option>
+                <option value="formula" ${bottleTypeVal === 'formula' ? 'selected' : ''}>Formula</option>
+            </select>
         </div>
         <div class="form-group">
             <label for="edit-timestamp">Time</label>
@@ -1167,6 +1204,8 @@ function buildEditBody(type) {
             if (body.feeding_type === 'bottle') {
                 const oz = document.getElementById('edit-amount-oz').value;
                 if (oz) body.amount_oz = parseFloat(oz);
+                const btEl = document.getElementById('edit-bottle-type');
+                if (btEl) body.bottle_type = btEl.value;
             } else {
                 const dur = document.getElementById('edit-duration').value;
                 if (dur) body.duration_minutes = parseInt(dur);
@@ -1200,14 +1239,16 @@ function initEditOptionButtons() {
             btn.classList.add('selected');
             document.getElementById(field).value = value;
 
-            // Toggle duration vs ounces for feeding edits
+            // Toggle duration vs ounces/bottle-type for feeding edits
             if (field === 'edit-feeding-type') {
                 const durGroup = document.getElementById('edit-duration-group');
                 const ozGroup = document.getElementById('edit-oz-group');
+                const btGroup = document.getElementById('edit-bottle-type-group');
                 if (durGroup && ozGroup) {
                     durGroup.style.display = value === 'bottle' ? 'none' : '';
                     ozGroup.style.display = value === 'bottle' ? '' : 'none';
                 }
+                if (btGroup) btGroup.style.display = value === 'bottle' ? '' : 'none';
             }
         });
     });
@@ -1468,6 +1509,7 @@ function initSettings() {
         const names = getBreastNames();
         document.getElementById('settings-left-name').value = names.left;
         document.getElementById('settings-right-name').value = names.right;
+        document.getElementById('settings-bottle-type').value = getDefaultBottleType();
         openModal('settings-modal');
     });
 
@@ -1475,10 +1517,13 @@ function initSettings() {
         e.preventDefault();
         const leftName = document.getElementById('settings-left-name').value.trim() || DEFAULT_LEFT_NAME;
         const rightName = document.getElementById('settings-right-name').value.trim() || DEFAULT_RIGHT_NAME;
+        const bottleType = document.getElementById('settings-bottle-type').value;
         localStorage.setItem(BREAST_LEFT_KEY, leftName);
         localStorage.setItem(BREAST_RIGHT_KEY, rightName);
+        localStorage.setItem(BOTTLE_TYPE_KEY, bottleType);
         closeModal('settings-modal');
         updateBreastLabels();
+        updateBottleTypeLabels();
         if (getTimerState()) showTimerUI();
         showToast('Settings saved!');
     });
@@ -1519,6 +1564,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initSettings();
     initExport();
     updateBreastLabels();
+    updateBottleTypeLabels();
     loadDashboard();
 
     // Theme toggle
