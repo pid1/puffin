@@ -1,5 +1,6 @@
 import os
 import re
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import create_engine, inspect, text
@@ -120,6 +121,14 @@ def _run_migrations(bind=None) -> None:
                 )
             conn.commit()
 
+        # Drop the obsolete NOT NULL ``dosage`` column if it is still lingering.
+        # ORM INSERTs don't supply ``dosage``, so leaving it in place causes
+        # every new medication save to fail with a NOT NULL constraint error.
+        med_cols = {c["name"] for c in inspect(conn).get_columns("medications")}
+        if "dosage" in med_cols:
+            conn.execute(text("ALTER TABLE medications DROP COLUMN dosage"))
+            conn.commit()
+
         # Seed saved_medications from existing medication log entries (first casing wins)
         if insp.has_table("saved_medications"):
             saved_count = conn.execute(text("SELECT COUNT(*) FROM saved_medications")).scalar()
@@ -128,13 +137,21 @@ def _run_migrations(bind=None) -> None:
                     text("SELECT medication_name FROM medications ORDER BY timestamp ASC, id ASC")
                 ).fetchall()
                 seen_lower: set[str] = set()
+                now = datetime.now(UTC)
                 for (name,) in rows:
                     lower = name.lower()
                     if lower not in seen_lower:
                         seen_lower.add(lower)
+                        # ``created_at`` is NOT NULL at the SQL level but only has
+                        # a Python-side default, so raw INSERTs must populate it
+                        # explicitly — without it, INSERT OR IGNORE would silently
+                        # skip every row.
                         conn.execute(
-                            text("INSERT OR IGNORE INTO saved_medications (name) VALUES (:name)"),
-                            {"name": name},
+                            text(
+                                "INSERT OR IGNORE INTO saved_medications (name, created_at) "
+                                "VALUES (:name, :created_at)"
+                            ),
+                            {"name": name, "created_at": now},
                         )
                 if seen_lower:
                     conn.commit()
