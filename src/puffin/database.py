@@ -92,6 +92,9 @@ def _run_migrations(bind=None) -> None:
         if "session_id" not in existing_cols:
             conn.execute(text("ALTER TABLE feedings ADD COLUMN session_id TEXT"))
             conn.commit()
+        if "bottle_type" not in existing_cols:
+            conn.execute(text("ALTER TABLE feedings ADD COLUMN bottle_type TEXT"))
+            conn.commit()
 
         insp = inspect(conn)
         if not insp.has_table("medications"):

@@ -54,6 +54,7 @@ class Feeding(Base):
     amount_oz: Mapped[float | None] = mapped_column(Float, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     session_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    bottle_type: Mapped[str | None] = mapped_column(String, nullable=True)  # breastmilk, formula
     created_at: Mapped[datetime] = mapped_column(_TZ_DATETIME, default=_utcnow)
 
     __table_args__ = (Index("idx_feeding_timestamp", "timestamp"),)

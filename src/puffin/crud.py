@@ -114,6 +114,7 @@ def create_feeding(
     amount_oz: float | None,
     notes: str | None,
     session_id: str | None = None,
+    bottle_type: str | None = None,
 ) -> Feeding:
     obj = Feeding(
         timestamp=timestamp or datetime.now(UTC),
@@ -122,6 +123,7 @@ def create_feeding(
         amount_oz=amount_oz,
         notes=notes,
         session_id=session_id,
+        bottle_type=bottle_type,
     )
     db.add(obj)
     db.commit()
@@ -447,7 +449,8 @@ def get_activities(
             session_groups.setdefault(f.session_id, []).append(f)
         else:
             if f.amount_oz:
-                detail = f"{f.amount_oz} oz"
+                bottle_label = "Formula" if f.bottle_type == "formula" else "Breastmilk"
+                detail = f"{bottle_label} · {f.amount_oz} oz"
             elif f.duration_minutes:
                 detail = f"{f.duration_minutes} min"
             else:

@@ -20,6 +20,11 @@ class FeedingType(StrEnum):
     bottle = "bottle"
 
 
+class BottleType(StrEnum):
+    breastmilk = "breastmilk"
+    formula = "formula"
+
+
 class TemperatureLocation(StrEnum):
     rectal = "rectal"
     oral = "oral"
@@ -72,6 +77,7 @@ class FeedingCreate(BaseModel):
     amount_oz: float | None = None
     notes: str | None = None
     session_id: str | None = None
+    bottle_type: BottleType | None = None
 
 
 class FeedingUpdate(BaseModel):
@@ -80,6 +86,7 @@ class FeedingUpdate(BaseModel):
     duration_minutes: int | None = None
     amount_oz: float | None = None
     notes: str | None = None
+    bottle_type: BottleType | None = None
 
 
 class FeedingResponse(BaseModel):
@@ -92,6 +99,7 @@ class FeedingResponse(BaseModel):
     amount_oz: float | None
     notes: str | None
     session_id: str | None
+    bottle_type: BottleType | None
     created_at: datetime
 
 
