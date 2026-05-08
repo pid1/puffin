@@ -139,7 +139,10 @@ function closeModal(id) {
     document.getElementById(id).classList.add('hidden');
     // Reset forms inside the modal
     const forms = document.getElementById(id).querySelectorAll('form');
-    forms.forEach(f => f.reset());
+    forms.forEach(f => {
+        f.reset();
+        f.querySelectorAll('button[type="submit"]').forEach(btn => { btn.disabled = false; });
+    });
     // Clear selected buttons
     document.getElementById(id).querySelectorAll('.btn-option.selected').forEach(b => b.classList.remove('selected'));
     if (id === 'health-modal') {
@@ -396,6 +399,8 @@ async function endTimer() {
         totals[seg.side] += dur;
     }
 
+    const confirmBtn = document.getElementById('timer-confirm-btn');
+    confirmBtn.disabled = true;
     try {
         // Save one entry per breast used; link paired breasts with a shared session_id
         const activeSides = Object.entries(totals).filter(([, ms]) => ms >= 1000);
@@ -432,6 +437,7 @@ async function endTimer() {
         }
         loadDashboard();
     } catch (e) {
+        confirmBtn.disabled = false;
         showToast('Error saving feeding: ' + e.message);
     }
 }
@@ -803,12 +809,15 @@ function initForms() {
         const notes = document.getElementById('diaper-notes').value || undefined;
         const timestampInput = document.getElementById('diaper-timestamp').value;
         const timestamp = timestampInput ? new Date(timestampInput).toISOString() : undefined;
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
         try {
             await api.post('/api/diapers', { type, notes, timestamp });
             closeModal('diaper-modal');
             showToast('Diaper change logged!');
             loadDashboard();
         } catch (err) {
+            submitBtn.disabled = false;
             showToast('Error: ' + err.message);
         }
     });
@@ -816,6 +825,7 @@ function initForms() {
     // Feeding form
     document.getElementById('feeding-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const saveBtn = document.getElementById('feeding-save-btn');
         const useTimer = document.getElementById('start-timer').checked;
         const notes = document.getElementById('feeding-notes').value || undefined;
         const timestampInput = document.getElementById('feeding-timestamp').value;
@@ -830,6 +840,7 @@ function initForms() {
                 const oz = document.getElementById('feeding-bottle-oz-timer-input').value;
                 if (!oz) { showToast('Please enter ounces'); return; }
                 const bottleType = document.getElementById('feeding-bottle-type-timer-select').value;
+                saveBtn.disabled = true;
                 try {
                     await api.post('/api/feedings', {
                         feeding_type: 'bottle',
@@ -842,12 +853,13 @@ function initForms() {
                     showToast('Feeding logged!');
                     loadDashboard();
                 } catch (err) {
+                    saveBtn.disabled = false;
                     showToast('Error: ' + err.message);
                 }
                 return;
             }
 
-            // Breast: start timer
+            // Breast: start timer (no API call)
             startTimer(feedingType);
             closeModal('feeding-modal');
             showToast('Timer started!');
@@ -864,6 +876,7 @@ function initForms() {
             return;
         }
 
+        saveBtn.disabled = true;
         try {
             const promises = [];
             let notesAttached = false;
@@ -906,6 +919,7 @@ function initForms() {
             showToast('Feeding logged!');
             loadDashboard();
         } catch (err) {
+            saveBtn.disabled = false;
             showToast('Error: ' + err.message);
         }
     });
@@ -933,12 +947,15 @@ function initForms() {
             showToast('Please select a unit');
             return;
         }
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
         try {
             await api.post('/api/medications', { medication_name: name, dosage_quantity, dosage_unit, notes, timestamp });
             closeModal('health-modal');
             showToast('Medication logged!');
             loadDashboard();
         } catch (err) {
+            submitBtn.disabled = false;
             showToast('Error: ' + err.message);
         }
     });
@@ -958,6 +975,8 @@ function initForms() {
             tempValue = (tempValue - 32) * 5 / 9;
         }
 
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
         try {
             await api.post('/api/temperatures', {
                 temperature_celsius: Math.round(tempValue * 10) / 10,
@@ -969,6 +988,7 @@ function initForms() {
             showToast('Temperature logged!');
             loadDashboard();
         } catch (err) {
+            submitBtn.disabled = false;
             showToast('Error: ' + err.message);
         }
     });
