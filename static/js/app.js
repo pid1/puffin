@@ -325,7 +325,9 @@ function showTimerUI() {
 
     // Reset end/confirm UI
     document.getElementById('timer-end-btn').classList.remove('hidden');
-    document.getElementById('timer-confirm-btn').classList.add('hidden');
+    const confirmBtn = document.getElementById('timer-confirm-btn');
+    confirmBtn.classList.add('hidden');
+    confirmBtn.disabled = false;
     document.getElementById('timer-cancel-btn').classList.add('hidden');
     document.getElementById('timer-discard-btn').classList.remove('hidden');
     document.getElementById('timer-discard-confirm-btn').classList.add('hidden');
