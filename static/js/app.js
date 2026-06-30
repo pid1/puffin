@@ -1122,7 +1122,7 @@ function buildFeedingEditFields(data, secondaryData = null) {
         </div>
         <div class="form-group" id="edit-oz-group" ${isBottle ? '' : 'style="display:none"'}>
             <label for="edit-amount-oz">Amount (oz)</label>
-            <input type="number" id="edit-amount-oz" min="0.5" max="12" step="0.5" value="${data.amount_oz || ''}">
+            <input type="number" id="edit-amount-oz" min="0.01" max="12.00" step="0.01" value="${data.amount_oz || ''}">
         </div>
         <div class="form-group" id="edit-bottle-type-group" ${isBottle ? '' : 'style="display:none"'}>
             <label for="edit-bottle-type">Bottle Type</label>
