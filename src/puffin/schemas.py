@@ -1,8 +1,9 @@
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
+from typing import Self
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 # --- Enums ---
 
@@ -25,6 +26,11 @@ class BottleType(StrEnum):
     formula = "formula"
 
 
+class BottleUnit(StrEnum):
+    oz = "oz"
+    ml = "mL"
+
+
 class TemperatureLocation(StrEnum):
     rectal = "rectal"
     oral = "oral"
@@ -33,7 +39,7 @@ class TemperatureLocation(StrEnum):
 
 
 class DosageUnit(StrEnum):
-    mL = "mL"
+    ml = "mL"
     tsp = "tsp(s)"
     tbsp = "tbsp(s)"
     drop = "drop(s)"
@@ -74,19 +80,41 @@ class FeedingCreate(BaseModel):
     timestamp: datetime | None = None
     feeding_type: FeedingType
     duration_minutes: int | None = None
-    amount_oz: float | None = None
+    amount: float | None = None
+    amount_unit: BottleUnit | None = None
     notes: str | None = None
     session_id: str | None = None
     bottle_type: BottleType | None = None
+
+    @model_validator(mode="after")
+    def validate_bottle_amount(self) -> Self:
+        if self.feeding_type == FeedingType.bottle:
+            if (self.amount is None) != (self.amount_unit is None):
+                raise ValueError("Bottle feeds require amount and amount_unit together")
+        else:
+            self.amount = None
+            self.amount_unit = None
+        return self
 
 
 class FeedingUpdate(BaseModel):
     timestamp: datetime | None = None
     feeding_type: FeedingType | None = None
     duration_minutes: int | None = None
-    amount_oz: float | None = None
+    amount: float | None = None
+    amount_unit: BottleUnit | None = None
     notes: str | None = None
     bottle_type: BottleType | None = None
+
+    @model_validator(mode="after")
+    def validate_bottle_amount(self) -> Self:
+        if self.feeding_type == FeedingType.bottle:
+            if (self.amount is None) != (self.amount_unit is None):
+                raise ValueError("Bottle feeds require amount and amount_unit together")
+        elif self.feeding_type in {FeedingType.breast_left, FeedingType.breast_right}:
+            self.amount = None
+            self.amount_unit = None
+        return self
 
 
 class FeedingResponse(BaseModel):
@@ -96,7 +124,8 @@ class FeedingResponse(BaseModel):
     timestamp: datetime
     feeding_type: FeedingType
     duration_minutes: int | None
-    amount_oz: float | None
+    amount: float | None
+    amount_unit: BottleUnit | None
     notes: str | None
     session_id: str | None
     bottle_type: BottleType | None
