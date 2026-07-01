@@ -46,12 +46,41 @@ const BREAST_RIGHT_KEY = 'puffin-breast-right-name';
 const DEFAULT_LEFT_NAME = 'Left';
 const DEFAULT_RIGHT_NAME = 'Right';
 
-/* ===== Bottle Type ===== */
+/* ===== Bottle Defaults ===== */
 const BOTTLE_TYPE_KEY = 'puffin-bottle-type-default';
+const BOTTLE_UNIT_KEY = 'defaultBottleUnit';
 const DEFAULT_BOTTLE_TYPE = 'breastmilk';
+const DEFAULT_BOTTLE_UNIT = 'oz';
 
 function getDefaultBottleType() {
     return localStorage.getItem(BOTTLE_TYPE_KEY) || DEFAULT_BOTTLE_TYPE;
+}
+
+function getDefaultBottleUnit() {
+    const unit = localStorage.getItem(BOTTLE_UNIT_KEY) || DEFAULT_BOTTLE_UNIT;
+    return unit === 'mL' ? 'mL' : 'oz';
+}
+
+function validateBottleAmountUnit(amount, unit) {
+    if (unit === 'mL' && !Number.isInteger(Number(amount))) {
+        showToast('mL amounts must be whole numbers');
+        return false;
+    }
+    return true;
+}
+
+function updateBottleUnitLabels() {
+    const defaultUnit = getDefaultBottleUnit();
+    const selects = [
+        document.getElementById('feeding-bottle-unit-timer-select'),
+        document.getElementById('feeding-bottle-unit-manual-select'),
+    ];
+    for (const sel of selects) {
+        if (!sel) continue;
+        sel.querySelector('option[value="oz"]').textContent = 'oz' + (defaultUnit === 'oz' ? ' (default)' : '');
+        sel.querySelector('option[value="mL"]').textContent = 'mL' + (defaultUnit === 'mL' ? ' (default)' : '');
+        sel.value = defaultUnit;
+    }
 }
 
 function updateBottleTypeLabels() {
@@ -125,6 +154,7 @@ function openModal(id) {
         loadLastBreastFeeding();
         loadNoteSuggestions('/api/feedings', 'feeding-note-suggestions', 'feeding-notes');
         updateBottleTypeLabels();
+        updateBottleUnitLabels();
     } else if (id === 'diaper-modal') {
         loadNoteSuggestions('/api/diapers', 'diaper-note-suggestions', 'diaper-notes');
     } else if (id === 'health-modal') {
@@ -152,7 +182,7 @@ function closeModal(id) {
     if (id === 'feeding-modal') {
         document.getElementById('feeding-timer-mode').classList.remove('hidden');
         document.getElementById('feeding-manual-mode').classList.add('hidden');
-        document.getElementById('feeding-bottle-oz-timer').classList.add('hidden');
+        document.getElementById('feeding-bottle-timer').classList.add('hidden');
         const timerRow = document.getElementById('timer-toggle-row');
         if (timerRow) timerRow.classList.remove('hidden');
         document.getElementById('feeding-save-btn').disabled = true;
@@ -574,8 +604,8 @@ function initFeedingForm() {
     const timerToggleRow = document.getElementById('timer-toggle-row');
     const timerMode = document.getElementById('feeding-timer-mode');
     const manualMode = document.getElementById('feeding-manual-mode');
-    const bottleOzTimerGroup = document.getElementById('feeding-bottle-oz-timer');
-    const bottleOzTimerInput = document.getElementById('feeding-bottle-oz-timer-input');
+    const bottleOzTimerGroup = document.getElementById('feeding-bottle-timer');
+    const bottleOzTimerInput = document.getElementById('feeding-bottle-timer-input');
     const saveBtn = document.getElementById('feeding-save-btn');
 
     function updateMode() {
@@ -600,14 +630,14 @@ function initFeedingForm() {
             return;
         }
         if (ft === 'bottle') {
-            // Bottle: hide timer toggle, show ounces, require a value, set button to Save
+            // Bottle: hide timer toggle, show amount, require a value, set button to Save
             if (timerToggleRow) timerToggleRow.classList.add('hidden');
             bottleOzTimerGroup.classList.remove('hidden');
             saveBtn.textContent = 'Save';
-            const hasOz = !!bottleOzTimerInput.value;
-            saveBtn.disabled = !hasOz;
+            const hasAmount = !!bottleOzTimerInput.value;
+            saveBtn.disabled = !hasAmount;
         } else {
-            // Breast: show timer toggle, hide ounces, enable Start
+            // Breast: show timer toggle, hide amount, enable Start
             if (timerToggleRow) timerToggleRow.classList.remove('hidden');
             bottleOzTimerGroup.classList.add('hidden');
             saveBtn.textContent = 'Start';
@@ -618,7 +648,7 @@ function initFeedingForm() {
     function updateManualBtnState() {
         const l = document.getElementById('feeding-left-duration').value;
         const r = document.getElementById('feeding-right-duration').value;
-        const b = document.getElementById('feeding-bottle-oz').value;
+        const b = document.getElementById('feeding-bottle').value;
         saveBtn.disabled = !(l || r || b);
     }
 
@@ -633,11 +663,10 @@ function initFeedingForm() {
         }
     });
 
-    // Recompute when ounces entered in timer mode
     bottleOzTimerInput.addEventListener('input', updateTimerBtnState);
 
     // Manual mode: enable save when any field is entered
-    ['feeding-left-duration', 'feeding-right-duration', 'feeding-bottle-oz'].forEach(id => {
+    ['feeding-left-duration', 'feeding-right-duration', 'feeding-bottle'].forEach(id => {
         document.getElementById(id).addEventListener('input', updateManualBtnState);
     });
 
@@ -839,14 +868,17 @@ function initForms() {
             if (!feedingType) { showToast('Please select a feeding type'); return; }
 
             if (feedingType === 'bottle') {
-                const oz = document.getElementById('feeding-bottle-oz-timer-input').value;
-                if (!oz) { showToast('Please enter ounces'); return; }
+                const amount = document.getElementById('feeding-bottle-timer-input').value;
+                const amountUnit = document.getElementById('feeding-bottle-unit-timer-select').value;
+                if (!amount) { showToast(`Please enter ${amountUnit}`); return; }
+                if (!validateBottleAmountUnit(amount, amountUnit)) return;
                 const bottleType = document.getElementById('feeding-bottle-type-timer-select').value;
                 saveBtn.disabled = true;
                 try {
                     await api.post('/api/feedings', {
                         feeding_type: 'bottle',
-                        amount_oz: parseFloat(oz),
+                        amount: parseFloat(amount),
+                        amount_unit: amountUnit,
                         bottle_type: bottleType,
                         notes,
                         timestamp,
@@ -871,12 +903,14 @@ function initForms() {
         // Manual mode: create entries for each non-empty field
         const leftDur = document.getElementById('feeding-left-duration').value;
         const rightDur = document.getElementById('feeding-right-duration').value;
-        const bottleOz = document.getElementById('feeding-bottle-oz').value;
+        const bottleAmount = document.getElementById('feeding-bottle').value;
+        const bottleUnit = document.getElementById('feeding-bottle-unit-manual-select').value;
 
-        if (!leftDur && !rightDur && !bottleOz) {
+        if (!leftDur && !rightDur && !bottleAmount) {
             showToast('Please enter at least one value');
             return;
         }
+        if (bottleAmount && !validateBottleAmountUnit(bottleAmount, bottleUnit)) return;
 
         saveBtn.disabled = true;
         try {
@@ -906,11 +940,12 @@ function initForms() {
                 promises.push(api.post('/api/feedings', body));
                 notesAttached = true;
             }
-            if (bottleOz) {
+            if (bottleAmount) {
                 const bottleType = document.getElementById('feeding-bottle-type-manual-select').value;
                 promises.push(api.post('/api/feedings', {
                     feeding_type: 'bottle',
-                    amount_oz: parseFloat(bottleOz),
+                    amount: parseFloat(bottleAmount),
+                    amount_unit: bottleUnit,
                     bottle_type: bottleType,
                     notes: notesAttached ? undefined : notes,
                     timestamp,
@@ -1106,6 +1141,7 @@ function buildFeedingEditFields(data, secondaryData = null) {
     const isBottle = data.feeding_type === 'bottle';
     const names = getBreastNames();
     const bottleTypeVal = data.bottle_type || 'breastmilk';
+    const bottleUnitVal = data.amount_unit || getDefaultBottleUnit();
     return `
         <div class="form-group">
             <label>Type</label>
@@ -1121,8 +1157,14 @@ function buildFeedingEditFields(data, secondaryData = null) {
             <input type="number" id="edit-duration" min="1" max="120" value="${data.duration_minutes || ''}">
         </div>
         <div class="form-group" id="edit-oz-group" ${isBottle ? '' : 'style="display:none"'}>
-            <label for="edit-amount-oz">Amount (oz)</label>
-            <input type="number" id="edit-amount-oz" min="0.01" max="12.00" step="0.01" value="${data.amount_oz || ''}">
+            <label for="edit-amount">Amount</label>
+            <div class="input-group">
+                <input type="number" id="edit-amount" min="0.01" step="0.01" value="${data.amount || ''}">
+                <select id="edit-amount-unit">
+                    <option value="oz" ${bottleUnitVal === 'oz' ? 'selected' : ''}>oz</option>
+                    <option value="mL" ${bottleUnitVal === 'mL' ? 'selected' : ''}>mL</option>
+                </select>
+            </div>
         </div>
         <div class="form-group" id="edit-bottle-type-group" ${isBottle ? '' : 'style="display:none"'}>
             <label for="edit-bottle-type">Bottle Type</label>
@@ -1224,8 +1266,13 @@ function buildEditBody(type) {
         case 'feeding': {
             body.feeding_type = document.getElementById('edit-feeding-type').value;
             if (body.feeding_type === 'bottle') {
-                const oz = document.getElementById('edit-amount-oz').value;
-                if (oz) body.amount_oz = parseFloat(oz);
+                const amount = document.getElementById('edit-amount').value;
+                const amountUnit = document.getElementById('edit-amount-unit').value;
+                if (amount) {
+                    if (!validateBottleAmountUnit(amount, amountUnit)) return null;
+                    body.amount = parseFloat(amount);
+                    body.amount_unit = amountUnit;
+                }
                 const btEl = document.getElementById('edit-bottle-type');
                 if (btEl) body.bottle_type = btEl.value;
             } else {
@@ -1261,7 +1308,7 @@ function initEditOptionButtons() {
             btn.classList.add('selected');
             document.getElementById(field).value = value;
 
-            // Toggle duration vs ounces/bottle-type for feeding edits
+            // Toggle duration vs amount/bottle-type for feeding edits
             if (field === 'edit-feeding-type') {
                 const durGroup = document.getElementById('edit-duration-group');
                 const ozGroup = document.getElementById('edit-oz-group');
@@ -1310,7 +1357,9 @@ function initEditForm() {
                     api.put(`/api/feedings/${rightIdEl.value}`, rightBody),
                 ]);
             } else {
-                await api.put(endpoints[type], buildEditBody(type));
+                const body = buildEditBody(type);
+                if (!body) return;
+                await api.put(endpoints[type], body);
             }
             closeModal('edit-modal');
             showToast('Updated!');
@@ -1532,6 +1581,8 @@ function initSettings() {
         document.getElementById('settings-left-name').value = names.left;
         document.getElementById('settings-right-name').value = names.right;
         document.getElementById('settings-bottle-type').value = getDefaultBottleType();
+        document.getElementById('settings-bottle-unit').value = getDefaultBottleUnit();
+        updateBottleUnitLabels();
         openModal('settings-modal');
     });
 
@@ -1540,12 +1591,15 @@ function initSettings() {
         const leftName = document.getElementById('settings-left-name').value.trim() || DEFAULT_LEFT_NAME;
         const rightName = document.getElementById('settings-right-name').value.trim() || DEFAULT_RIGHT_NAME;
         const bottleType = document.getElementById('settings-bottle-type').value;
+        const bottleUnit = document.getElementById('settings-bottle-unit').value;
         localStorage.setItem(BREAST_LEFT_KEY, leftName);
         localStorage.setItem(BREAST_RIGHT_KEY, rightName);
         localStorage.setItem(BOTTLE_TYPE_KEY, bottleType);
+        localStorage.setItem(BOTTLE_UNIT_KEY, bottleUnit);
         closeModal('settings-modal');
         updateBreastLabels();
         updateBottleTypeLabels();
+        updateBottleUnitLabels();
         if (getTimerState()) showTimerUI();
         showToast('Settings saved!');
     });
@@ -1587,6 +1641,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initExport();
     updateBreastLabels();
     updateBottleTypeLabels();
+    updateBottleUnitLabels();
     loadDashboard();
 
     // Theme toggle

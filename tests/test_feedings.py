@@ -26,13 +26,52 @@ def test_create_bottle_feeding(client):
 def test_create_bottle_feeding_with_oz(client):
     resp = client.post(
         "/api/feedings",
-        json={"feeding_type": "bottle", "amount_oz": 3.5},
+        json={"feeding_type": "bottle", "amount": 3.5, "amount_unit": "oz"},
     )
     assert resp.status_code == 201
     data = resp.json()
     assert data["feeding_type"] == "bottle"
-    assert data["amount_oz"] == 3.5
+    assert data["amount"] == 3.5
+    assert data["amount_unit"] == "oz"
     assert data["duration_minutes"] is None
+
+
+def test_create_bottle_feeding_with_ml(client):
+    resp = client.post(
+        "/api/feedings",
+        json={"feeding_type": "bottle", "amount": 120, "amount_unit": "mL"},
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["amount"] == 120
+    assert data["amount_unit"] == "mL"
+
+
+def test_create_bottle_feeding_amount_requires_unit(client):
+    resp = client.post(
+        "/api/feedings",
+        json={"feeding_type": "bottle", "amount": 3.5},
+    )
+    assert resp.status_code == 422
+
+
+def test_create_bottle_feeding_unit_requires_amount(client):
+    resp = client.post(
+        "/api/feedings",
+        json={"feeding_type": "bottle", "amount_unit": "oz"},
+    )
+    assert resp.status_code == 422
+
+
+def test_create_breast_feeding_normalizes_amount_unit(client):
+    resp = client.post(
+        "/api/feedings",
+        json={"feeding_type": "breast_left", "amount": 3.5, "amount_unit": "oz"},
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["amount"] is None
+    assert data["amount_unit"] is None
 
 
 def test_create_feeding_with_timestamp(client):
@@ -40,7 +79,12 @@ def test_create_feeding_with_timestamp(client):
     custom_time = "2026-04-05T08:00:00Z"
     resp = client.post(
         "/api/feedings",
-        json={"feeding_type": "bottle", "amount_oz": 4.0, "timestamp": custom_time},
+        json={
+            "feeding_type": "bottle",
+            "amount": 4.0,
+            "amount_unit": "oz",
+            "timestamp": custom_time,
+        },
     )
     assert resp.status_code == 201
     data = resp.json()
@@ -67,6 +111,40 @@ def test_update_feeding(client):
     resp = client.put(f"/api/feedings/{fid}", json={"duration_minutes": 20})
     assert resp.status_code == 200
     assert resp.json()["duration_minutes"] == 20
+
+
+def test_update_bottle_amount_and_unit(client):
+    create_resp = client.post(
+        "/api/feedings",
+        json={"feeding_type": "bottle", "amount": 3.0, "amount_unit": "oz"},
+    )
+    fid = create_resp.json()["id"]
+    resp = client.put(f"/api/feedings/{fid}", json={"amount": 100, "amount_unit": "mL"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["amount"] == 100
+    assert data["amount_unit"] == "mL"
+
+
+def test_update_bottle_amount_requires_unit(client):
+    create_resp = client.post("/api/feedings", json={"feeding_type": "bottle"})
+    fid = create_resp.json()["id"]
+    resp = client.put(f"/api/feedings/{fid}", json={"amount": 100})
+    assert resp.status_code == 422
+
+
+def test_update_breast_feeding_normalizes_amount_unit(client):
+    create_resp = client.post("/api/feedings", json={"feeding_type": "bottle"})
+    fid = create_resp.json()["id"]
+    resp = client.put(
+        f"/api/feedings/{fid}",
+        json={"feeding_type": "breast_left", "amount": 100, "amount_unit": "mL"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["feeding_type"] == "breast_left"
+    assert data["amount"] is None
+    assert data["amount_unit"] is None
 
 
 def test_delete_feeding(client):
@@ -112,7 +190,10 @@ def test_feeding_stats_mixed_sessions(client):
         json={"feeding_type": "breast_right", "duration_minutes": 6, "session_id": session_id},
     )
     # One individual bottle feed
-    client.post("/api/feedings", json={"feeding_type": "bottle", "amount_oz": 3.0})
+    client.post(
+        "/api/feedings",
+        json={"feeding_type": "bottle", "amount": 3.0, "amount_unit": "oz"},
+    )
     resp = client.get("/api/feedings/stats")
     assert resp.status_code == 200
     assert resp.json()["today"] == 2  # one paired session + one bottle
@@ -236,6 +317,9 @@ def test_migration_adds_session_id_column(setup_db):
     with old_engine.connect() as conn:
         post_cols = {c["name"] for c in inspect(conn).get_columns("feedings")}
     assert "session_id" in post_cols
+    assert "amount" in post_cols
+    assert "amount_unit" in post_cols
+    assert "amount_oz" not in post_cols
 
     # Running the migration a second time must be idempotent (no error)
     _run_migrations(bind=old_engine)
