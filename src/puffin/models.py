@@ -51,7 +51,8 @@ class Feeding(Base):
         String, nullable=False
     )  # breast_left, breast_right, bottle
     duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    amount_oz: Mapped[float | None] = mapped_column(Float, nullable=True)
+    amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    amount_unit: Mapped[str | None] = mapped_column(String, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     session_id: Mapped[str | None] = mapped_column(String, nullable=True)
     bottle_type: Mapped[str | None] = mapped_column(String, nullable=True)  # breastmilk, formula

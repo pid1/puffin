@@ -16,6 +16,14 @@ router = APIRouter(prefix="/api", tags=["dashboard"])
 _PDF_MAX_CELL_LENGTH = 40  # max characters per cell before truncation
 
 
+def _format_bottle_amount(amount: float | None, amount_unit: str | None) -> str:
+    if amount is None or amount_unit is None:
+        return ""
+    if amount_unit == "mL":
+        return f"{amount:.0f} mL"
+    return f"{amount:.2f} oz"
+
+
 @router.get("/dashboard", response_model=DashboardSummary)
 def get_dashboard(
     date: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
@@ -72,8 +80,7 @@ def export_data(
             def header(self):
                 self.set_font("Helvetica", "B", 16)
                 self.cell(
-                    0, 10, "Puffin Baby Tracker Report",
-                    align="C", new_x="LMARGIN", new_y="NEXT"
+                    0, 10, "Puffin Baby Tracker Report", align="C", new_x="LMARGIN", new_y="NEXT"
                 )
                 self.set_font("Helvetica", "", 9)
                 report_range = _build_date_range_label(start_date, end_date)
@@ -89,45 +96,65 @@ def export_data(
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
 
-        _pdf_section(pdf, "Diaper Changes", ["Time", "Type", "Notes"], [
+        _pdf_section(
+            pdf,
+            "Diaper Changes",
+            ["Time", "Type", "Notes"],
             [
-                _fmt_ts(d.timestamp),
-                str(d.type),
-                d.notes or "",
-            ]
-            for d in diapers
-        ])
+                [
+                    _fmt_ts(d.timestamp),
+                    str(d.type),
+                    d.notes or "",
+                ]
+                for d in diapers
+            ],
+        )
 
-        _pdf_section(pdf, "Feedings", ["Time", "Type", "Duration (min)", "Amount (oz)", "Notes"], [
+        _pdf_section(
+            pdf,
+            "Feedings",
+            ["Time", "Type", "Duration (min)", "Amount", "Notes"],
             [
-                _fmt_ts(f.timestamp),
-                str(f.feeding_type),
-                str(f.duration_minutes) if f.duration_minutes is not None else "",
-                str(f.amount_oz) if f.amount_oz is not None else "",
-                f.notes or "",
-            ]
-            for f in feedings
-        ])
+                [
+                    _fmt_ts(f.timestamp),
+                    str(f.feeding_type),
+                    str(f.duration_minutes) if f.duration_minutes is not None else "",
+                    _format_bottle_amount(f.amount, f.amount_unit),
+                    f.notes or "",
+                ]
+                for f in feedings
+            ],
+        )
 
-        _pdf_section(pdf, "Medications", ["Time", "Medication", "Dosage", "Notes"], [
+        _pdf_section(
+            pdf,
+            "Medications",
+            ["Time", "Medication", "Dosage", "Notes"],
             [
-                _fmt_ts(m.timestamp),
-                m.medication_name,
-                f"{m.dosage_quantity:.2f} {m.dosage_unit}",
-                m.notes or "",
-            ]
-            for m in medications
-        ])
+                [
+                    _fmt_ts(m.timestamp),
+                    m.medication_name,
+                    f"{m.dosage_quantity:.2f} {m.dosage_unit}",
+                    m.notes or "",
+                ]
+                for m in medications
+            ],
+        )
 
-        _pdf_section(pdf, "Temperature Readings", ["Time", "Temp (°C)", "Location", "Notes"], [
+        _pdf_section(
+            pdf,
+            "Temperature Readings",
+            ["Time", "Temp (°C)", "Location", "Notes"],
             [
-                _fmt_ts(t.timestamp),
-                str(t.temperature_celsius),
-                str(t.location) if t.location else "",
-                t.notes or "",
-            ]
-            for t in temperatures
-        ])
+                [
+                    _fmt_ts(t.timestamp),
+                    str(t.temperature_celsius),
+                    str(t.location) if t.location else "",
+                    t.notes or "",
+                ]
+                for t in temperatures
+            ],
+        )
 
         pdf_bytes = pdf.output()
         return StreamingResponse(
@@ -148,7 +175,16 @@ def export_data(
     writer.writerow([])
     writer.writerow(["--- Feedings ---"])
     writer.writerow(
-        ["id", "timestamp", "feeding_type", "duration_minutes", "amount_oz", "notes", "created_at"]
+        [
+            "id",
+            "timestamp",
+            "feeding_type",
+            "duration_minutes",
+            "amount",
+            "amount_unit",
+            "notes",
+            "created_at",
+        ]
     )
     for f in feedings:
         writer.writerow(
@@ -157,7 +193,8 @@ def export_data(
                 f.timestamp,
                 f.feeding_type,
                 f.duration_minutes,
-                f.amount_oz,
+                f.amount,
+                f.amount_unit,
                 f.notes,
                 f.created_at,
             ]
@@ -165,9 +202,29 @@ def export_data(
 
     writer.writerow([])
     writer.writerow(["--- Medications ---"])
-    writer.writerow(["id", "timestamp", "medication_name", "dosage_quantity", "dosage_unit", "notes", "created_at"])
+    writer.writerow(
+        [
+            "id",
+            "timestamp",
+            "medication_name",
+            "dosage_quantity",
+            "dosage_unit",
+            "notes",
+            "created_at",
+        ]
+    )
     for m in medications:
-        writer.writerow([m.id, m.timestamp, m.medication_name, m.dosage_quantity, m.dosage_unit, m.notes, m.created_at])
+        writer.writerow(
+            [
+                m.id,
+                m.timestamp,
+                m.medication_name,
+                m.dosage_quantity,
+                m.dosage_unit,
+                m.notes,
+                m.created_at,
+            ]
+        )
 
     writer.writerow([])
     writer.writerow(["--- Temperature Readings ---"])

@@ -11,6 +11,7 @@ user upgrading from an older release still ends up with:
 - ``saved_medications`` seeded from prior log entries so the autocomplete
   dropdown is non-empty on first use.
 """
+
 import sqlite3
 
 import pytest
@@ -62,6 +63,15 @@ def legacy_engine(tmp_path):
             ("2026-04-03 10:00:00", "tylenol", "2.5 ml", None, "2026-04-03 10:00:00"),
         ],
     )
+    raw.executemany(
+        "INSERT INTO feedings "
+        "(timestamp, feeding_type, duration_minutes, amount_oz, notes, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        [
+            ("2026-04-01 09:00:00", "bottle", None, 3.5, None, "2026-04-01 09:00:00"),
+            ("2026-04-01 10:00:00", "breast_left", 12, None, None, "2026-04-01 10:00:00"),
+        ],
+    )
     raw.commit()
     raw.close()
 
@@ -85,6 +95,19 @@ def test_migration_adds_split_dosage_columns(legacy_engine):
     assert "dosage_unit" in cols
 
 
+def test_migration_renames_feeding_amount_column(legacy_engine):
+    with legacy_engine.connect() as conn:
+        cols = {c["name"] for c in inspect(conn).get_columns("feedings")}
+        rows = conn.execute(
+            text("SELECT feeding_type, amount, amount_unit FROM feedings ORDER BY id")
+        ).fetchall()
+    assert "amount" in cols
+    assert "amount_unit" in cols
+    assert "amount_oz" not in cols
+    assert rows[0] == ("bottle", 3.5, "oz")
+    assert rows[1] == ("breast_left", None, None)
+
+
 def test_migration_drops_obsolete_dosage_column(legacy_engine):
     """The old NOT NULL ``dosage`` column must go — otherwise new medication
     saves fail with a NOT NULL constraint error (issue #30)."""
@@ -97,8 +120,7 @@ def test_migration_parses_existing_dosage_values(legacy_engine):
     with legacy_engine.connect() as conn:
         rows = conn.execute(
             text(
-                "SELECT medication_name, dosage_quantity, dosage_unit "
-                "FROM medications ORDER BY id"
+                "SELECT medication_name, dosage_quantity, dosage_unit FROM medications ORDER BY id"
             )
         ).fetchall()
     assert rows[0] == ("Tylenol", 2.5, "mL")
@@ -149,7 +171,11 @@ def test_migration_is_idempotent(legacy_engine):
     _run_migrations(bind=legacy_engine)
     with legacy_engine.connect() as conn:
         cols = {c["name"] for c in inspect(conn).get_columns("medications")}
+        feeding_cols = {c["name"] for c in inspect(conn).get_columns("feedings")}
         saved = conn.execute(text("SELECT COUNT(*) FROM saved_medications")).scalar()
     assert "dosage" not in cols
     assert "dosage_quantity" in cols
+    assert "amount" in feeding_cols
+    assert "amount_unit" in feeding_cols
+    assert "amount_oz" not in feeding_cols
     assert saved == 2

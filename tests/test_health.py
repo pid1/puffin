@@ -93,7 +93,10 @@ def test_create_medication_all_valid_units(client):
 
 
 def test_list_medications(client):
-    client.post("/api/medications", json={"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"})
+    client.post(
+        "/api/medications",
+        json={"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"},
+    )
     resp = client.get("/api/medications")
     assert resp.status_code == 200
     assert len(resp.json()) == 1
@@ -228,6 +231,21 @@ def test_export_csv(client):
     resp = client.get("/api/export?format=csv")
     assert resp.status_code == 200
     assert "text/csv" in resp.headers["content-type"]
+
+
+def test_export_csv_feeding_amount_columns(client):
+    client.post(
+        "/api/feedings",
+        json={"feeding_type": "bottle", "amount": 100, "amount_unit": "mL"},
+    )
+    resp = client.get("/api/export?format=csv")
+    assert resp.status_code == 200
+    content = resp.content.decode()
+    assert "amount" in content
+    assert "amount_unit" in content
+    assert "amount_oz" not in content
+    assert "100.0" in content
+    assert "mL" in content
 
 
 def test_export_csv_medication_columns(client):
