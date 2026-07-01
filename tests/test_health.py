@@ -233,6 +233,21 @@ def test_export_csv(client):
     assert "text/csv" in resp.headers["content-type"]
 
 
+def test_export_csv_feeding_amount_columns(client):
+    client.post(
+        "/api/feedings",
+        json={"feeding_type": "bottle", "amount": 100, "amount_unit": "mL"},
+    )
+    resp = client.get("/api/export?format=csv")
+    assert resp.status_code == 200
+    content = resp.content.decode()
+    assert "amount" in content
+    assert "amount_unit" in content
+    assert "amount_oz" not in content
+    assert "100.0" in content
+    assert "mL" in content
+
+
 def test_export_csv_medication_columns(client):
     client.post(
         "/api/medications",

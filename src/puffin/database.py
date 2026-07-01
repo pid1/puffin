@@ -96,8 +96,54 @@ def _run_migrations(bind=None) -> None:
         if "session_id" not in existing_cols:
             conn.execute(text("ALTER TABLE feedings ADD COLUMN session_id TEXT"))
             conn.commit()
+            existing_cols.add("session_id")
         if "bottle_type" not in existing_cols:
             conn.execute(text("ALTER TABLE feedings ADD COLUMN bottle_type TEXT"))
+            conn.commit()
+            existing_cols.add("bottle_type")
+        if "amount_unit" not in existing_cols:
+            conn.execute(text("ALTER TABLE feedings ADD COLUMN amount_unit TEXT"))
+            conn.commit()
+            existing_cols.add("amount_unit")
+        conn.execute(
+            text(
+                "UPDATE feedings SET amount_unit = 'oz' "
+                "WHERE feeding_type = 'bottle' AND amount_unit IS NULL"
+            )
+        )
+        conn.commit()
+        if "amount_oz" in existing_cols and "amount" not in existing_cols:
+            conn.execute(text("PRAGMA foreign_keys=off"))
+            conn.execute(
+                text(
+                    "CREATE TABLE feedings_new ("
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    "timestamp DATETIME NOT NULL, "
+                    "feeding_type VARCHAR NOT NULL, "
+                    "duration_minutes INTEGER, "
+                    "amount FLOAT, "
+                    "amount_unit VARCHAR, "
+                    "notes TEXT, "
+                    "session_id VARCHAR, "
+                    "bottle_type VARCHAR, "
+                    "created_at DATETIME)"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO feedings_new "
+                    "(id, timestamp, feeding_type, duration_minutes, amount, amount_unit, "
+                    "notes, session_id, bottle_type, created_at) "
+                    "SELECT id, timestamp, feeding_type, duration_minutes, amount_oz, amount_unit, "
+                    "notes, session_id, bottle_type, created_at FROM feedings"
+                )
+            )
+            conn.execute(text("DROP TABLE feedings"))
+            conn.execute(text("ALTER TABLE feedings_new RENAME TO feedings"))
+            conn.execute(
+                text("CREATE INDEX IF NOT EXISTS idx_feeding_timestamp ON feedings (timestamp)")
+            )
+            conn.execute(text("PRAGMA foreign_keys=on"))
             conn.commit()
 
         insp = inspect(conn)
@@ -120,8 +166,8 @@ def _run_migrations(bind=None) -> None:
                 qty, unit = _parse_dosage(dosage_text or "")
                 conn.execute(
                     text(
-                        "UPDATE medications SET dosage_quantity = :qty, "
-                        "dosage_unit = :unit WHERE id = :id"
+                        "UPDATE medications SET dosage_quantity = :qty, dosage_unit = :unit "
+                        "WHERE id = :id"
                     ),
                     {"qty": qty, "unit": unit, "id": row_id},
                 )

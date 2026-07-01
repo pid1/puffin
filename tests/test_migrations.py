@@ -63,6 +63,15 @@ def legacy_engine(tmp_path):
             ("2026-04-03 10:00:00", "tylenol", "2.5 ml", None, "2026-04-03 10:00:00"),
         ],
     )
+    raw.executemany(
+        "INSERT INTO feedings "
+        "(timestamp, feeding_type, duration_minutes, amount_oz, notes, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        [
+            ("2026-04-01 09:00:00", "bottle", None, 3.5, None, "2026-04-01 09:00:00"),
+            ("2026-04-01 10:00:00", "breast_left", 12, None, None, "2026-04-01 10:00:00"),
+        ],
+    )
     raw.commit()
     raw.close()
 
@@ -84,6 +93,68 @@ def test_migration_adds_split_dosage_columns(legacy_engine):
         cols = {c["name"] for c in inspect(conn).get_columns("medications")}
     assert "dosage_quantity" in cols
     assert "dosage_unit" in cols
+
+
+def test_migration_renames_feeding_amount_column(legacy_engine):
+    with legacy_engine.connect() as conn:
+        cols = {c["name"] for c in inspect(conn).get_columns("feedings")}
+        rows = conn.execute(
+            text("SELECT feeding_type, amount, amount_unit FROM feedings ORDER BY id")
+        ).fetchall()
+    assert "amount" in cols
+    assert "amount_unit" in cols
+    assert "amount_oz" not in cols
+    assert rows[0] == ("bottle", 3.5, "oz")
+    assert rows[1] == ("breast_left", None, None)
+
+
+def test_migration_adds_amount_unit_to_current_amount_schema(tmp_path):
+    db_path = tmp_path / "amount_without_unit.db"
+    raw = sqlite3.connect(db_path)
+    raw.executescript(
+        """
+        CREATE TABLE feedings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME NOT NULL,
+            feeding_type TEXT NOT NULL,
+            duration_minutes INTEGER,
+            amount REAL,
+            notes TEXT,
+            session_id TEXT,
+            bottle_type TEXT,
+            created_at DATETIME
+        );
+        INSERT INTO feedings
+            (timestamp, feeding_type, duration_minutes, amount, notes, created_at)
+        VALUES
+            ('2026-04-01 09:00:00', 'bottle', NULL, 120, NULL, '2026-04-01 09:00:00'),
+            ('2026-04-01 10:00:00', 'breast_left', 12, NULL, NULL, '2026-04-01 10:00:00');
+        """
+    )
+    raw.commit()
+    raw.close()
+
+    engine = create_engine(
+        f"sqlite:///{db_path}",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    try:
+        _run_migrations(bind=engine)
+        _run_migrations(bind=engine)
+        with engine.connect() as conn:
+            cols = {c["name"] for c in inspect(conn).get_columns("feedings")}
+            rows = conn.execute(
+                text("SELECT feeding_type, amount, amount_unit FROM feedings ORDER BY id")
+            ).fetchall()
+    finally:
+        engine.dispose()
+
+    assert "amount" in cols
+    assert "amount_unit" in cols
+    assert "amount_oz" not in cols
+    assert rows[0] == ("bottle", 120.0, "oz")
+    assert rows[1] == ("breast_left", None, None)
 
 
 def test_migration_drops_obsolete_dosage_column(legacy_engine):
@@ -149,7 +220,11 @@ def test_migration_is_idempotent(legacy_engine):
     _run_migrations(bind=legacy_engine)
     with legacy_engine.connect() as conn:
         cols = {c["name"] for c in inspect(conn).get_columns("medications")}
+        feeding_cols = {c["name"] for c in inspect(conn).get_columns("feedings")}
         saved = conn.execute(text("SELECT COUNT(*) FROM saved_medications")).scalar()
     assert "dosage" not in cols
     assert "dosage_quantity" in cols
+    assert "amount" in feeding_cols
+    assert "amount_unit" in feeding_cols
+    assert "amount_oz" not in feeding_cols
     assert saved == 2

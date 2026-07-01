@@ -106,21 +106,34 @@ def diaper_stats(db: Session) -> dict[str, int]:
 # --- Feedings ---
 
 
+def _format_bottle_amount(amount: float | None, amount_unit: str | None) -> str:
+    if amount is None or amount_unit is None:
+        return ""
+    if amount_unit == "mL":
+        return f"{amount:.0f} mL"
+    return f"{amount:.2f} oz"
+
+
 def create_feeding(
     db: Session,
     timestamp: datetime | None,
     feeding_type: str,
     duration_minutes: int | None,
-    amount_oz: float | None,
+    amount: float | None,
+    amount_unit: str | None,
     notes: str | None,
     session_id: str | None = None,
     bottle_type: str | None = None,
 ) -> Feeding:
+    if feeding_type != "bottle":
+        amount = None
+        amount_unit = None
     obj = Feeding(
         timestamp=timestamp or datetime.now(UTC),
         feeding_type=feeding_type,
         duration_minutes=duration_minutes,
-        amount_oz=amount_oz,
+        amount=amount,
+        amount_unit=amount_unit,
         notes=notes,
         session_id=session_id,
         bottle_type=bottle_type,
@@ -155,8 +168,12 @@ def update_feeding(db: Session, feeding_id: int, **kwargs) -> Feeding | None:
     obj = db.get(Feeding, feeding_id)
     if not obj:
         return None
+    target_type = kwargs.get("feeding_type", obj.feeding_type)
+    if target_type in {"breast_left", "breast_right"}:
+        kwargs["amount"] = None
+        kwargs["amount_unit"] = None
     for k, v in kwargs.items():
-        if v is not None:
+        if v is not None or k in {"amount", "amount_unit"}:
             setattr(obj, k, v)
     db.commit()
     db.refresh(obj)
@@ -444,9 +461,9 @@ def get_activities(
         if f.session_id:
             session_groups.setdefault(f.session_id, []).append(f)
         else:
-            if f.amount_oz:
+            if f.amount is not None and f.amount_unit:
                 bottle_label = "Formula" if f.bottle_type == "formula" else "Breastmilk"
-                detail = f"{bottle_label} · {f.amount_oz} oz"
+                detail = f"{bottle_label} · {_format_bottle_amount(f.amount, f.amount_unit)}"
             elif f.duration_minutes:
                 detail = f"{f.duration_minutes} min"
             else:
