@@ -52,41 +52,6 @@ def test_list_activities_paired_session_merged(client):
     assert "Right" in feeding_activities[0]["detail"]
 
 
-def test_list_activities_formats_bottle_oz(client):
-    from datetime import UTC, datetime
-
-    client.post(
-        "/api/feedings",
-        json={
-            "feeding_type": "bottle",
-            "amount": 3.5,
-            "amount_unit": "oz",
-            "bottle_type": "formula",
-        },
-    )
-
-    today = datetime.now(UTC).strftime("%Y-%m-%d")
-    resp = client.get(f"/api/activities?date={today}")
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data[0]["detail"] == "Formula · 3.50 oz"
-
-
-def test_list_activities_formats_bottle_ml(client):
-    from datetime import UTC, datetime
-
-    client.post(
-        "/api/feedings",
-        json={"feeding_type": "bottle", "amount": 100, "amount_unit": "mL"},
-    )
-
-    today = datetime.now(UTC).strftime("%Y-%m-%d")
-    resp = client.get(f"/api/activities?date={today}")
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data[0]["detail"] == "Breastmilk · 100 mL"
-
-
 def test_list_activities_empty(client):
     """No activities for a date far in the past."""
     resp = client.get("/api/activities?date=2000-01-01")

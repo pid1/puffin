@@ -17,8 +17,7 @@ def create_feeding(data: FeedingCreate, db: Session = Depends(get_db)):
         timestamp=data.timestamp,
         feeding_type=data.feeding_type.value,
         duration_minutes=data.duration_minutes,
-        amount=data.amount,
-        amount_unit=data.amount_unit.value if data.amount_unit else None,
+        amount_oz=data.amount_oz,
         notes=data.notes,
         session_id=data.session_id,
         bottle_type=data.bottle_type.value if data.bottle_type else None,
@@ -53,15 +52,6 @@ def get_feeding(feeding_id: int, db: Session = Depends(get_db)):
 
 @router.put("/{feeding_id}", response_model=FeedingResponse)
 def update_feeding(feeding_id: int, data: FeedingUpdate, db: Session = Depends(get_db)):
-    existing = crud.get_feeding(db, feeding_id)
-    if not existing:
-        raise HTTPException(status_code=404, detail="Feeding not found")
-    target_type = data.feeding_type.value if data.feeding_type else existing.feeding_type
-    if target_type == "bottle" and (data.amount is None) != (data.amount_unit is None):
-        raise HTTPException(
-            status_code=422,
-            detail="Bottle feeds require amount and amount_unit together",
-        )
     updates = {}
     if data.timestamp is not None:
         updates["timestamp"] = data.timestamp
@@ -69,15 +59,16 @@ def update_feeding(feeding_id: int, data: FeedingUpdate, db: Session = Depends(g
         updates["feeding_type"] = data.feeding_type.value
     if data.duration_minutes is not None:
         updates["duration_minutes"] = data.duration_minutes
-    if data.amount is not None:
-        updates["amount"] = data.amount
-    if data.amount_unit is not None:
-        updates["amount_unit"] = data.amount_unit.value
+    if data.amount_oz is not None:
+        updates["amount_oz"] = data.amount_oz
     if data.notes is not None:
         updates["notes"] = data.notes
     if data.bottle_type is not None:
         updates["bottle_type"] = data.bottle_type.value
-    return crud.update_feeding(db, feeding_id, **updates)
+    obj = crud.update_feeding(db, feeding_id, **updates)
+    if not obj:
+        raise HTTPException(status_code=404, detail="Feeding not found")
+    return obj
 
 
 @router.delete("/{feeding_id}", status_code=204)

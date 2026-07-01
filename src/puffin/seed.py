@@ -77,8 +77,7 @@ def generate_feedings(day_offset: int, base_date: datetime, now: datetime) -> li
                 Feeding(
                     timestamp=current_time,
                     feeding_type="bottle",
-                    amount=round(random.uniform(1.0, 4.0), 1),
-                    amount_unit="oz",
+                    amount_oz=round(random.uniform(1.0, 4.0), 1),
                     notes=random.choice(FEEDING_NOTES),
                     created_at=current_time,
                 )

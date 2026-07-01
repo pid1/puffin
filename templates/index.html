@@ -139,14 +139,10 @@
                         </div>
                         <input type="hidden" id="feeding-type">
                     </div>
-                    <div id="feeding-bottle-timer" class="form-group hidden">
-                        <label>Amount</label>
+                    <div id="feeding-bottle-oz-timer" class="form-group hidden">
+                        <label>Amount &amp; Type</label>
                         <div class="input-group">
-                            <input type="number" id="feeding-bottle-timer-input" min="0.01" step="0.01">
-                            <select id="feeding-bottle-unit-timer-select">
-                                <option value="oz">oz</option>
-                                <option value="mL">mL</option>
-                            </select>
+                            <input type="number" id="feeding-bottle-oz-timer-input" min="0.01" max="12.00" step="0.01" placeholder="oz">
                             <select id="feeding-bottle-type-timer-select">
                                 <option value="breastmilk">Breastmilk (default)</option>
                                 <option value="formula">Formula</option>
@@ -168,11 +164,7 @@
                     <div class="form-group">
                         <label>🍼 Bottle</label>
                         <div class="input-group">
-                            <input type="number" id="feeding-bottle" min="0.01" step="0.01">
-                            <select id="feeding-bottle-unit-manual-select">
-                                <option value="oz">oz</option>
-                                <option value="mL">mL</option>
-                            </select>
+                            <input type="number" id="feeding-bottle-oz" min="0.01" max="12.00" step="0.01" placeholder="oz">
                             <select id="feeding-bottle-type-manual-select">
                                 <option value="breastmilk">Breastmilk (default)</option>
                                 <option value="formula">Formula</option>
@@ -330,13 +322,6 @@
                     <select id="settings-bottle-type">
                         <option value="breastmilk">Breastmilk</option>
                         <option value="formula">Formula</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="settings-bottle-unit">Default bottle unit</label>
-                    <select id="settings-bottle-unit">
-                        <option value="oz">oz</option>
-                        <option value="mL">mL</option>
                     </select>
                 </div>
                 <div class="form-actions">
