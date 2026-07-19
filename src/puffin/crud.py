@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import UTC, datetime, timedelta
 from datetime import date as date_type
@@ -14,6 +15,11 @@ from puffin.models import (
     SavedMedication,
     TemperatureReading,
 )
+
+# "uvicorn.error" is uvicorn's general-purpose app logger, not just errors.
+# Using it makes startup warnings match the surrounding "INFO:" server lines
+# instead of arriving unformatted via logging's last-resort handler.
+logger = logging.getLogger("uvicorn.error")
 
 # --- Child filtering ---
 
@@ -56,6 +62,31 @@ def _get_local_tz() -> ZoneInfo:
         return ZoneInfo(tz_name)
     except (ZoneInfoNotFoundError, KeyError):
         return ZoneInfo("UTC")
+
+
+def warn_if_tz_unconfigured() -> None:
+    """Log a warning at startup if ``TZ`` is unset or unusable.
+
+    Day boundaries silently fall back to UTC in both cases, which shifts
+    evening activity west of UTC onto the next day. Called from the app
+    lifespan so self-hosters see it in the container logs.
+    """
+    tz_name = os.environ.get("TZ")
+    if tz_name is None:
+        logger.warning(
+            "TZ is not set; day boundaries use UTC. Activity logged in the evening "
+            "west of UTC will count toward tomorrow. Set TZ to an IANA timezone "
+            "name (e.g. TZ=America/New_York)."
+        )
+        return
+    try:
+        ZoneInfo(tz_name)
+    except (ZoneInfoNotFoundError, KeyError):
+        logger.warning(
+            "TZ=%r is not a recognized IANA timezone name; falling back to UTC. "
+            "Day boundaries will not match your local time.",
+            tz_name,
+        )
 
 
 def _period_count(db: Session, model, timestamp_col, period: str, child: ChildFilter = None) -> int:

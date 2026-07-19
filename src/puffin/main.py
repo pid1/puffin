@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from puffin.crud import warn_if_tz_unconfigured
 from puffin.database import init_db
 from puffin.routers import activities, children, dashboard, diapers, feedings, health
 
@@ -25,6 +26,7 @@ class NoCacheAPIMiddleware(BaseHTTPMiddleware):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    warn_if_tz_unconfigured()
     init_db()
     yield
 
