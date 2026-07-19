@@ -108,6 +108,45 @@ def test_migration_renames_feeding_amount_column(legacy_engine):
     assert rows[1] == ("breast_left", None, None)
 
 
+@pytest.mark.parametrize(
+    "table",
+    ["diaper_changes", "feedings", "medications", "temperature_readings"],
+)
+def test_migration_adds_child_id_to_every_log_table(legacy_engine, table):
+    """Issue #44 — profiles are opt-in, so the column must simply exist."""
+    with legacy_engine.connect() as conn:
+        cols = {c["name"] for c in inspect(conn).get_columns(table)}
+    assert "child_id" in cols
+
+
+def test_migration_leaves_existing_logs_unassigned(legacy_engine):
+    """No log is silently adopted by a profile — bulk assignment is opt-in.
+
+    ``feedings`` is the sharp case: it is rebuilt wholesale by the amount_oz
+    rename, so this also proves ``child_id`` survives that rebuild.
+    """
+    with legacy_engine.connect() as conn:
+        for table in ("feedings", "medications"):
+            rows = conn.execute(text(f"SELECT child_id FROM {table}")).fetchall()  # noqa: S608
+            assert rows, f"expected seeded rows in {table}"
+            assert all(child_id is None for (child_id,) in rows)
+
+
+def test_migration_creates_children_table(legacy_engine):
+    with legacy_engine.connect() as conn:
+        assert inspect(conn).has_table("children")
+        assert conn.execute(text("SELECT COUNT(*) FROM children")).scalar() == 0
+
+
+def test_migration_is_idempotent_for_child_id(legacy_engine):
+    """Startup runs migrations every time; a second pass must be a no-op."""
+    _run_migrations(bind=legacy_engine)
+    _run_migrations(bind=legacy_engine)
+    with legacy_engine.connect() as conn:
+        cols = [c["name"] for c in inspect(conn).get_columns("diaper_changes")]
+    assert cols.count("child_id") == 1
+
+
 def test_migration_adds_amount_unit_to_current_amount_schema(tmp_path):
     db_path = tmp_path / "amount_without_unit.db"
     raw = sqlite3.connect(db_path)

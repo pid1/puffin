@@ -17,6 +17,12 @@
     </header>
 
     <main class="container">
+        <!-- Child Switcher (hidden until at least one profile exists) -->
+        <section id="child-switcher-section" class="child-switcher-section hidden">
+            <label class="sr-only" for="child-switcher">Switch child</label>
+            <select id="child-switcher" class="child-switcher"></select>
+        </section>
+
         <!-- Active Feeding Timer -->
         <section id="timer-section" class="timer-section hidden">
             <div class="timer-display">
@@ -64,6 +70,15 @@
 
         <!-- Calendar Day View -->
         <section class="calendar-section">
+            <h2 id="child-log-title" class="child-log-title hidden"></h2>
+            <div id="unassigned-bar" class="unassigned-bar hidden">
+                <span id="unassigned-bar-count" class="unassigned-bar-count"></span>
+                <div class="unassigned-bar-actions">
+                    <button type="button" id="unassigned-assign-btn" class="btn btn-sm btn-primary">Assign all to…</button>
+                    <label class="sr-only" for="unassigned-assign-target">Assign all to</label>
+                    <select id="unassigned-assign-target"></select>
+                </div>
+            </div>
             <div class="calendar-nav">
                 <button id="cal-prev" class="btn btn-icon calendar-arrow" aria-label="Previous day">&lsaquo;</button>
                 <button id="cal-date-btn" class="calendar-date" aria-label="Pick a date">
@@ -315,6 +330,14 @@
         <div class="modal-content">
             <h2>Settings</h2>
             <form id="settings-form">
+                <h3 class="settings-section-title">Children</h3>
+                <p class="settings-hint">Optional. Add a child to track each one's logs separately.</p>
+                <div id="child-list" class="child-list"></div>
+                <div class="form-group child-add-row">
+                    <label class="sr-only" for="child-new-name">First name</label>
+                    <input type="text" id="child-new-name" maxlength="30" placeholder="First name">
+                    <button type="button" id="child-add-btn" class="btn btn-sm btn-secondary">+ Add a child</button>
+                </div>
                 <h3 class="settings-section-title">Breast Names</h3>
                 <div class="form-group">
                     <label for="settings-left-name">Left breast name</label>
@@ -370,11 +393,35 @@
                     <label for="export-end-date">End Date (optional)</label>
                     <input type="date" id="export-end-date">
                 </div>
+                <div class="form-group hidden" id="export-child-group">
+                    <label for="export-child">Child</label>
+                    <select id="export-child"></select>
+                </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary btn-lg">Download</button>
                     <button type="button" class="btn btn-secondary modal-close">Cancel</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!--
+      Two-step confirmation shared by the first-profile migration offer and the
+      bulk re-assign from the unassigned view.  Its backdrop is marked static so
+      a stray click cannot dismiss a half-finished migration — every exit runs
+      through the buttons, which clean up after themselves.
+    -->
+    <div id="child-confirm-modal" class="modal hidden">
+        <div class="modal-backdrop modal-backdrop-static"></div>
+        <div class="modal-content">
+            <h2 id="child-confirm-title"></h2>
+            <p id="child-confirm-body"></p>
+            <p id="child-confirm-note" class="settings-hint hidden"></p>
+            <div class="form-actions">
+                <button type="button" id="child-confirm-primary" class="btn btn-primary btn-lg"></button>
+                <button type="button" id="child-confirm-secondary" class="btn btn-secondary"></button>
+                <button type="button" id="child-confirm-cancel" class="btn btn-secondary"></button>
+            </div>
         </div>
     </div>
 

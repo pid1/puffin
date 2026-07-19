@@ -8,12 +8,16 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from puffin import crud
+from puffin.crud import ChildFilter
 from puffin.database import get_db
+from puffin.dependencies import child_filter
 from puffin.schemas import DashboardSummary
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
 _PDF_MAX_CELL_LENGTH = 40  # max characters per cell before truncation
+
+_UNASSIGNED_LABEL = "Unassigned"
 
 
 def _format_bottle_amount(amount: float | None, amount_unit: str | None) -> str:
@@ -27,9 +31,10 @@ def _format_bottle_amount(amount: float | None, amount_unit: str | None) -> str:
 @router.get("/dashboard", response_model=DashboardSummary)
 def get_dashboard(
     date: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    child: ChildFilter = Depends(child_filter),
     db: Session = Depends(get_db),
 ):
-    return crud.get_dashboard(db, date_str=date)
+    return crud.get_dashboard(db, date_str=date, child=child)
 
 
 @router.get("/export")
@@ -37,12 +42,30 @@ def export_data(
     export_format: str = Query("csv", alias="format", pattern="^(csv|json|pdf)$"),
     start_date: datetime | None = Query(None),
     end_date: datetime | None = Query(None),
+    child: ChildFilter = Depends(child_filter),
     db: Session = Depends(get_db),
 ):
-    diapers = crud.get_diapers(db, start_date=start_date, end_date=end_date, limit=10000)
-    feedings = crud.get_feedings(db, start_date=start_date, end_date=end_date, limit=10000)
-    medications = crud.get_medications(db, start_date=start_date, end_date=end_date, limit=10000)
-    temperatures = crud.get_temperatures(db, start_date=start_date, end_date=end_date, limit=10000)
+    diapers = crud.get_diapers(
+        db, start_date=start_date, end_date=end_date, limit=10000, child=child
+    )
+    feedings = crud.get_feedings(
+        db, start_date=start_date, end_date=end_date, limit=10000, child=child
+    )
+    medications = crud.get_medications(
+        db, start_date=start_date, end_date=end_date, limit=10000, child=child
+    )
+    temperatures = crud.get_temperatures(
+        db, start_date=start_date, end_date=end_date, limit=10000, child=child
+    )
+
+    # A child column only earns its place when the export spans more than one
+    # child.  Scoped exports are already about a single child, and installs
+    # with no profiles would just get a blank column.
+    child_names = {c.id: c.name for c in crud.get_children(db)}
+    include_child = child is None and bool(child_names)
+
+    def child_name(obj) -> str:
+        return child_names.get(obj.child_id, _UNASSIGNED_LABEL)
 
     if export_format == "json":
         from puffin.schemas import (
@@ -66,6 +89,10 @@ def export_data(
                 TemperatureResponse.model_validate(t).model_dump(mode="json") for t in temperatures
             ],
         }
+        if include_child:
+            # Records carry ``child_id``; this resolves those ids to names
+            # without repeating the name on every row.
+            data["children"] = {str(cid): name for cid, name in child_names.items()}
         content = json.dumps(data, indent=2, default=str)
         return StreamingResponse(
             io.BytesIO(content.encode()),
@@ -96,64 +123,84 @@ def export_data(
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
 
+        def with_child(headers: list[str], rows: list[list[str]], objs) -> tuple:
+            """Append a trailing Child column when the export spans children."""
+            if not include_child:
+                return headers, rows
+            return headers + ["Child"], [
+                row + [child_name(obj)] for row, obj in zip(rows, objs, strict=True)
+            ]
+
         _pdf_section(
             pdf,
             "Diaper Changes",
-            ["Time", "Type", "Notes"],
-            [
+            *with_child(
+                ["Time", "Type", "Notes"],
                 [
-                    _fmt_ts(d.timestamp),
-                    str(d.type),
-                    d.notes or "",
-                ]
-                for d in diapers
-            ],
+                    [
+                        _fmt_ts(d.timestamp),
+                        str(d.type),
+                        d.notes or "",
+                    ]
+                    for d in diapers
+                ],
+                diapers,
+            ),
         )
 
         _pdf_section(
             pdf,
             "Feedings",
-            ["Time", "Type", "Duration (min)", "Amount", "Notes"],
-            [
+            *with_child(
+                ["Time", "Type", "Duration (min)", "Amount", "Notes"],
                 [
-                    _fmt_ts(f.timestamp),
-                    str(f.feeding_type),
-                    str(f.duration_minutes) if f.duration_minutes is not None else "",
-                    _format_bottle_amount(f.amount, f.amount_unit),
-                    f.notes or "",
-                ]
-                for f in feedings
-            ],
+                    [
+                        _fmt_ts(f.timestamp),
+                        str(f.feeding_type),
+                        str(f.duration_minutes) if f.duration_minutes is not None else "",
+                        _format_bottle_amount(f.amount, f.amount_unit),
+                        f.notes or "",
+                    ]
+                    for f in feedings
+                ],
+                feedings,
+            ),
         )
 
         _pdf_section(
             pdf,
             "Medications",
-            ["Time", "Medication", "Dosage", "Notes"],
-            [
+            *with_child(
+                ["Time", "Medication", "Dosage", "Notes"],
                 [
-                    _fmt_ts(m.timestamp),
-                    m.medication_name,
-                    f"{m.dosage_quantity:.2f} {m.dosage_unit}",
-                    m.notes or "",
-                ]
-                for m in medications
-            ],
+                    [
+                        _fmt_ts(m.timestamp),
+                        m.medication_name,
+                        f"{m.dosage_quantity:.2f} {m.dosage_unit}",
+                        m.notes or "",
+                    ]
+                    for m in medications
+                ],
+                medications,
+            ),
         )
 
         _pdf_section(
             pdf,
             "Temperature Readings",
-            ["Time", "Temp (°C)", "Location", "Notes"],
-            [
+            *with_child(
+                ["Time", "Temp (°C)", "Location", "Notes"],
                 [
-                    _fmt_ts(t.timestamp),
-                    str(t.temperature_celsius),
-                    str(t.location) if t.location else "",
-                    t.notes or "",
-                ]
-                for t in temperatures
-            ],
+                    [
+                        _fmt_ts(t.timestamp),
+                        str(t.temperature_celsius),
+                        str(t.location) if t.location else "",
+                        t.notes or "",
+                    ]
+                    for t in temperatures
+                ],
+                temperatures,
+            ),
         )
 
         pdf_bytes = pdf.output()
@@ -167,71 +214,89 @@ def export_data(
     output = io.StringIO()
     writer = csv.writer(output)
 
+    def header(cols: list[str]) -> list[str]:
+        return cols + ["child"] if include_child else cols
+
+    def row(cells: list, obj) -> list:
+        return cells + [child_name(obj)] if include_child else cells
+
     writer.writerow(["--- Diaper Changes ---"])
-    writer.writerow(["id", "timestamp", "type", "notes", "created_at"])
+    writer.writerow(header(["id", "timestamp", "type", "notes", "created_at"]))
     for d in diapers:
-        writer.writerow([d.id, d.timestamp, d.type, d.notes, d.created_at])
+        writer.writerow(row([d.id, d.timestamp, d.type, d.notes, d.created_at], d))
 
     writer.writerow([])
     writer.writerow(["--- Feedings ---"])
     writer.writerow(
-        [
-            "id",
-            "timestamp",
-            "feeding_type",
-            "duration_minutes",
-            "amount",
-            "amount_unit",
-            "notes",
-            "created_at",
-        ]
+        header(
+            [
+                "id",
+                "timestamp",
+                "feeding_type",
+                "duration_minutes",
+                "amount",
+                "amount_unit",
+                "notes",
+                "created_at",
+            ]
+        )
     )
     for f in feedings:
         writer.writerow(
-            [
-                f.id,
-                f.timestamp,
-                f.feeding_type,
-                f.duration_minutes,
-                f.amount,
-                f.amount_unit,
-                f.notes,
-                f.created_at,
-            ]
+            row(
+                [
+                    f.id,
+                    f.timestamp,
+                    f.feeding_type,
+                    f.duration_minutes,
+                    f.amount,
+                    f.amount_unit,
+                    f.notes,
+                    f.created_at,
+                ],
+                f,
+            )
         )
 
     writer.writerow([])
     writer.writerow(["--- Medications ---"])
     writer.writerow(
-        [
-            "id",
-            "timestamp",
-            "medication_name",
-            "dosage_quantity",
-            "dosage_unit",
-            "notes",
-            "created_at",
-        ]
+        header(
+            [
+                "id",
+                "timestamp",
+                "medication_name",
+                "dosage_quantity",
+                "dosage_unit",
+                "notes",
+                "created_at",
+            ]
+        )
     )
     for m in medications:
         writer.writerow(
-            [
-                m.id,
-                m.timestamp,
-                m.medication_name,
-                m.dosage_quantity,
-                m.dosage_unit,
-                m.notes,
-                m.created_at,
-            ]
+            row(
+                [
+                    m.id,
+                    m.timestamp,
+                    m.medication_name,
+                    m.dosage_quantity,
+                    m.dosage_unit,
+                    m.notes,
+                    m.created_at,
+                ],
+                m,
+            )
         )
 
     writer.writerow([])
     writer.writerow(["--- Temperature Readings ---"])
-    writer.writerow(["id", "timestamp", "temperature_celsius", "location", "notes", "created_at"])
+    writer.writerow(
+        header(["id", "timestamp", "temperature_celsius", "location", "notes", "created_at"])
+    )
     for t in temperatures:
         writer.writerow(
-            [t.id, t.timestamp, t.temperature_celsius, t.location, t.notes, t.created_at]
+            row([t.id, t.timestamp, t.temperature_celsius, t.location, t.notes, t.created_at], t)
         )
 
     content = output.getvalue()

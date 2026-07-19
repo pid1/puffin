@@ -714,3 +714,98 @@ body {
     color: var(--text-secondary);
     margin-bottom: 12px;
 }
+
+.settings-hint {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: -6px 0 12px;
+}
+
+/* ===== Child Profiles ===== */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.child-switcher-section {
+    margin-bottom: 16px;
+}
+
+.child-switcher {
+    width: 100%;
+    padding: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card-bg);
+    color: var(--text);
+}
+
+.child-log-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 12px;
+    color: var(--text);
+}
+
+.unassigned-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card-bg);
+}
+
+.unassigned-bar-count {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.unassigned-bar-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.child-list {
+    margin-bottom: 12px;
+}
+
+.child-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.child-row-name,
+.child-rename-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.child-add-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.child-add-row input {
+    flex: 1;
+    min-width: 0;
+}
