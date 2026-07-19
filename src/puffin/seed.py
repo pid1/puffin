@@ -88,7 +88,12 @@ def generate_feedings(day_offset: int, base_date: datetime, now: datetime) -> li
             base_duration = 10 + min(day_offset, 7) * 2
 
             if random.random() < 0.65:
-                # Paired session: both breasts with individual durations
+                # Paired session: both breasts with individual durations. Both
+                # rows share a session_id — that is what the app keys off to
+                # count them as one session and merge them into a single "Both
+                # Breasts" timeline item. Derived from the seeded RNG so the
+                # demo data stays reproducible.
+                session_id = f"seed-{random.getrandbits(64):016x}"
                 first_side = random.choice(["breast_left", "breast_right"])
                 second_side = "breast_right" if first_side == "breast_left" else "breast_left"
 
@@ -101,6 +106,7 @@ def generate_feedings(day_offset: int, base_date: datetime, now: datetime) -> li
                         timestamp=current_time,
                         feeding_type=first_side,
                         duration_minutes=first_dur,
+                        session_id=session_id,
                         notes=random.choice(FEEDING_NOTES),
                         created_at=current_time,
                     )
@@ -113,6 +119,7 @@ def generate_feedings(day_offset: int, base_date: datetime, now: datetime) -> li
                             timestamp=second_time,
                             feeding_type=second_side,
                             duration_minutes=second_dur,
+                            session_id=session_id,
                             notes=None,
                             created_at=second_time,
                         )
@@ -178,7 +185,8 @@ def generate_medications(day_offset: int, base_date: datetime, now: datetime) ->
                 Medication(
                     timestamp=vit_d_time,
                     medication_name="Vitamin D",
-                    dosage="400 IU (1 drop)",
+                    dosage_quantity=1.0,
+                    dosage_unit="drop(s)",
                     notes=None,
                     created_at=vit_d_time,
                 )
@@ -195,7 +203,8 @@ def generate_medications(day_offset: int, base_date: datetime, now: datetime) ->
                 Medication(
                     timestamp=t,
                     medication_name="Infant Tylenol",
-                    dosage="1.25 ml",
+                    dosage_quantity=1.25,
+                    dosage_unit="mL",
                     notes="Pain relief" if i == 0 else None,
                     created_at=t,
                 )

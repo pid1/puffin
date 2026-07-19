@@ -70,6 +70,12 @@ def _get_local_tz() -> ZoneInfo:
         return ZoneInfo("UTC")
 
 
+# Public alias for callers outside this module (e.g. the export router) that
+# need the same local zone the day-boundary logic uses.
+def get_local_tz() -> ZoneInfo:
+    return _get_local_tz()
+
+
 def warn_if_tz_unconfigured() -> None:
     """Log a warning at startup if ``TZ`` is unset or unusable.
 
