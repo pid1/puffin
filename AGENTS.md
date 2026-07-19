@@ -30,6 +30,7 @@ dev          # start FastAPI dev server on port 8000
 | `test-js` | Run JS tests only (Node's built-in `node:test`) |
 | `install-deps` | Install dependencies with uv |
 | `seed` | Generate 14 days of demo data |
+| `backup` | Snapshot the database into `<db-dir>/backups` |
 
 ### For AI Agents
 

@@ -47,6 +47,22 @@ Then open [http://localhost:8000](http://localhost:8000).
 
 - `PUFFIN_DB_PATH` — Path to the SQLite database file (default: `/data/puffin.db`). Normally you don't need to change this.
 - `TZ` — IANA timezone name (e.g. `America/New_York`) used to decide where one day ends and the next begins (default: `UTC`). **Set this to your local timezone.** Without it, an evening log west of UTC is counted as tomorrow — a diaper logged at 21:10 US Central lands on the next UTC day, so it won't show up in today's dashboard counts or timeline until midnight UTC. An unrecognized value falls back to UTC.
+- `PUFFIN_BACKUP_KEEP` — How many database snapshots to retain per backup (default: `10`). Set to `0` to keep every snapshot.
+
+## Backups
+
+All your data is a single SQLite file, so there are two safety nets:
+
+- **Automatic pre-migration snapshots.** On every startup, before any schema migration runs, the database is copied to `<db-dir>/backups/` (i.e. `/data/backups` in Docker). Migrations rewrite tables in place, so this gives you a rollback point for the one operation most likely to damage data. Old snapshots are pruned to `PUFFIN_BACKUP_KEEP`.
+- **On-demand backups.** Run `backup` (in `devenv shell`) or `python -m puffin.backup` to snapshot on demand. Wire it to cron or a systemd timer for regular copies, e.g. a daily line in the container host's crontab:
+
+  ```cron
+  0 3 * * * docker exec puffin python -m puffin.backup
+  ```
+
+To restore, stop the app and copy the chosen `backups/*.db` file back over `puffin.db`.
+
+> **Off-box copies:** these snapshots live on the same disk/volume as the database, so they protect against bad migrations and logical corruption but **not** against losing the disk. For disaster protection, periodically copy `backups/` elsewhere, or replicate the database off-box with a tool like [Litestream](https://litestream.io/).
 
 ## Development
 
@@ -79,8 +95,9 @@ Run these commands inside `devenv shell`:
 - `lint` — Run ruff linter
 - `lint-fix` — Run ruff linter with auto-fix
 - `format` — Run ruff formatter
-- `test` — Run pytest
+- `test` — Run all tests (Python + JS)
 - `seed` — Generate 14 days of realistic demo data
+- `backup` — Snapshot the database into `<db-dir>/backups`
 
 See `AGENTS.md` for the complete command reference including background/agent-friendly variants.
 

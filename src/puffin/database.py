@@ -249,5 +249,12 @@ def _run_migrations(bind=None) -> None:
 def init_db():
     """Create all tables, disposing stale connections first."""
     engine.dispose()
+    # Snapshot the existing database before migrations rewrite it in place, so a
+    # failed or wrong migration can be rolled back. No-op on a fresh install.
+    # Imported here (not at module top) to avoid a circular import: backup's CLI
+    # reads DB_PATH from this module.
+    from puffin.backup import backup_database
+
+    backup_database(DB_PATH, reason="pre-migration")
     Base.metadata.create_all(bind=engine)
     _run_migrations()
