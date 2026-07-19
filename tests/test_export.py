@@ -91,3 +91,66 @@ def test_json_export_stays_utc(client):
 
     data = client.get("/api/export?format=json").json()
     assert data["feedings"][0]["timestamp"] == "2026-07-19T18:30:00Z"
+
+
+# --- Low-severity export completeness (second-audit follow-ups) ---
+
+
+def test_csv_feeding_includes_bottle_type_and_session_id(client):
+    """CSV must carry bottle_type and session_id, matching the JSON export."""
+    client.post(
+        "/api/feedings",
+        json={
+            "feeding_type": "bottle",
+            "amount": 4.0,
+            "amount_unit": "oz",
+            "bottle_type": "formula",
+        },
+    )
+    body = client.get("/api/export?format=csv").text
+
+    # Header carries the columns...
+    feeding_header = next(
+        line for line in body.splitlines() if line.startswith("id,timestamp,feeding_type")
+    )
+    assert "bottle_type" in feeding_header
+    assert "session_id" in feeding_header
+    # ...and the value is present in the row.
+    assert "formula" in body
+
+
+def test_pdf_folds_bottle_type_into_the_type_label():
+    """The PDF has no bottle_type column, so it's surfaced in the type label."""
+    assert dashboard._feeding_type_label("bottle", "formula") == "bottle (formula)"
+    assert dashboard._feeding_type_label("bottle", "breastmilk") == "bottle (breastmilk)"
+    assert dashboard._feeding_type_label("bottle", None) == "bottle"
+    assert dashboard._feeding_type_label("breast_left", None) == "breast_left"
+
+
+def test_pdf_truncation_marks_the_cut_with_an_ellipsis():
+    short = "brief note"
+    assert dashboard._truncate_cell(short) == short
+    long = "x" * 60
+    out = dashboard._truncate_cell(long)
+    assert len(out) == dashboard._PDF_MAX_CELL_LENGTH
+    assert out.endswith("…")
+
+
+def test_export_is_not_capped(client):
+    """The export must return every row, not a fixed page of them.
+
+    The old code capped each type at 10,000 with no indication; a complete
+    export must never silently drop the oldest records.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    base = datetime(2026, 1, 1, tzinfo=UTC)
+    for i in range(120):
+        ts = (base + timedelta(minutes=i)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        client.post("/api/diapers", json={"type": "pee", "timestamp": ts})
+
+    # A plain list endpoint is capped at 200; the export is not capped at all.
+    body = client.get("/api/export?format=csv").text
+    diaper_rows = [line for line in body.splitlines() if line and line.split(",")[0].isdigit()]
+    # 120 diapers all present (plus any other types, but we posted only diapers).
+    assert len(diaper_rows) == 120

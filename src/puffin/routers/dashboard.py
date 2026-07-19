@@ -77,6 +77,24 @@ def _format_bottle_amount(amount: float | None, amount_unit: str | None) -> str:
     return f"{amount:.2f} oz"
 
 
+def _truncate_cell(text: str) -> str:
+    """Clip a PDF cell to the max width, marking the cut with an ellipsis."""
+    if len(text) <= _PDF_MAX_CELL_LENGTH:
+        return text
+    return text[: _PDF_MAX_CELL_LENGTH - 1] + "…"
+
+
+def _feeding_type_label(feeding_type: str, bottle_type: str | None) -> str:
+    """Feeding type for display, surfacing breastmilk vs formula for bottles.
+
+    The PDF has no dedicated bottle_type column, so it is folded in here (the
+    CSV/JSON carry it as its own field).
+    """
+    if feeding_type == "bottle" and bottle_type:
+        return f"bottle ({bottle_type})"
+    return str(feeding_type)
+
+
 @router.get("/dashboard", response_model=DashboardSummary)
 def get_dashboard(
     date: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
@@ -94,17 +112,19 @@ def export_data(
     child: ChildFilter = Depends(child_filter),
     db: Session = Depends(get_db),
 ):
+    # limit=None means every matching row: an export must never silently drop
+    # the oldest records (the old fixed 10k cap did so with no indication).
     diapers = crud.get_diapers(
-        db, start_date=start_date, end_date=end_date, limit=10000, child=child
+        db, start_date=start_date, end_date=end_date, limit=None, child=child
     )
     feedings = crud.get_feedings(
-        db, start_date=start_date, end_date=end_date, limit=10000, child=child
+        db, start_date=start_date, end_date=end_date, limit=None, child=child
     )
     medications = crud.get_medications(
-        db, start_date=start_date, end_date=end_date, limit=10000, child=child
+        db, start_date=start_date, end_date=end_date, limit=None, child=child
     )
     temperatures = crud.get_temperatures(
-        db, start_date=start_date, end_date=end_date, limit=10000, child=child
+        db, start_date=start_date, end_date=end_date, limit=None, child=child
     )
 
     # A child column only earns its place when the export spans more than one
@@ -225,7 +245,7 @@ def export_data(
                 [
                     [
                         _fmt_ts(f.timestamp, local_tz),
-                        str(f.feeding_type),
+                        _feeding_type_label(f.feeding_type, f.bottle_type),
                         str(f.duration_minutes) if f.duration_minutes is not None else "",
                         _format_bottle_amount(f.amount, f.amount_unit),
                         f.notes or "",
@@ -311,6 +331,8 @@ def export_data(
                 "amount",
                 "amount_unit",
                 "notes",
+                "session_id",
+                "bottle_type",
                 "created_at",
             ]
         )
@@ -326,6 +348,8 @@ def export_data(
                     f.amount,
                     f.amount_unit,
                     f.notes,
+                    f.session_id,
+                    f.bottle_type,
                     ts(f.created_at),
                 ],
                 f,
@@ -441,8 +465,9 @@ def _pdf_section(pdf, title: str, headers: list[str], rows: list[list[str]]) -> 
     fill = False
     pdf.set_fill_color(245, 248, 255)
     for row in rows:
-        # Truncate long cells (full text remains in the CSV/JSON exports).
-        cells = [str(v)[:_PDF_MAX_CELL_LENGTH] for v in row]
+        # Truncate long cells with an ellipsis so a cut is visible (the full
+        # text remains in the CSV/JSON exports).
+        cells = [_truncate_cell(str(v)) for v in row]
         if pdf.sanitize:
             cells = [_latin1_safe(c) for c in cells]
         for cell in cells:
