@@ -20,6 +20,7 @@ in
     ruff
     sqlite
     git
+    nodejs  # JS test runner (node:test); no npm dependencies required
   ];
 
   # Language support
@@ -91,7 +92,12 @@ in
     lint.exec = "ruff check .";
     lint-fix.exec = "ruff check . --fix";
     format.exec = "ruff format .";
-    test.exec = "uv run pytest";
+    # `test` runs both suites; `test-py`/`test-js` run one. The JS suite uses
+    # Node's built-in runner (node:test) against static/js/app.js -- no npm
+    # dependencies, so nothing to install.
+    test.exec = "test-py && test-js";
+    test-py.exec = "uv run pytest";
+    test-js.exec = ''node --test "tests/js/*.test.mjs"'';
     install-deps.exec = "uv sync --all-extras";
 
     # Data commands
@@ -120,7 +126,9 @@ in
     echo "  lint             - Run ruff linter"
     echo "  lint-fix         - Run ruff with auto-fix"
     echo "  format           - Run ruff formatter"
-    echo "  test             - Run pytest"
+    echo "  test             - Run all tests (Python + JS)"
+    echo "  test-py          - Run pytest only"
+    echo "  test-js          - Run JS tests only (node:test)"
     echo ""
     echo "Data commands:"
     echo "  seed             - Generate 14 days of demo data"
