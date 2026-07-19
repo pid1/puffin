@@ -4,7 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from puffin import crud
+from puffin.crud import ChildFilter
 from puffin.database import get_db
+from puffin.dependencies import child_filter
 from puffin.schemas import DiaperChangeCreate, DiaperChangeResponse, DiaperChangeUpdate, PeriodStats
 
 router = APIRouter(prefix="/api/diapers", tags=["diapers"])
@@ -12,7 +14,13 @@ router = APIRouter(prefix="/api/diapers", tags=["diapers"])
 
 @router.post("", response_model=DiaperChangeResponse, status_code=201)
 def create_diaper(data: DiaperChangeCreate, db: Session = Depends(get_db)):
-    return crud.create_diaper(db, timestamp=data.timestamp, type_=data.type.value, notes=data.notes)
+    return crud.create_diaper(
+        db,
+        timestamp=data.timestamp,
+        type_=data.type.value,
+        notes=data.notes,
+        child_id=data.child_id,
+    )
 
 
 @router.get("", response_model=list[DiaperChangeResponse])
@@ -21,16 +29,20 @@ def list_diapers(
     end_date: datetime | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    child: ChildFilter = Depends(child_filter),
     db: Session = Depends(get_db),
 ):
     return crud.get_diapers(
-        db, start_date=start_date, end_date=end_date, limit=limit, offset=offset
+        db, start_date=start_date, end_date=end_date, limit=limit, offset=offset, child=child
     )
 
 
 @router.get("/stats", response_model=PeriodStats)
-def get_diaper_stats(db: Session = Depends(get_db)):
-    return crud.diaper_stats(db)
+def get_diaper_stats(
+    child: ChildFilter = Depends(child_filter),
+    db: Session = Depends(get_db),
+):
+    return crud.diaper_stats(db, child)
 
 
 @router.get("/{diaper_id}", response_model=DiaperChangeResponse)
@@ -50,6 +62,10 @@ def update_diaper(diaper_id: int, data: DiaperChangeUpdate, db: Session = Depend
         updates["type"] = data.type.value
     if data.notes is not None:
         updates["notes"] = data.notes
+    # ``child_id`` keys off fields_set, not None: an explicit null is how a log
+    # is moved back to unassigned.
+    if "child_id" in data.model_fields_set:
+        updates["child_id"] = data.child_id
     obj = crud.update_diaper(db, diaper_id, **updates)
     if not obj:
         raise HTTPException(status_code=404, detail="Diaper change not found")

@@ -120,6 +120,404 @@ function updateBreastLabels() {
     if (rightLabel) rightLabel.textContent = `🤱 ${names.right} breast (minutes)`;
 }
 
+/* ===== Child Profiles ===== */
+// Profiles themselves live server-side with the logs they label; only the
+// *selection* is per-device, so two phones can view two children at once.
+const SELECTED_CHILD_KEY = 'puffin-selected-child';
+const UNASSIGNED_VIEW = 'unassigned';
+
+let childProfiles = [];
+let unassignedCount = 0;
+// null means "every log regardless of child" — what an install with no
+// profiles always shows, and exactly how Puffin behaved before profiles.
+let selectedChild = null;
+
+function hasProfiles() {
+    return childProfiles.length > 0;
+}
+
+function readStoredChild() {
+    const raw = localStorage.getItem(SELECTED_CHILD_KEY);
+    if (!raw) return null;
+    if (raw === UNASSIGNED_VIEW) return UNASSIGNED_VIEW;
+    const id = parseInt(raw, 10);
+    return Number.isNaN(id) ? null : id;
+}
+
+function storeSelectedChild(value) {
+    if (value === null) localStorage.removeItem(SELECTED_CHILD_KEY);
+    else localStorage.setItem(SELECTED_CHILD_KEY, String(value));
+}
+
+/** The current scope as a query fragment appended to dashboard/activity calls. */
+function childQuery() {
+    if (selectedChild === UNASSIGNED_VIEW) return '&unassigned=true';
+    if (typeof selectedChild === 'number') return `&child_id=${selectedChild}`;
+    return '';
+}
+
+/**
+ * The child new logs are created against.
+ *
+ * Returns null in the unassigned view so a log created while looking at
+ * unassigned logs stays unassigned, matching what is on screen.
+ */
+function currentChildId() {
+    return typeof selectedChild === 'number' ? selectedChild : null;
+}
+
+function resolveSelectedChild() {
+    if (!hasProfiles()) return null;
+    const stored = readStoredChild();
+    // The unassigned view only survives while it still has something in it.
+    if (stored === UNASSIGNED_VIEW && unassignedCount > 0) return UNASSIGNED_VIEW;
+    if (typeof stored === 'number' && childProfiles.some(c => c.id === stored)) return stored;
+    return childProfiles[0].id; // default: the first profile created
+}
+
+async function loadChildren() {
+    try {
+        const [profiles, unassigned] = await Promise.all([
+            api.get('/api/children'),
+            api.get('/api/children/unassigned'),
+        ]);
+        childProfiles = profiles;
+        unassignedCount = unassigned.count;
+    } catch (err) {
+        console.error('Failed to load children:', err);
+        childProfiles = [];
+        unassignedCount = 0;
+    }
+    selectedChild = resolveSelectedChild();
+    storeSelectedChild(selectedChild);
+    renderChildSwitcher();
+    renderChildHeader();
+}
+
+function childOptionsHtml() {
+    return childProfiles
+        .map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`)
+        .join('');
+}
+
+function renderChildSwitcher() {
+    const section = document.getElementById('child-switcher-section');
+    const select = document.getElementById('child-switcher');
+    section.classList.toggle('hidden', !hasProfiles());
+    if (!hasProfiles()) {
+        select.innerHTML = '';
+        return;
+    }
+    let html = childOptionsHtml();
+    // Offered only while logs actually sit outside every profile.
+    if (unassignedCount > 0) {
+        html += `<option value="${UNASSIGNED_VIEW}">Unassigned logs</option>`;
+    }
+    select.innerHTML = html;
+    select.value = String(selectedChild);
+}
+
+function selectedChildName() {
+    const match = childProfiles.find(c => c.id === selectedChild);
+    return match ? match.name : null;
+}
+
+function renderChildHeader() {
+    const title = document.getElementById('child-log-title');
+    const bar = document.getElementById('unassigned-bar');
+    const name = selectedChildName();
+
+    if (selectedChild === UNASSIGNED_VIEW) {
+        title.textContent = 'Unassigned Logs';
+    } else if (name) {
+        title.textContent = `${name}'s Care Logs`;
+    } else {
+        title.textContent = '';
+    }
+    title.classList.toggle('hidden', !title.textContent);
+
+    // The bulk re-assign is the permanent escape hatch that makes declining the
+    // one-time migration offer recoverable.
+    const showBar = selectedChild === UNASSIGNED_VIEW && hasProfiles();
+    bar.classList.toggle('hidden', !showBar);
+    if (showBar) {
+        const plural = unassignedCount === 1 ? '' : 's';
+        document.getElementById('unassigned-bar-count').textContent =
+            `${unassignedCount} log${plural} not linked to any child`;
+        document.getElementById('unassigned-assign-target').innerHTML = childOptionsHtml();
+    }
+}
+
+async function refreshChildUI() {
+    await loadChildren();
+    renderChildList();
+    renderExportChildOptions();
+    loadDashboard();
+}
+
+/**
+ * Reload after a change that may have moved a log in or out of unassigned.
+ *
+ * Editing a log's child, or deleting one, changes the unassigned count — and
+ * that count decides whether `Unassigned logs` is in the switcher at all.
+ * Refreshing only the dashboard would leave a freshly-unassigned log with no
+ * way to reach it until the page was reloaded.
+ */
+function reloadAfterLogChange() {
+    if (hasProfiles()) return refreshChildUI();
+    return loadDashboard();
+}
+
+/* --- Shared two-step confirmation --- */
+
+function showChildConfirm({ title, body, note, primary, secondary, cancel,
+                            onPrimary, onSecondary, onCancel }) {
+    document.getElementById('child-confirm-title').textContent = title;
+    document.getElementById('child-confirm-body').textContent = body;
+
+    const noteEl = document.getElementById('child-confirm-note');
+    noteEl.textContent = note || '';
+    noteEl.classList.toggle('hidden', !note);
+
+    const wire = (id, label, handler) => {
+        const btn = document.getElementById(id);
+        btn.classList.toggle('hidden', !label);
+        if (label) btn.textContent = label;
+        // Replacing the node drops listeners from a previous step, so the
+        // buttons never accumulate stale handlers across the flow.
+        const fresh = btn.cloneNode(true);
+        btn.parentNode.replaceChild(fresh, btn);
+        if (label && handler) fresh.addEventListener('click', handler);
+    };
+    wire('child-confirm-primary', primary, onPrimary);
+    wire('child-confirm-secondary', secondary, onSecondary);
+    wire('child-confirm-cancel', cancel, onCancel);
+
+    openModal('child-confirm-modal');
+}
+
+/* --- Creating a profile, and the one-time migration offer --- */
+
+async function addChild() {
+    const input = document.getElementById('child-new-name');
+    const name = input.value.trim();
+    if (!name) {
+        showToast('Please enter a first name');
+        input.focus();
+        return;
+    }
+
+    const isFirstProfile = !hasProfiles();
+    let created;
+    try {
+        created = await api.post('/api/children', { name });
+    } catch (err) {
+        showToast('Error: ' + err.message);
+        return;
+    }
+    input.value = '';
+
+    // The bulk offer is made once: at first profile creation, on an install
+    // that already has logs.  Re-read the count so it reflects this moment.
+    if (isFirstProfile) {
+        const { count } = await api.get('/api/children/unassigned');
+        if (count > 0) {
+            offerMigration(created, count);
+            return;
+        }
+    }
+    await refreshChildUI();
+    showToast(`${created.name} added`);
+}
+
+function offerMigration(child, count) {
+    const plural = count === 1 ? '' : 's';
+    showChildConfirm({
+        title: 'Move existing logs?',
+        body: `You have ${count} care log${plural} that aren't linked to any child. `
+            + `Move them all to ${child.name}?`,
+        note: 'This bulk move is only offered once, when you create your first child. '
+            + 'You can always re-assign unassigned logs later from "Unassigned logs" '
+            + 'in the child menu.',
+        primary: 'Yes, move them',
+        secondary: 'No, leave them unassigned',
+        cancel: 'Cancel',
+        onPrimary: () => confirmMigration(child, count),
+        onSecondary: async () => {
+            closeModal('child-confirm-modal');
+            await refreshChildUI();
+            showToast(`${child.name} added`);
+        },
+        onCancel: () => cancelChildCreation(child),
+    });
+}
+
+function confirmMigration(child, count) {
+    const plural = count === 1 ? '' : 's';
+    showChildConfirm({
+        title: 'Confirm move',
+        body: `This will assign all ${count} existing log${plural} to ${child.name}. `
+            + `This can't be undone in bulk.`,
+        primary: `Confirm — move all logs to ${child.name}`,
+        secondary: 'Go back',
+        cancel: 'Cancel',
+        onPrimary: () => runBulkAssign(child),
+        onSecondary: () => offerMigration(child, count),
+        onCancel: () => cancelChildCreation(child),
+    });
+}
+
+/**
+ * Cancel backs all the way out of profile creation.
+ *
+ * Deleting the just-created profile is what makes "go back and create a
+ * different child first" work — the profile never half-exists.  It has no logs
+ * of its own yet, so nothing is stranded.
+ */
+async function cancelChildCreation(child) {
+    try {
+        await api.del(`/api/children/${child.id}`);
+    } catch (err) {
+        console.error('Failed to undo profile creation:', err);
+    }
+    closeModal('child-confirm-modal');
+    await refreshChildUI();
+    showToast('Profile creation cancelled');
+}
+
+async function runBulkAssign(child) {
+    try {
+        const result = await api.post(`/api/children/${child.id}/assign-unassigned`);
+        closeModal('child-confirm-modal');
+        await refreshChildUI();
+        const plural = result.assigned === 1 ? '' : 's';
+        showToast(`Moved ${result.assigned} log${plural} to ${child.name}`);
+    } catch (err) {
+        showToast('Error: ' + err.message);
+    }
+}
+
+/* --- Settings: the Children section --- */
+
+function renderChildList() {
+    const container = document.getElementById('child-list');
+    if (!hasProfiles()) {
+        container.innerHTML = '<p class="empty-state">No children yet.</p>';
+        return;
+    }
+    container.innerHTML = childProfiles.map(c => `
+        <div class="child-row" data-child-row="${c.id}">
+            <span class="child-row-name">${escapeHtml(c.name)}</span>
+            <button type="button" class="btn btn-sm btn-secondary" data-child-rename="${c.id}">Rename</button>
+            <button type="button" class="btn btn-sm btn-danger" data-child-delete="${c.id}">Delete</button>
+        </div>`).join('');
+}
+
+function startChildRename(childId) {
+    const child = childProfiles.find(c => c.id === childId);
+    const row = document.querySelector(`[data-child-row="${childId}"]`);
+    if (!child || !row) return;
+    row.innerHTML = `
+        <input type="text" class="child-rename-input" maxlength="30" value="${escapeAttr(child.name)}">
+        <button type="button" class="btn btn-sm btn-primary" data-child-rename-save="${childId}">Save</button>
+        <button type="button" class="btn btn-sm btn-secondary" data-child-rename-cancel="1">Cancel</button>`;
+    row.querySelector('.child-rename-input').focus();
+}
+
+async function saveChildRename(childId) {
+    const row = document.querySelector(`[data-child-row="${childId}"]`);
+    const name = row.querySelector('.child-rename-input').value.trim();
+    if (!name) {
+        showToast('Please enter a first name');
+        return;
+    }
+    try {
+        await api.put(`/api/children/${childId}`, { name });
+        await refreshChildUI();
+        showToast('Child renamed');
+    } catch (err) {
+        showToast('Error: ' + err.message);
+    }
+}
+
+function confirmChildDelete(childId) {
+    const child = childProfiles.find(c => c.id === childId);
+    if (!child) return;
+    showChildConfirm({
+        title: `Delete ${child.name}?`,
+        body: `${child.name}'s logs will be kept and moved to "Unassigned logs", `
+            + `where you can re-assign them. No log data is deleted.`,
+        primary: `Delete ${child.name}`,
+        cancel: 'Cancel',
+        onPrimary: async () => {
+            try {
+                await api.del(`/api/children/${childId}`);
+                closeModal('child-confirm-modal');
+                await refreshChildUI();
+                showToast(`${child.name} deleted — their logs are now unassigned`);
+            } catch (err) {
+                showToast('Error: ' + err.message);
+            }
+        },
+        onCancel: () => closeModal('child-confirm-modal'),
+    });
+}
+
+function initChildProfiles() {
+    document.getElementById('child-switcher').addEventListener('change', (e) => {
+        const raw = e.target.value;
+        selectedChild = raw === UNASSIGNED_VIEW ? UNASSIGNED_VIEW : parseInt(raw, 10);
+        storeSelectedChild(selectedChild);
+        renderChildHeader();
+        loadDashboard();
+    });
+
+    document.getElementById('child-add-btn').addEventListener('click', addChild);
+    document.getElementById('child-new-name').addEventListener('keydown', (e) => {
+        // The Children section lives inside the settings form; Enter here must
+        // add a child, not submit (and close) the whole settings modal.
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addChild();
+        }
+    });
+
+    document.getElementById('child-list').addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        if (btn.dataset.childRename) startChildRename(parseInt(btn.dataset.childRename, 10));
+        else if (btn.dataset.childRenameSave) saveChildRename(parseInt(btn.dataset.childRenameSave, 10));
+        else if (btn.dataset.childRenameCancel) renderChildList();
+        else if (btn.dataset.childDelete) confirmChildDelete(parseInt(btn.dataset.childDelete, 10));
+    });
+
+    document.getElementById('unassigned-assign-btn').addEventListener('click', () => {
+        const targetId = parseInt(document.getElementById('unassigned-assign-target').value, 10);
+        const child = childProfiles.find(c => c.id === targetId);
+        if (!child) return;
+        const count = unassignedCount;
+        const plural = count === 1 ? '' : 's';
+        showChildConfirm({
+            title: `Assign all to ${child.name}?`,
+            body: `This will move all ${count} unassigned log${plural} to ${child.name}.`,
+            primary: 'Continue',
+            cancel: 'Cancel',
+            onPrimary: () => showChildConfirm({
+                title: 'Confirm assignment',
+                body: `This will assign ${count} log${plural} to ${child.name}. `
+                    + `This can't be undone in bulk.`,
+                primary: `Confirm — assign to ${child.name}`,
+                secondary: 'Go back',
+                cancel: 'Cancel',
+                onPrimary: () => runBulkAssign(child),
+                onSecondary: () => document.getElementById('unassigned-assign-btn').click(),
+                onCancel: () => closeModal('child-confirm-modal'),
+            }),
+            onCancel: () => closeModal('child-confirm-modal'),
+        });
+    });
+}
+
 /* ===== Dark Mode ===== */
 function initTheme() {
     const saved = localStorage.getItem('puffin-theme');
@@ -244,6 +642,11 @@ function getTimerState() {
 function startTimer(side) {
     const state = {
         active: true,
+        // The timer belongs to whoever was selected when it started, and keeps
+        // that child even if the user switches profiles mid-feed.  Only one
+        // timer runs at a time; simultaneous per-child timers (tandem feeding)
+        // are a separate feature.
+        childId: currentChildId(),
         segments: [{ side, startTime: new Date().toISOString(), endTime: null }],
     };
     localStorage.setItem(TIMER_KEY, JSON.stringify(state));
@@ -444,6 +847,8 @@ async function endTimer() {
                 timestamp: starts[side],
                 feeding_type: side,
                 duration_minutes: durationMinutes,
+                // A timer started before profiles existed has no childId.
+                child_id: state.childId ?? null,
             };
             if (sessionId) body.session_id = sessionId;
             promises.push(api.post('/api/feedings', body));
@@ -467,7 +872,7 @@ async function endTimer() {
             });
             showToast(`Feeding logged: ${parts.join(' + ')}`);
         }
-        loadDashboard();
+        reloadAfterLogChange();
     } catch (e) {
         confirmBtn.disabled = false;
         showToast('Error saving feeding: ' + e.message);
@@ -843,10 +1248,10 @@ function initForms() {
         const submitBtn = e.target.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
         try {
-            await api.post('/api/diapers', { type, notes, timestamp });
+            await api.post('/api/diapers', { type, notes, timestamp, child_id: currentChildId() });
             closeModal('diaper-modal');
             showToast('Diaper change logged!');
-            loadDashboard();
+            reloadAfterLogChange();
         } catch (err) {
             submitBtn.disabled = false;
             showToast('Error: ' + err.message);
@@ -882,10 +1287,11 @@ function initForms() {
                         bottle_type: bottleType,
                         notes,
                         timestamp,
+                        child_id: currentChildId(),
                     });
                     closeModal('feeding-modal');
                     showToast('Feeding logged!');
-                    loadDashboard();
+                    reloadAfterLogChange();
                 } catch (err) {
                     saveBtn.disabled = false;
                     showToast('Error: ' + err.message);
@@ -924,6 +1330,7 @@ function initForms() {
                     duration_minutes: parseInt(leftDur),
                     notes: notesAttached ? undefined : notes,
                     timestamp,
+                    child_id: currentChildId(),
                 };
                 if (manualSessionId) body.session_id = manualSessionId;
                 promises.push(api.post('/api/feedings', body));
@@ -935,6 +1342,7 @@ function initForms() {
                     duration_minutes: parseInt(rightDur),
                     notes: notesAttached ? undefined : notes,
                     timestamp,
+                    child_id: currentChildId(),
                 };
                 if (manualSessionId) body.session_id = manualSessionId;
                 promises.push(api.post('/api/feedings', body));
@@ -949,12 +1357,13 @@ function initForms() {
                     bottle_type: bottleType,
                     notes: notesAttached ? undefined : notes,
                     timestamp,
+                    child_id: currentChildId(),
                 }));
             }
             await Promise.all(promises);
             closeModal('feeding-modal');
             showToast('Feeding logged!');
-            loadDashboard();
+            reloadAfterLogChange();
         } catch (err) {
             saveBtn.disabled = false;
             showToast('Error: ' + err.message);
@@ -987,10 +1396,10 @@ function initForms() {
         const submitBtn = e.target.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
         try {
-            await api.post('/api/medications', { medication_name: name, dosage_quantity, dosage_unit, notes, timestamp });
+            await api.post('/api/medications', { medication_name: name, dosage_quantity, dosage_unit, notes, timestamp, child_id: currentChildId() });
             closeModal('health-modal');
             showToast('Medication logged!');
-            loadDashboard();
+            reloadAfterLogChange();
         } catch (err) {
             submitBtn.disabled = false;
             showToast('Error: ' + err.message);
@@ -1020,10 +1429,11 @@ function initForms() {
                 location,
                 notes,
                 timestamp,
+                child_id: currentChildId(),
             });
             closeModal('health-modal');
             showToast('Temperature logged!');
-            loadDashboard();
+            reloadAfterLogChange();
         } catch (err) {
             submitBtn.disabled = false;
             showToast('Error: ' + err.message);
@@ -1080,12 +1490,38 @@ async function openEditModal(type, id, secondaryId = null) {
 }
 
 function buildEditFields(type, data, secondaryData = null) {
+    let html;
     switch (type) {
-        case 'diaper': return buildDiaperEditFields(data);
-        case 'feeding': return buildFeedingEditFields(data, secondaryData);
-        case 'medication': return buildMedicationEditFields(data);
-        case 'temperature': return buildTemperatureEditFields(data);
+        case 'diaper': html = buildDiaperEditFields(data); break;
+        case 'feeding': html = buildFeedingEditFields(data, secondaryData); break;
+        case 'medication': html = buildMedicationEditFields(data); break;
+        case 'temperature': html = buildTemperatureEditFields(data); break;
     }
+    return html + buildChildEditField(data);
+}
+
+/**
+ * The child selector — the only place a single log's association can change.
+ *
+ * Hidden entirely when no profiles exist, so nothing about editing a log
+ * changes for installs that never opted in.  `Unassigned` is selectable: a log
+ * mis-assigned during a bulk move can be parked rather than forced onto the
+ * wrong child.
+ */
+function buildChildEditField(data) {
+    if (!hasProfiles()) return '';
+    const options = childProfiles.map(c =>
+        `<option value="${c.id}" ${data.child_id === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`
+    ).join('');
+    const unassignedSelected = data.child_id == null ? 'selected' : '';
+    return `
+        <div class="form-group">
+            <label for="edit-child">Child</label>
+            <select id="edit-child">
+                ${options}
+                <option value="" ${unassignedSelected}>Unassigned</option>
+            </select>
+        </div>`;
 }
 
 function buildDiaperEditFields(data) {
@@ -1259,6 +1695,11 @@ function buildEditBody(type) {
     }
     body.notes = notes;
 
+    // Absent when no profiles exist; an empty value means Unassigned, which
+    // must be sent as an explicit null rather than omitted.
+    const childEl = document.getElementById('edit-child');
+    if (childEl) body.child_id = childEl.value ? parseInt(childEl.value, 10) : null;
+
     switch (type) {
         case 'diaper':
             body.type = document.getElementById('edit-diaper-type').value;
@@ -1363,7 +1804,7 @@ function initEditForm() {
             }
             closeModal('edit-modal');
             showToast('Updated!');
-            loadDashboard();
+            reloadAfterLogChange();
         } catch (err) {
             showToast('Error: ' + err.message);
         }
@@ -1395,7 +1836,7 @@ function initEditForm() {
             }
             closeModal('edit-modal');
             showToast('Deleted!');
-            loadDashboard();
+            reloadAfterLogChange();
         } catch (err) {
             showToast('Error: ' + err.message);
         }
@@ -1481,7 +1922,7 @@ async function loadDayActivities() {
     const timeline = document.getElementById('timeline');
     try {
         const dateStr = toDateString(currentDate);
-        const activities = await api.get(`/api/activities?date=${dateStr}`);
+        const activities = await api.get(`/api/activities?date=${dateStr}${childQuery()}`);
         if (activities.length === 0) {
             timeline.innerHTML = '<p class="empty-state">No entries for this day.</p>';
             return;
@@ -1526,7 +1967,7 @@ function timeAgo(isoStr) {
 async function loadDashboard() {
     try {
         const dateStr = toDateString(currentDate);
-        const data = await api.get(`/api/dashboard?date=${dateStr}`);
+        const data = await api.get(`/api/dashboard?date=${dateStr}${childQuery()}`);
 
         // Summary card titles reflect the displayed day
         const isToday = isSameDay(currentDate, new Date());
@@ -1583,6 +2024,8 @@ function initSettings() {
         document.getElementById('settings-bottle-type').value = getDefaultBottleType();
         document.getElementById('settings-bottle-unit').value = getDefaultBottleUnit();
         updateBottleUnitLabels();
+        renderChildList();
+        document.getElementById('child-new-name').value = '';
         openModal('settings-modal');
     });
 
@@ -1606,8 +2049,26 @@ function initSettings() {
 }
 
 /* ===== Export Modal ===== */
+const EXPORT_ALL_CHILDREN = 'all';
+
+/** Export defaults to the child on screen, with an explicit all-children option. */
+function renderExportChildOptions() {
+    const group = document.getElementById('export-child-group');
+    const select = document.getElementById('export-child');
+    group.classList.toggle('hidden', !hasProfiles());
+    if (!hasProfiles()) {
+        select.innerHTML = '';
+        return;
+    }
+    select.innerHTML = childOptionsHtml()
+        + (unassignedCount > 0 ? `<option value="${UNASSIGNED_VIEW}">Unassigned logs</option>` : '')
+        + `<option value="${EXPORT_ALL_CHILDREN}">All children</option>`;
+    select.value = selectedChild === null ? EXPORT_ALL_CHILDREN : String(selectedChild);
+}
+
 function initExport() {
     document.getElementById('export-btn').addEventListener('click', () => {
+        renderExportChildOptions();
         openModal('export-modal');
     });
 
@@ -1620,6 +2081,13 @@ function initExport() {
         let url = `/api/export?format=${encodeURIComponent(fmt)}`;
         if (start) url += `&start_date=${encodeURIComponent(start + 'T00:00:00')}`;
         if (end) url += `&end_date=${encodeURIComponent(end + 'T23:59:59')}`;
+
+        const childEl = document.getElementById('export-child');
+        if (hasProfiles() && childEl.value !== EXPORT_ALL_CHILDREN) {
+            url += childEl.value === UNASSIGNED_VIEW
+                ? '&unassigned=true'
+                : `&child_id=${encodeURIComponent(childEl.value)}`;
+        }
 
         window.location.href = url;
         closeModal('export-modal');
@@ -1639,10 +2107,16 @@ document.addEventListener('DOMContentLoaded', () => {
     initCalendar();
     initSettings();
     initExport();
+    initChildProfiles();
     updateBreastLabels();
     updateBottleTypeLabels();
     updateBottleUnitLabels();
-    loadDashboard();
+    // Resolves the selected child before the first dashboard fetch, so the
+    // counts are never briefly wrong for a multi-child install.
+    loadChildren().then(() => {
+        renderChildList();
+        loadDashboard();
+    });
 
     // Theme toggle
     document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
@@ -1652,8 +2126,10 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', () => openModal(btn.dataset.modal));
     });
 
-    // Close modal via backdrop or cancel button
-    document.querySelectorAll('.modal-backdrop').forEach(el => {
+    // Close modal via backdrop or cancel button.  Static backdrops opt out:
+    // dismissing a two-step confirmation by clicking away would strand a
+    // half-created profile.
+    document.querySelectorAll('.modal-backdrop:not(.modal-backdrop-static)').forEach(el => {
         el.addEventListener('click', closeAllModals);
     });
     document.querySelectorAll('.modal-close').forEach(el => {

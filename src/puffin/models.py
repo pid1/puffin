@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Float, Index, Integer, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import TypeDecorator
 
@@ -30,6 +30,30 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+class Child(Base):
+    """An optional profile a log can be associated with.
+
+    Profiles are opt-in: an install with no rows here behaves exactly as
+    Puffin did before profiles existed.
+    """
+
+    __tablename__ = "children"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(_TZ_DATETIME, default=_utcnow)
+
+
+def _child_fk() -> Mapped[int | None]:
+    """A nullable association to a :class:`Child`.
+
+    ``NULL`` means *unassigned* — the state of every log predating profiles,
+    of logs whose profile was deleted, and of logs explicitly set back to
+    unassigned by editing them.
+    """
+    return mapped_column(Integer, ForeignKey("children.id", ondelete="SET NULL"), nullable=True)
+
+
 class DiaperChange(Base):
     __tablename__ = "diaper_changes"
 
@@ -37,9 +61,13 @@ class DiaperChange(Base):
     timestamp: Mapped[datetime] = mapped_column(_TZ_DATETIME, nullable=False, default=_utcnow)
     type: Mapped[str] = mapped_column(String, nullable=False)  # pee, poop, both
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    child_id: Mapped[int | None] = _child_fk()
     created_at: Mapped[datetime] = mapped_column(_TZ_DATETIME, default=_utcnow)
 
-    __table_args__ = (Index("idx_diaper_timestamp", "timestamp"),)
+    __table_args__ = (
+        Index("idx_diaper_timestamp", "timestamp"),
+        Index("idx_diaper_child", "child_id"),
+    )
 
 
 class Feeding(Base):
@@ -56,9 +84,13 @@ class Feeding(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     session_id: Mapped[str | None] = mapped_column(String, nullable=True)
     bottle_type: Mapped[str | None] = mapped_column(String, nullable=True)  # breastmilk, formula
+    child_id: Mapped[int | None] = _child_fk()
     created_at: Mapped[datetime] = mapped_column(_TZ_DATETIME, default=_utcnow)
 
-    __table_args__ = (Index("idx_feeding_timestamp", "timestamp"),)
+    __table_args__ = (
+        Index("idx_feeding_timestamp", "timestamp"),
+        Index("idx_feeding_child", "child_id"),
+    )
 
 
 class Medication(Base):
@@ -70,9 +102,13 @@ class Medication(Base):
     dosage_quantity: Mapped[float] = mapped_column(Float, nullable=False)
     dosage_unit: Mapped[str] = mapped_column(String, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    child_id: Mapped[int | None] = _child_fk()
     created_at: Mapped[datetime] = mapped_column(_TZ_DATETIME, default=_utcnow)
 
-    __table_args__ = (Index("idx_medication_timestamp", "timestamp"),)
+    __table_args__ = (
+        Index("idx_medication_timestamp", "timestamp"),
+        Index("idx_medication_child", "child_id"),
+    )
 
 
 class TemperatureReading(Base):
@@ -85,9 +121,13 @@ class TemperatureReading(Base):
         String, nullable=True
     )  # rectal, oral, axillary, temporal
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    child_id: Mapped[int | None] = _child_fk()
     created_at: Mapped[datetime] = mapped_column(_TZ_DATETIME, default=_utcnow)
 
-    __table_args__ = (Index("idx_temperature_timestamp", "timestamp"),)
+    __table_args__ = (
+        Index("idx_temperature_timestamp", "timestamp"),
+        Index("idx_temperature_child", "child_id"),
+    )
 
 
 class SavedMedication(Base):

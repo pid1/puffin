@@ -4,7 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from puffin import crud
+from puffin.crud import ChildFilter
 from puffin.database import get_db
+from puffin.dependencies import child_filter
 from puffin.schemas import FeedingCreate, FeedingResponse, FeedingUpdate, PeriodStats
 
 router = APIRouter(prefix="/api/feedings", tags=["feedings"])
@@ -22,6 +24,7 @@ def create_feeding(data: FeedingCreate, db: Session = Depends(get_db)):
         notes=data.notes,
         session_id=data.session_id,
         bottle_type=data.bottle_type.value if data.bottle_type else None,
+        child_id=data.child_id,
     )
 
 
@@ -31,16 +34,20 @@ def list_feedings(
     end_date: datetime | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    child: ChildFilter = Depends(child_filter),
     db: Session = Depends(get_db),
 ):
     return crud.get_feedings(
-        db, start_date=start_date, end_date=end_date, limit=limit, offset=offset
+        db, start_date=start_date, end_date=end_date, limit=limit, offset=offset, child=child
     )
 
 
 @router.get("/stats", response_model=PeriodStats)
-def get_feeding_stats(db: Session = Depends(get_db)):
-    return crud.feeding_stats(db)
+def get_feeding_stats(
+    child: ChildFilter = Depends(child_filter),
+    db: Session = Depends(get_db),
+):
+    return crud.feeding_stats(db, child)
 
 
 @router.get("/{feeding_id}", response_model=FeedingResponse)
@@ -77,6 +84,10 @@ def update_feeding(feeding_id: int, data: FeedingUpdate, db: Session = Depends(g
         updates["notes"] = data.notes
     if data.bottle_type is not None:
         updates["bottle_type"] = data.bottle_type.value
+    # ``child_id`` keys off fields_set, not None: an explicit null is how a log
+    # is moved back to unassigned.
+    if "child_id" in data.model_fields_set:
+        updates["child_id"] = data.child_id
     return crud.update_feeding(db, feeding_id, **updates)
 
 

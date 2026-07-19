@@ -4,7 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from puffin import crud
+from puffin.crud import ChildFilter
 from puffin.database import get_db
+from puffin.dependencies import child_filter
 from puffin.schemas import (
     MedicationCreate,
     MedicationResponse,
@@ -13,7 +15,6 @@ from puffin.schemas import (
     TemperatureCreate,
     TemperatureResponse,
     TemperatureUpdate,
-    DosageUnit,
 )
 
 router = APIRouter(tags=["health"])
@@ -31,6 +32,7 @@ def create_medication(data: MedicationCreate, db: Session = Depends(get_db)):
         dosage_quantity=data.dosage_quantity,
         dosage_unit=data.dosage_unit.value,
         notes=data.notes,
+        child_id=data.child_id,
     )
     crud.add_saved_medication(db, data.medication_name)
     return result
@@ -47,16 +49,20 @@ def list_medications(
     end_date: datetime | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    child: ChildFilter = Depends(child_filter),
     db: Session = Depends(get_db),
 ):
     return crud.get_medications(
-        db, start_date=start_date, end_date=end_date, limit=limit, offset=offset
+        db, start_date=start_date, end_date=end_date, limit=limit, offset=offset, child=child
     )
 
 
 @router.get("/api/medications/stats", response_model=PeriodStats)
-def get_medication_stats(db: Session = Depends(get_db)):
-    return crud.medication_stats(db)
+def get_medication_stats(
+    child: ChildFilter = Depends(child_filter),
+    db: Session = Depends(get_db),
+):
+    return crud.medication_stats(db, child)
 
 
 @router.get("/api/medications/{medication_id}", response_model=MedicationResponse)
@@ -80,6 +86,10 @@ def update_medication(medication_id: int, data: MedicationUpdate, db: Session = 
         updates["dosage_unit"] = data.dosage_unit.value
     if data.notes is not None:
         updates["notes"] = data.notes
+    # ``child_id`` keys off fields_set, not None: an explicit null is how a log
+    # is moved back to unassigned.
+    if "child_id" in data.model_fields_set:
+        updates["child_id"] = data.child_id
     obj = crud.update_medication(db, medication_id, **updates)
     if not obj:
         raise HTTPException(status_code=404, detail="Medication record not found")
@@ -103,6 +113,7 @@ def create_temperature(data: TemperatureCreate, db: Session = Depends(get_db)):
         temperature_celsius=data.temperature_celsius,
         location=data.location.value if data.location else None,
         notes=data.notes,
+        child_id=data.child_id,
     )
 
 
@@ -112,10 +123,11 @@ def list_temperatures(
     end_date: datetime | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    child: ChildFilter = Depends(child_filter),
     db: Session = Depends(get_db),
 ):
     return crud.get_temperatures(
-        db, start_date=start_date, end_date=end_date, limit=limit, offset=offset
+        db, start_date=start_date, end_date=end_date, limit=limit, offset=offset, child=child
     )
 
 
@@ -138,6 +150,10 @@ def update_temperature(temp_id: int, data: TemperatureUpdate, db: Session = Depe
         updates["location"] = data.location.value
     if data.notes is not None:
         updates["notes"] = data.notes
+    # ``child_id`` keys off fields_set, not None: an explicit null is how a log
+    # is moved back to unassigned.
+    if "child_id" in data.model_fields_set:
+        updates["child_id"] = data.child_id
     obj = crud.update_temperature(db, temp_id, **updates)
     if not obj:
         raise HTTPException(status_code=404, detail="Temperature reading not found")

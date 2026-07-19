@@ -146,6 +146,27 @@ def _run_migrations(bind=None) -> None:
             conn.execute(text("PRAGMA foreign_keys=on"))
             conn.commit()
 
+        # Child profiles: every log table gains a nullable ``child_id``.
+        # Existing rows keep ``NULL`` (unassigned) — no log data is read or
+        # reinterpreted here.  Bulk assignment to a profile is a separate,
+        # user-initiated action.  This must run after the ``feedings`` rebuild
+        # above (which recreates the table without ``child_id``) and before the
+        # medications early-return below.
+        insp = inspect(conn)
+        for table, index in (
+            ("diaper_changes", "idx_diaper_child"),
+            ("feedings", "idx_feeding_child"),
+            ("medications", "idx_medication_child"),
+            ("temperature_readings", "idx_temperature_child"),
+        ):
+            if not insp.has_table(table):
+                continue
+            if "child_id" not in {c["name"] for c in insp.get_columns(table)}:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN child_id INTEGER"))
+                conn.commit()
+            conn.execute(text(f"CREATE INDEX IF NOT EXISTS {index} ON {table} (child_id)"))
+            conn.commit()
+
         insp = inspect(conn)
         if not insp.has_table("medications"):
             return

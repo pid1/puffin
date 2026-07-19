@@ -9,7 +9,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from puffin.crud import warn_if_tz_unconfigured
 from puffin.database import init_db
-from puffin.routers import activities, dashboard, diapers, feedings, health
+from puffin.routers import activities, children, dashboard, diapers, feedings, health
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -48,6 +48,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 # Include routers
 app.include_router(activities.router)
+app.include_router(children.router)
 app.include_router(diapers.router)
 app.include_router(feedings.router)
 app.include_router(health.router)

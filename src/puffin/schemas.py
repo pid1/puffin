@@ -48,6 +48,55 @@ class DosageUnit(StrEnum):
     unit = "unit(s)"
 
 
+# --- Child Schemas ---
+
+
+class ChildCreate(BaseModel):
+    name: str
+
+    @field_validator("name")
+    @classmethod
+    def check_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Name is required")
+        return v
+
+
+class ChildUpdate(BaseModel):
+    name: str
+
+    @field_validator("name")
+    @classmethod
+    def check_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Name is required")
+        return v
+
+
+class ChildResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    created_at: datetime
+
+
+class UnassignedSummary(BaseModel):
+    """Whether any logs are currently unassigned.
+
+    Drives both the conditional ``Unassigned logs`` switcher option and the
+    one-time migration offer at first profile creation.
+    """
+
+    count: int = 0
+
+
+class BulkAssignResult(BaseModel):
+    assigned: int = 0
+
+
 # --- Diaper Schemas ---
 
 
@@ -55,12 +104,14 @@ class DiaperChangeCreate(BaseModel):
     timestamp: datetime | None = None
     type: DiaperType
     notes: str | None = None
+    child_id: int | None = None
 
 
 class DiaperChangeUpdate(BaseModel):
     timestamp: datetime | None = None
     type: DiaperType | None = None
     notes: str | None = None
+    child_id: int | None = None
 
 
 class DiaperChangeResponse(BaseModel):
@@ -70,6 +121,7 @@ class DiaperChangeResponse(BaseModel):
     timestamp: datetime
     type: DiaperType
     notes: str | None
+    child_id: int | None = None
     created_at: datetime
 
 
@@ -85,6 +137,7 @@ class FeedingCreate(BaseModel):
     notes: str | None = None
     session_id: str | None = None
     bottle_type: BottleType | None = None
+    child_id: int | None = None
 
     @model_validator(mode="after")
     def validate_bottle_amount(self) -> Self:
@@ -105,6 +158,7 @@ class FeedingUpdate(BaseModel):
     amount_unit: BottleUnit | None = None
     notes: str | None = None
     bottle_type: BottleType | None = None
+    child_id: int | None = None
 
     @model_validator(mode="after")
     def validate_bottle_amount(self) -> Self:
@@ -129,6 +183,7 @@ class FeedingResponse(BaseModel):
     notes: str | None
     session_id: str | None
     bottle_type: BottleType | None
+    child_id: int | None = None
     created_at: datetime
 
 
@@ -149,6 +204,7 @@ class MedicationCreate(BaseModel):
     dosage_quantity: float
     dosage_unit: DosageUnit
     notes: str | None = None
+    child_id: int | None = None
 
     @field_validator("dosage_quantity")
     @classmethod
@@ -162,6 +218,7 @@ class MedicationUpdate(BaseModel):
     dosage_quantity: float | None = None
     dosage_unit: DosageUnit | None = None
     notes: str | None = None
+    child_id: int | None = None
 
     @field_validator("dosage_quantity")
     @classmethod
@@ -180,6 +237,7 @@ class MedicationResponse(BaseModel):
     dosage_quantity: float
     dosage_unit: str
     notes: str | None
+    child_id: int | None = None
     created_at: datetime
 
 
@@ -191,6 +249,7 @@ class TemperatureCreate(BaseModel):
     temperature_celsius: float
     location: TemperatureLocation | None = None
     notes: str | None = None
+    child_id: int | None = None
 
 
 class TemperatureUpdate(BaseModel):
@@ -198,6 +257,7 @@ class TemperatureUpdate(BaseModel):
     temperature_celsius: float | None = None
     location: TemperatureLocation | None = None
     notes: str | None = None
+    child_id: int | None = None
 
 
 class TemperatureResponse(BaseModel):
@@ -208,6 +268,7 @@ class TemperatureResponse(BaseModel):
     temperature_celsius: float
     location: TemperatureLocation | None
     notes: str | None
+    child_id: int | None = None
     created_at: datetime
 
 
