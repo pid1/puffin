@@ -324,11 +324,19 @@ async function addChild() {
 
     // The bulk offer is made once: at first profile creation, on an install
     // that already has logs.  Re-read the count so it reflects this moment.
+    // The profile already exists server-side, so a failure here must still
+    // fall through to showing it -- otherwise the new child never appears, no
+    // error is raised, and the user retries into a duplicate.  The migration
+    // offer isn't lost: it can be made later from "Unassigned logs".
     if (isFirstProfile) {
-        const { count } = await api.get('/api/children/unassigned');
-        if (count > 0) {
-            offerMigration(created, count);
-            return;
+        try {
+            const { count } = await api.get('/api/children/unassigned');
+            if (count > 0) {
+                offerMigration(created, count);
+                return;
+            }
+        } catch (err) {
+            console.error('Failed to check for unassigned logs:', err);
         }
     }
     await refreshChildUI();
@@ -633,7 +641,20 @@ let timerInterval = null;
 function getTimerState() {
     const raw = localStorage.getItem(TIMER_KEY);
     if (!raw) return null;
-    const state = JSON.parse(raw);
+    let state;
+    try {
+        state = JSON.parse(raw);
+    } catch (err) {
+        // A truncated or corrupt write (storage quota, a tab killed mid
+        // setItem) must not throw here: getTimerState runs first thing in
+        // initTimer, so an uncaught parse error aborts the rest of
+        // DOMContentLoaded -- no form listeners, no calendar, no data load --
+        // and the page stays a dead shell across reloads until localStorage is
+        // cleared by hand. Drop the unreadable state and start clean instead.
+        console.error('Discarding corrupt timer state:', err);
+        localStorage.removeItem(TIMER_KEY);
+        return null;
+    }
     // Migrate old format (pre-switching)
     if (state.active && !state.segments) {
         state.segments = [{ side: state.side, startTime: state.startTime, endTime: null }];
@@ -854,6 +875,17 @@ async function endTimer() {
     try {
         // Save one entry per breast used; link paired breasts with a shared session_id
         const activeSides = Object.entries(totals).filter(([, ms]) => ms >= 1000);
+        // Nothing reached the 1s threshold (an accidental Start then End). Posting
+        // nothing but toasting "Feeding logged: " with an empty side list reads as
+        // a successful save; clear the timer and say plainly that nothing was
+        // recorded instead.
+        if (activeSides.length === 0) {
+            localStorage.removeItem(TIMER_KEY);
+            showTimerUI();
+            showToast('Timer discarded — nothing to log');
+            confirmBtn.disabled = false;
+            return;
+        }
         const sessionId = activeSides.length > 1 ? generateUUID() : null;
         const promises = [];
         for (const [side, totalMs] of activeSides) {
@@ -1110,7 +1142,10 @@ async function loadSavedMedNames() {
 
 async function loadMedDosageMap() {
     try {
-        const meds = await api.get('/api/medications?limit=50');
+        // Scoped to the selected child: this map autofills the dosage form, so
+        // an unscoped fetch can pre-fill a newborn's dose from an older
+        // sibling's record.
+        const meds = await api.get(`/api/medications?limit=50${childQuery()}`);
         medDosageMap = {};
         const seen = new Set();
         for (const m of meds) {
@@ -1228,7 +1263,9 @@ async function loadNoteSuggestions(endpoint, containerId, textareaId) {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
     try {
-        const entries = await api.get(`${endpoint}?limit=30`);
+        // Scoped like the rest of the modal's reads, so a child's note chips
+        // reflect that child's history rather than a sibling's.
+        const entries = await api.get(`${endpoint}?limit=30${childQuery()}`);
         const uniqueNotes = [];
         const seen = new Set();
         for (const e of entries) {
@@ -2005,16 +2042,27 @@ function formatTime(isoStr) {
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function formatShortDate(isoStr) {
+    return new Date(isoStr).toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
 function timeAgo(isoStr) {
     if (!isoStr) return '';
     const diff = Date.now() - new Date(isoStr).getTime();
-    if (diff < 0) return formatTime(isoStr); // future timestamp
+    // Future timestamp: a bare clock time reads as "today at HH:MM"; show the
+    // date so a mistyped or scheduled entry is legible.
+    if (diff < 0) return `${formatShortDate(isoStr)} ${formatTime(isoStr)}`;
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return 'just now';
     if (mins < 60) return `${mins}m ago`;
     const hrs = Math.floor(mins / 60);
     if (hrs < 24) return `${hrs}h ${mins % 60}m ago`;
-    return formatTime(isoStr);
+    // Past 24h a bare clock time is indistinguishable from earlier today
+    // (a three-day-old change reading "08:32"), so switch to a day count and,
+    // beyond a week, a short date.
+    const days = Math.floor(hrs / 24);
+    if (days < 7) return `${days}d ago`;
+    return formatShortDate(isoStr);
 }
 
 async function loadDashboard() {
