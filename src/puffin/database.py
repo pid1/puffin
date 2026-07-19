@@ -3,7 +3,7 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 _DOSAGE_UNIT_MAP = {
@@ -64,6 +64,22 @@ DB_PATH = os.environ.get(
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+
+
+@event.listens_for(engine, "connect")
+def _enable_foreign_keys(dbapi_connection, connection_record):
+    """Enforce foreign keys, which SQLite leaves off per-connection by default.
+
+    Without this the ``ondelete`` clauses on every log table are inert and a
+    bad ``child_id`` is written happily, orphaning the log where no view can
+    reach it.  Application-level validation in ``dependencies`` is the real
+    guard; this is the backstop for any write that bypasses it.
+    """
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

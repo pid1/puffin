@@ -80,3 +80,27 @@ def test_diaper_stats(client):
     assert data["today"] == 2
     assert data["week"] >= 2
     assert data["month"] >= 2
+
+
+def test_diaper_stats_week_boundary_respects_utc_offset(client, monkeypatch):
+    """The week window must be measured in UTC, not local wall clock.
+
+    ``_period_count`` builds its bound from ``datetime.now(local_tz)``, and
+    SQLite drops tzinfo when binding a datetime — so a bound that is not
+    explicitly converted to UTC is compared as local wall clock against
+    UTC-stored rows, silently widening the window by the local offset.
+
+    A diaper logged 7 days *and 2 hours* ago is outside the window at any
+    offset.  Under ``Etc/GMT+5`` (UTC-5) an unconverted bound would shift
+    the cutoff 5 hours earlier and wrongly include it.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    ts = (datetime.now(UTC) - timedelta(days=7, hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    client.post("/api/diapers", json={"type": "pee", "timestamp": ts})
+
+    monkeypatch.setenv("TZ", "Etc/GMT+5")
+
+    resp = client.get("/api/diapers/stats")
+    assert resp.status_code == 200
+    assert resp.json()["week"] == 0

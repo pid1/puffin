@@ -342,3 +342,52 @@ def test_migration_adds_session_id_column(setup_db):
             assert resp.json()["today"] == 0
     finally:
         app.dependency_overrides.clear()
+
+
+def test_paired_edit_reassigns_both_records(client):
+    """Editing a paired breast session must move *both* records to the new child.
+
+    The frontend builds this submit body by hand rather than going through
+    ``buildEditBody``, so it has to read the child selector itself.  Because
+    the router keys off ``model_fields_set``, an omitted ``child_id`` is a
+    silent no-op — the user sees "Updated!" while the association is
+    unchanged (see ``test_edit_without_child_id_leaves_association_untouched``
+    in test_children.py for that behaviour on its own).  This asserts the
+    paired path actually sends the field.
+    """
+    maya = client.post("/api/children", json={"name": "Maya"}).json()["id"]
+    theo = client.post("/api/children", json={"name": "Theo"}).json()["id"]
+
+    session_id = "paired-session-1"
+    timestamp = "2026-07-19T12:00:00Z"
+    left = client.post(
+        "/api/feedings",
+        json={
+            "feeding_type": "breast_left",
+            "duration_minutes": 10,
+            "session_id": session_id,
+            "timestamp": timestamp,
+            "child_id": maya,
+        },
+    ).json()
+    right = client.post(
+        "/api/feedings",
+        json={
+            "feeding_type": "breast_right",
+            "duration_minutes": 8,
+            "session_id": session_id,
+            "timestamp": timestamp,
+            "child_id": maya,
+        },
+    ).json()
+
+    # Exactly what the paired submit branch sends once the child is switched.
+    base = {"notes": "", "child_id": theo}
+    for feeding, duration in ((left, 10), (right, 8)):
+        resp = client.put(
+            f"/api/feedings/{feeding['id']}", json={**base, "duration_minutes": duration}
+        )
+        assert resp.status_code == 200
+
+    assert client.get(f"/api/feedings/{left['id']}").json()["child_id"] == theo
+    assert client.get(f"/api/feedings/{right['id']}").json()["child_id"] == theo

@@ -93,14 +93,18 @@ def _period_count(db: Session, model, timestamp_col, period: str, child: ChildFi
     local_tz = _get_local_tz()
     now = datetime.now(local_tz)
     if period == "today":
-        local_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        start = local_midnight.astimezone(UTC)
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     elif period == "week":
         start = now - timedelta(days=7)
     elif period == "month":
         start = now - timedelta(days=30)
     else:
         start = now
+    # Timestamps are stored as UTC, and SQLite drops tzinfo when binding a
+    # datetime — so every bound must be converted before it is compared, not
+    # just the "today" one.  Without this the week/month windows are off by
+    # the local UTC offset.
+    start = start.astimezone(UTC)
     stmt = select(func.count()).select_from(model).where(timestamp_col >= start)
     stmt = _child_where(stmt, model.child_id, child)
     return db.execute(stmt).scalar() or 0

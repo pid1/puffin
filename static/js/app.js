@@ -184,9 +184,14 @@ async function loadChildren() {
         childProfiles = profiles;
         unassignedCount = unassigned.count;
     } catch (err) {
+        // Do NOT fall back to an empty profile list: that is indistinguishable
+        // from a genuine zero-profile install, and persisting it would clear
+        // the stored selection and silently route every log created this
+        // session to "Unassigned". Keep the last known state instead and tell
+        // the user, so a flaky request stays a transient error.
         console.error('Failed to load children:', err);
-        childProfiles = [];
-        unassignedCount = 0;
+        showToast('Could not load profiles — showing last known state');
+        return;
     }
     selectedChild = resolveSelectedChild();
     storeSelectedChild(selectedChild);
@@ -640,6 +645,16 @@ function getTimerState() {
 }
 
 function startTimer(side) {
+    // An active session lives only in localStorage until it is ended, so
+    // overwriting it destroys every segment recorded so far with no way back.
+    // Reaching Start with a timer already running means a mis-tap, not an
+    // intent to discard a feed in progress.
+    const existing = getTimerState();
+    if (existing && existing.active) {
+        showTimerUI();
+        showToast('A feeding is already in progress');
+        return;
+    }
     const state = {
         active: true,
         // The timer belongs to whoever was selected when it started, and keeps
@@ -956,7 +971,9 @@ function initTimer() {
 async function loadLastBreastFeeding() {
     const infoEl = document.getElementById('last-feeding-info');
     try {
-        const feedings = await api.get('/api/feedings?limit=20');
+        // Scoped like every other read: this banner drives the next-feed
+        // decision, so showing a sibling's session here is actively misleading.
+        const feedings = await api.get(`/api/feedings?limit=20${childQuery()}`);
         const now = Date.now();
 
         // Find the most recent breast feeding session. Feedings sharing a session_id
@@ -1787,6 +1804,17 @@ function initEditForm() {
                 if (timestamp && timestamp !== originalTimestamp) {
                     baseBody.timestamp = new Date(timestamp).toISOString();
                 }
+                // This branch hand-builds its bodies instead of going through
+                // buildEditBody, so the Child select — which is rendered for
+                // paired feeds too — has to be read here as well. The router
+                // keys off model_fields_set, so omitting child_id is a no-op
+                // and the reassignment would silently do nothing.
+                const pairedChildEl = document.getElementById('edit-child');
+                if (pairedChildEl) {
+                    baseBody.child_id = pairedChildEl.value
+                        ? parseInt(pairedChildEl.value, 10)
+                        : null;
+                }
                 const leftDur = document.getElementById('edit-left-duration').value;
                 const rightDur = document.getElementById('edit-right-duration').value;
                 const leftBody = { ...baseBody };
@@ -1845,6 +1873,9 @@ function initEditForm() {
 
 /* ===== Calendar Day View ===== */
 let currentDate = new Date();
+// The calendar day the UI was last rendered against. The auto-refresh compares
+// it to the real clock to notice midnight passing on a page left open.
+let lastKnownToday = new Date();
 
 function toDateString(d) {
     const y = d.getFullYear();
@@ -1874,6 +1905,28 @@ function updateCalendarUI() {
     document.getElementById('cal-next').disabled = isToday;
     const pill = document.getElementById('cal-today-pill');
     pill.classList.toggle('hidden', isToday);
+}
+
+/**
+ * Periodic refresh that survives midnight.
+ *
+ * ``currentDate`` is fixed when the page loads, so on a page left open
+ * overnight a plain ``loadDashboard()`` keeps requesting yesterday while the
+ * heading still reads "Today" — and both escape hatches are unavailable,
+ * because ``cal-next`` was disabled and the jump-to-today pill hidden back
+ * when the two dates did agree. Overnight use is exactly when this app is
+ * open, so follow the day forward instead.
+ */
+function refreshDashboard() {
+    const now = new Date();
+    if (!isSameDay(now, lastKnownToday)) {
+        // Only follow the rollover if the user was actually on "today";
+        // someone reviewing an earlier day should stay where they are.
+        if (isSameDay(currentDate, lastKnownToday)) currentDate = now;
+        lastKnownToday = now;
+        updateCalendarUI();
+    }
+    loadDashboard();
 }
 
 function prevDay() {
@@ -2140,5 +2193,5 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Auto-refresh dashboard every 60 seconds
-    setInterval(loadDashboard, 60000);
+    setInterval(refreshDashboard, 60000);
 });
