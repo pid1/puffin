@@ -7,13 +7,14 @@
 // scope -- that hands back the functions and getter/setters for the mutable
 // `let` state. The shipped file is used byte-for-byte and never modified.
 //
-// Only DOM-free functions are exposed here (time formatting, child scoping,
-// timer state read). Functions that drive the DOM (showTimerUI, render*, the
-// bootstrap) are exercised in the app itself; wiring a full DOM is a separate,
-// heavier step and deliberately out of this first harness.
+// DOM-free functions load with no options. DOM-driven ones (the timer state
+// machine, the calendar rollover, loadChildren) need loadApp({ dom: true }),
+// which installs a minimal hand-rolled document (fake-dom.mjs). Timers are
+// always stubbed so nothing schedules real work and leaks past the test.
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { createDocument } from './fake-dom.mjs';
 import { dirname, join } from 'node:path';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -23,6 +24,7 @@ const APP_PATH = join(HERE, '..', '..', 'static', 'js', 'app.js');
 // the file, or the epilogue throws ReferenceError at load (a useful tripwire
 // if a function is renamed).
 const EXPOSED_FUNCTIONS = [
+    // DOM-free
     'timeAgo',
     'formatShortDate',
     'formatTime',
@@ -34,13 +36,33 @@ const EXPOSED_FUNCTIONS = [
     'storeSelectedChild',
     'readStoredChild',
     'validateBottleAmountUnit',
+    // DOM-driven (only callable when loadApp({ dom: true }))
+    'startTimer',
+    'endTimer',
+    'switchBreast',
+    'pauseTimer',
+    'resumeTimer',
+    'showTimerUI',
+    'refreshDashboard',
+    'updateCalendarUI',
+    'loadChildren',
 ];
 
 // Mutable module-level `let`s tests need to drive. Exposed as getter/setters so
 // a test can set state and read back what the code did to it.
-const EXPOSED_STATE = ['selectedChild', 'childProfiles', 'unassignedCount'];
+const EXPOSED_STATE = [
+    'selectedChild',
+    'childProfiles',
+    'unassignedCount',
+    'currentDate',
+    'lastKnownToday',
+];
 
 const EXPOSED_CONSTANTS = ['UNASSIGNED_VIEW', 'SELECTED_CHILD_KEY'];
+
+// Reassignable function bindings a test can stub to isolate the function under
+// test from its heavier collaborators (fetch + render cascades).
+const OVERRIDABLE = ['loadDashboard', 'refreshChildUI', 'loadDayActivities'];
 
 function makeLocalStorage(initial = {}) {
     const store = new Map(Object.entries(initial));
@@ -71,6 +93,26 @@ function makeFixedDate(fixedNowMs) {
     });
 }
 
+// No-op timer factory: records scheduled callbacks but never runs them, so a
+// setInterval in showTimerUI can't keep the node:test process alive.
+function makeTimers() {
+    let nextId = 1;
+    const scheduled = [];
+    return {
+        scheduled,
+        setTimeout: (fn, ms) => {
+            scheduled.push({ kind: 'timeout', fn, ms, id: nextId });
+            return nextId++;
+        },
+        setInterval: (fn, ms) => {
+            scheduled.push({ kind: 'interval', fn, ms, id: nextId });
+            return nextId++;
+        },
+        clearTimeout: () => {},
+        clearInterval: () => {},
+    };
+}
+
 /**
  * Load app.js into a fresh, isolated scope.
  *
@@ -78,7 +120,9 @@ function makeFixedDate(fixedNowMs) {
  * @param {object} [opts.localStorage] initial key/value seed for localStorage
  * @param {number} [opts.now] fixed epoch ms for Date.now()/new Date()
  * @param {function} [opts.fetch] fetch stub
- * @returns an object with { fns, state, constants, localStorage, consoleErrors }
+ * @param {boolean} [opts.dom] install the hand-rolled fake document
+ * @returns {{fns, state, constants, api, localStorage, document, timers,
+ *            consoleErrors, override}}
  */
 export function loadApp(opts = {}) {
     const source = readFileSync(APP_PATH, 'utf8');
@@ -86,14 +130,13 @@ export function loadApp(opts = {}) {
     const localStorage = makeLocalStorage(opts.localStorage || {});
     const consoleErrors = [];
     const DateImpl = opts.now != null ? makeFixedDate(opts.now) : Date;
+    const timers = makeTimers();
 
-    // Minimal ambient stubs. The bootstrap only calls document.addEventListener;
-    // getElementById is present but unused by the exposed functions.
-    const documentStub = {
-        addEventListener: () => {},
-        getElementById: () => null,
-        querySelectorAll: () => [],
-    };
+    // With dom:true, a real (if minimal) document. Otherwise a stub whose only
+    // job is to absorb the bootstrap's addEventListener.
+    const documentImpl = opts.dom
+        ? createDocument()
+        : { addEventListener: () => {}, getElementById: () => null, querySelectorAll: () => [] };
     const windowStub = { addEventListener: () => {} };
     const consoleStub = {
         ...console,
@@ -106,12 +149,19 @@ export function loadApp(opts = {}) {
             const fns = {};
             ${EXPOSED_FUNCTIONS.map((n) => `fns[${JSON.stringify(n)}] = ${n};`).join('\n')}
             __exports.fns = fns;
+            __exports.api = api;
             __exports.state = {};
             ${EXPOSED_STATE.map(
                 (n) => `Object.defineProperty(__exports.state, ${JSON.stringify(n)}, {
                     get: () => ${n}, set: (v) => { ${n} = v; }, enumerable: true });`
             ).join('\n')}
             __exports.constants = { ${EXPOSED_CONSTANTS.join(', ')} };
+            // Setters for reassignable function bindings, so a test can stub a
+            // heavy collaborator (loadDashboard, refreshChildUI, ...).
+            __exports.override = {};
+            ${OVERRIDABLE.map(
+                (n) => `__exports.override[${JSON.stringify(n)}] = (f) => { ${n} = f; };`
+            ).join('\n')}
         })();
     `;
 
@@ -122,18 +172,38 @@ export function loadApp(opts = {}) {
         'fetch',
         'console',
         'Date',
+        'setTimeout',
+        'clearTimeout',
+        'setInterval',
+        'clearInterval',
         '__exports',
     ];
     const exports = {};
     // eslint-disable-next-line no-new-func
     const run = new Function(...params, source + epilogue);
-    run(windowStub, documentStub, localStorage, fetchStub, consoleStub, DateImpl, exports);
+    run(
+        windowStub,
+        documentImpl,
+        localStorage,
+        fetchStub,
+        consoleStub,
+        DateImpl,
+        timers.setTimeout,
+        timers.clearTimeout,
+        timers.setInterval,
+        timers.clearInterval,
+        exports
+    );
 
     return {
         fns: exports.fns,
         state: exports.state,
         constants: exports.constants,
+        api: exports.api,
+        override: exports.override,
         localStorage,
+        document: documentImpl,
+        timers,
         consoleErrors,
     };
 }

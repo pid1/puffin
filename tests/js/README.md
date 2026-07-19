@@ -21,17 +21,30 @@ function is renamed, the epilogue throws `ReferenceError` at load — a
 deliberate tripwire.
 
 The harness injects a fixed `Date` (deterministic relative-time formatting), a
-Map-backed `localStorage`, and a `console` that records `error` calls.
+Map-backed `localStorage`, a `console` that records `error` calls, and no-op
+timers (so a `setInterval` in `showTimerUI` can't keep the process alive).
 
-## What is and isn't covered
+## Two tiers
 
-Covered: the DOM-free logic — time formatting (`timeAgo`), child scoping
+**DOM-free** (`loadApp()`): time formatting (`timeAgo`), child scoping
 (`childQuery`, `currentChildId`, `resolveSelectedChild`), and reading the timer
 state (`getTimerState`).
 
-Not covered here: functions that drive the DOM (`showTimerUI`, the `render*`
-family, the bootstrap) or perform fetches (`startTimer` end-to-end,
-`loadChildren`, `refreshDashboard`). Exercising those needs a DOM, which this
-harness deliberately does not stand up. They remain verified by hand against
-the running app; wiring a DOM fixture so they can be tested here is the natural
-next step.
+**DOM-driven** (`loadApp({ dom: true })`): installs a minimal hand-rolled
+`document` (`fake-dom.mjs`) so the timer state machine (`startTimer`,
+`endTimer`, `switchBreast`, `pauseTimer`), the calendar rollover
+(`refreshDashboard`, `updateCalendarUI`), and `loadChildren` can run. Fetches
+are driven by an `opts.fetch` stub, and `loadApp().api` / `.override` let a test
+capture requests or stub a heavy collaborator (e.g. `loadDashboard`) to isolate
+the function under test.
+
+`fake-dom.mjs` is deliberately minimal — `getElementById` returning stateful
+elements with `classList` / `textContent` / `innerHTML` / `value` / `disabled`
+/ `dataset`, and little else. If a newly covered function needs more, extend it
+there rather than reaching for jsdom.
+
+## Still not covered
+
+The `render*` family and the full `DOMContentLoaded` bootstrap (event wiring)
+aren't exercised — they touch far more of the DOM and carry less logic. They
+remain verified by hand against the running app.
