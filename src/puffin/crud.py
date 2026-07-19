@@ -145,7 +145,7 @@ def get_diapers(
     db: Session,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
-    limit: int = 50,
+    limit: int | None = 50,
     offset: int = 0,
     child: ChildFilter = None,
 ) -> list[DiaperChange]:
@@ -239,7 +239,7 @@ def get_feedings(
     db: Session,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
-    limit: int = 50,
+    limit: int | None = 50,
     offset: int = 0,
     child: ChildFilter = None,
 ) -> list[Feeding]:
@@ -368,7 +368,7 @@ def get_medications(
     db: Session,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
-    limit: int = 50,
+    limit: int | None = 50,
     offset: int = 0,
     child: ChildFilter = None,
 ) -> list[Medication]:
@@ -480,7 +480,7 @@ def get_temperatures(
     db: Session,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
-    limit: int = 50,
+    limit: int | None = 50,
     offset: int = 0,
     child: ChildFilter = None,
 ) -> list[TemperatureReading]:
