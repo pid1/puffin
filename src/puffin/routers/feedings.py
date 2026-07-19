@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from puffin import crud
 from puffin.crud import ChildFilter
 from puffin.database import get_db
-from puffin.dependencies import child_filter
+from puffin.dependencies import child_filter, validate_child_id
 from puffin.schemas import FeedingCreate, FeedingResponse, FeedingUpdate, PeriodStats
 
 router = APIRouter(prefix="/api/feedings", tags=["feedings"])
@@ -14,6 +14,7 @@ router = APIRouter(prefix="/api/feedings", tags=["feedings"])
 
 @router.post("", response_model=FeedingResponse, status_code=201)
 def create_feeding(data: FeedingCreate, db: Session = Depends(get_db)):
+    validate_child_id(db, data.child_id)
     return crud.create_feeding(
         db,
         timestamp=data.timestamp,
@@ -87,6 +88,7 @@ def update_feeding(feeding_id: int, data: FeedingUpdate, db: Session = Depends(g
     # ``child_id`` keys off fields_set, not None: an explicit null is how a log
     # is moved back to unassigned.
     if "child_id" in data.model_fields_set:
+        validate_child_id(db, data.child_id)
         updates["child_id"] = data.child_id
     return crud.update_feeding(db, feeding_id, **updates)
 

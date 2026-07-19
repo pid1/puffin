@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from puffin import crud
 from puffin.crud import ChildFilter
 from puffin.database import get_db
-from puffin.dependencies import child_filter
+from puffin.dependencies import child_filter, validate_child_id
 from puffin.schemas import (
     MedicationCreate,
     MedicationResponse,
@@ -25,6 +25,7 @@ router = APIRouter(tags=["health"])
 
 @router.post("/api/medications", response_model=MedicationResponse, status_code=201)
 def create_medication(data: MedicationCreate, db: Session = Depends(get_db)):
+    validate_child_id(db, data.child_id)
     result = crud.create_medication(
         db,
         timestamp=data.timestamp,
@@ -89,6 +90,7 @@ def update_medication(medication_id: int, data: MedicationUpdate, db: Session = 
     # ``child_id`` keys off fields_set, not None: an explicit null is how a log
     # is moved back to unassigned.
     if "child_id" in data.model_fields_set:
+        validate_child_id(db, data.child_id)
         updates["child_id"] = data.child_id
     obj = crud.update_medication(db, medication_id, **updates)
     if not obj:
@@ -107,6 +109,7 @@ def delete_medication(medication_id: int, db: Session = Depends(get_db)):
 
 @router.post("/api/temperatures", response_model=TemperatureResponse, status_code=201)
 def create_temperature(data: TemperatureCreate, db: Session = Depends(get_db)):
+    validate_child_id(db, data.child_id)
     return crud.create_temperature(
         db,
         timestamp=data.timestamp,
@@ -153,6 +156,7 @@ def update_temperature(temp_id: int, data: TemperatureUpdate, db: Session = Depe
     # ``child_id`` keys off fields_set, not None: an explicit null is how a log
     # is moved back to unassigned.
     if "child_id" in data.model_fields_set:
+        validate_child_id(db, data.child_id)
         updates["child_id"] = data.child_id
     obj = crud.update_temperature(db, temp_id, **updates)
     if not obj:

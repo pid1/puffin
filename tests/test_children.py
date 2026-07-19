@@ -316,3 +316,53 @@ def test_zero_profiles_export_has_no_child_column(client):
 def test_zero_profiles_children_list_is_empty(client):
     assert client.get("/api/children").json() == []
     assert client.get("/api/children/unassigned").json()["count"] == 0
+
+
+def test_create_rejects_nonexistent_child_id(client):
+    """A log naming a child that does not exist must be refused.
+
+    SQLite foreign keys are off by default, so nothing below the application
+    catches this — and the resulting orphan is unreachable in every view:
+    no child's scoped list matches it, and the unassigned view filters on
+    ``child_id IS NULL``.  Silent, unrecoverable data loss.
+    """
+    for path, payload in (
+        ("/api/diapers", {"type": "pee"}),
+        ("/api/feedings", {"feeding_type": "bottle", "amount": 3.0, "amount_unit": "oz"}),
+        (
+            "/api/medications",
+            {"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"},
+        ),
+        ("/api/temperatures", {"temperature_celsius": 37.2}),
+    ):
+        resp = client.post(path, json={**payload, "child_id": 999})
+        assert resp.status_code == 422, f"{path} accepted a nonexistent child_id"
+
+    assert client.get("/api/children/unassigned").json()["count"] == 0
+
+
+def test_update_rejects_nonexistent_child_id(client):
+    """Reassigning a log to a nonexistent child must be refused too.
+
+    The update path is how a stale client — one holding a profile id deleted
+    in another tab — orphans an *existing* log.
+    """
+    child_id = client.post("/api/children", json={"name": "Theo"}).json()["id"]
+    diaper_id = client.post("/api/diapers", json={"type": "pee", "child_id": child_id}).json()["id"]
+
+    resp = client.put(f"/api/diapers/{diaper_id}", json={"child_id": 424242})
+    assert resp.status_code == 422
+
+    # The original association must survive the rejected update.
+    assert client.get(f"/api/diapers/{diaper_id}").json()["child_id"] == child_id
+
+
+def test_update_to_explicit_null_still_unassigns(client):
+    """Validation must not break the deliberate move back to unassigned."""
+    child_id = client.post("/api/children", json={"name": "Maya"}).json()["id"]
+    created = client.post("/api/diapers", json={"type": "poop", "child_id": child_id})
+    diaper_id = created.json()["id"]
+
+    resp = client.put(f"/api/diapers/{diaper_id}", json={"child_id": None})
+    assert resp.status_code == 200
+    assert resp.json()["child_id"] is None
