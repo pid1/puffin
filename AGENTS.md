@@ -25,7 +25,9 @@ dev          # start FastAPI dev server on port 8000
 | `lint` | Run ruff linter |
 | `lint-fix` | Run ruff linter with auto-fix |
 | `format` | Run ruff formatter |
-| `test` | Run pytest |
+| `test` | Run all tests (Python + JS) |
+| `test-py` | Run pytest only |
+| `test-js` | Run JS tests only (Node's built-in `node:test`) |
 | `install-deps` | Install dependencies with uv |
 | `seed` | Generate 14 days of demo data |
 
@@ -48,6 +50,8 @@ dev          # start FastAPI dev server on port 8000
 - `templates/` — Jinja2 HTML templates
 - `static/` — CSS and JavaScript assets
 - `tests/` — pytest test suite
+- `tests/js/` — JS tests (`node:test`); `harness.mjs` loads `static/js/app.js`
+  unmodified and exposes its DOM-free functions
 
 ## Tech Stack
 
@@ -55,4 +59,5 @@ dev          # start FastAPI dev server on port 8000
 - **Frontend**: Vanilla HTML/CSS/JS (no build step)
 - **Package Manager**: uv
 - **Linter/Formatter**: ruff
-- **Tests**: pytest with httpx TestClient
+- **Tests**: pytest with httpx TestClient (backend); Node's built-in
+  `node:test` runner (frontend, no npm dependencies)
