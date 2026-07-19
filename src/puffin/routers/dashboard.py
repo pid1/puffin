@@ -2,6 +2,7 @@ import csv
 import io
 import json
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -18,6 +19,54 @@ router = APIRouter(prefix="/api", tags=["dashboard"])
 _PDF_MAX_CELL_LENGTH = 40  # max characters per cell before truncation
 
 _UNASSIGNED_LABEL = "Unassigned"
+
+# Bundled Unicode font for the PDF export. FPDF's core fonts are Latin-1 only
+# and raise on anything outside that range (emoji, curly quotes a phone
+# inserts, accents), which crashed the whole export. When these are missing we
+# fall back to Helvetica and transliterate — see ``_register_pdf_fonts``.
+_FONT_DIR = Path(__file__).resolve().parents[3] / "static" / "fonts"
+_FONT_REGULAR = _FONT_DIR / "DejaVuSans.ttf"
+_FONT_BOLD = _FONT_DIR / "DejaVuSans-Bold.ttf"
+
+# Smart punctuation a phone keyboard produces, mapped to Latin-1 equivalents so
+# the Helvetica fallback path degrades gracefully instead of dropping to "?".
+_SMART_PUNCTUATION = {
+    "‘": "'",
+    "’": "'",
+    "“": '"',
+    "”": '"',
+    "–": "-",
+    "—": "-",
+    "…": "...",
+    "•": "*",
+    " ": " ",
+}
+
+
+def _latin1_safe(text: str) -> str:
+    """Make *text* renderable by the Latin-1 core font without raising.
+
+    Only used on the fallback path when the bundled Unicode font is absent:
+    common smart punctuation is transliterated, and anything still outside
+    Latin-1 (e.g. emoji) becomes ``?`` rather than crashing the export.
+    """
+    for fancy, plain in _SMART_PUNCTUATION.items():
+        text = text.replace(fancy, plain)
+    return text.encode("latin-1", "replace").decode("latin-1")
+
+
+def _register_pdf_fonts(pdf) -> str:
+    """Register the bundled Unicode font if present; return the family to use.
+
+    Returns ``"DejaVu"`` when the font files are available (full Unicode), or
+    ``"Helvetica"`` when they are not — in which case body text must be run
+    through ``_latin1_safe`` before rendering.
+    """
+    if _FONT_REGULAR.exists() and _FONT_BOLD.exists():
+        pdf.add_font("DejaVu", "", str(_FONT_REGULAR))
+        pdf.add_font("DejaVu", "B", str(_FONT_BOLD))
+        return "DejaVu"
+    return "Helvetica"
 
 
 def _format_bottle_amount(amount: float | None, amount_unit: str | None) -> str:
@@ -67,6 +116,12 @@ def export_data(
     def child_name(obj) -> str:
         return child_names.get(obj.child_id, _UNASSIGNED_LABEL)
 
+    # Timestamps are stored in UTC; the app's UI shows them in the configured
+    # local zone. The human-facing CSV and PDF exports do the same so they
+    # don't contradict what the user saw when logging. (JSON stays UTC ISO-8601
+    # — unambiguous and standard for machine consumption.)
+    local_tz = crud.get_local_tz()
+
     if export_format == "json":
         from puffin.schemas import (
             DiaperChangeResponse,
@@ -105,21 +160,35 @@ def export_data(
 
         class PuffinPDF(FPDF):
             def header(self):
-                self.set_font("Helvetica", "B", 16)
+                self.set_font(self.body_family, "B", 16)
                 self.cell(
                     0, 10, "Puffin Baby Tracker Report", align="C", new_x="LMARGIN", new_y="NEXT"
                 )
-                self.set_font("Helvetica", "", 9)
+                self.set_font(self.body_family, "", 9)
                 report_range = _build_date_range_label(start_date, end_date)
                 self.cell(0, 6, report_range, align="C", new_x="LMARGIN", new_y="NEXT")
-                self.ln(4)
+                self.set_font(self.body_family, "", 8)
+                self.cell(
+                    0,
+                    5,
+                    f"Times shown in {self.tz_label}",
+                    align="C",
+                    new_x="LMARGIN",
+                    new_y="NEXT",
+                )
+                self.ln(3)
 
             def footer(self):
                 self.set_y(-15)
+                # Page numbers are ASCII, so the Latin-1 core font is always safe.
                 self.set_font("Helvetica", "I", 8)
                 self.cell(0, 10, f"Page {self.page_no()}", align="C")
 
         pdf = PuffinPDF()
+        # Fonts must be registered before add_page(), which triggers header().
+        pdf.body_family = _register_pdf_fonts(pdf)
+        pdf.sanitize = pdf.body_family == "Helvetica"
+        pdf.tz_label = str(local_tz)
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
 
@@ -138,7 +207,7 @@ def export_data(
                 ["Time", "Type", "Notes"],
                 [
                     [
-                        _fmt_ts(d.timestamp),
+                        _fmt_ts(d.timestamp, local_tz),
                         str(d.type),
                         d.notes or "",
                     ]
@@ -155,7 +224,7 @@ def export_data(
                 ["Time", "Type", "Duration (min)", "Amount", "Notes"],
                 [
                     [
-                        _fmt_ts(f.timestamp),
+                        _fmt_ts(f.timestamp, local_tz),
                         str(f.feeding_type),
                         str(f.duration_minutes) if f.duration_minutes is not None else "",
                         _format_bottle_amount(f.amount, f.amount_unit),
@@ -174,7 +243,7 @@ def export_data(
                 ["Time", "Medication", "Dosage", "Notes"],
                 [
                     [
-                        _fmt_ts(m.timestamp),
+                        _fmt_ts(m.timestamp, local_tz),
                         m.medication_name,
                         f"{m.dosage_quantity:.2f} {m.dosage_unit}",
                         m.notes or "",
@@ -192,7 +261,7 @@ def export_data(
                 ["Time", "Temp (°C)", "Location", "Notes"],
                 [
                     [
-                        _fmt_ts(t.timestamp),
+                        _fmt_ts(t.timestamp, local_tz),
                         str(t.temperature_celsius),
                         str(t.location) if t.location else "",
                         t.notes or "",
@@ -220,10 +289,15 @@ def export_data(
     def row(cells: list, obj) -> list:
         return cells + [child_name(obj)] if include_child else cells
 
+    def ts(value: datetime | None) -> str:
+        # Local ISO-8601 with offset (e.g. 2026-07-19T14:30:00-04:00): matches
+        # the time the UI showed, and the offset keeps it unambiguous.
+        return value.astimezone(local_tz).isoformat() if value else ""
+
     writer.writerow(["--- Diaper Changes ---"])
     writer.writerow(header(["id", "timestamp", "type", "notes", "created_at"]))
     for d in diapers:
-        writer.writerow(row([d.id, d.timestamp, d.type, d.notes, d.created_at], d))
+        writer.writerow(row([d.id, ts(d.timestamp), d.type, d.notes, ts(d.created_at)], d))
 
     writer.writerow([])
     writer.writerow(["--- Feedings ---"])
@@ -246,13 +320,13 @@ def export_data(
             row(
                 [
                     f.id,
-                    f.timestamp,
+                    ts(f.timestamp),
                     f.feeding_type,
                     f.duration_minutes,
                     f.amount,
                     f.amount_unit,
                     f.notes,
-                    f.created_at,
+                    ts(f.created_at),
                 ],
                 f,
             )
@@ -278,12 +352,12 @@ def export_data(
             row(
                 [
                     m.id,
-                    m.timestamp,
+                    ts(m.timestamp),
                     m.medication_name,
                     m.dosage_quantity,
                     m.dosage_unit,
                     m.notes,
-                    m.created_at,
+                    ts(m.created_at),
                 ],
                 m,
             )
@@ -296,7 +370,17 @@ def export_data(
     )
     for t in temperatures:
         writer.writerow(
-            row([t.id, t.timestamp, t.temperature_celsius, t.location, t.notes, t.created_at], t)
+            row(
+                [
+                    t.id,
+                    ts(t.timestamp),
+                    t.temperature_celsius,
+                    t.location,
+                    t.notes,
+                    ts(t.created_at),
+                ],
+                t,
+            )
         )
 
     content = output.getvalue()
@@ -307,9 +391,9 @@ def export_data(
     )
 
 
-def _fmt_ts(ts: datetime) -> str:
-    """Format a UTC datetime for display in the PDF."""
-    return ts.strftime("%Y-%m-%d %H:%M") if ts else ""
+def _fmt_ts(ts: datetime, tz) -> str:
+    """Format a stored UTC datetime in the local zone for the PDF."""
+    return ts.astimezone(tz).strftime("%Y-%m-%d %H:%M") if ts else ""
 
 
 def _build_date_range_label(start: datetime | None, end: datetime | None) -> str:
@@ -324,13 +408,16 @@ def _build_date_range_label(start: datetime | None, end: datetime | None) -> str
 
 def _pdf_section(pdf, title: str, headers: list[str], rows: list[list[str]]) -> None:
     """Render a titled table section into the PDF."""
+    family = pdf.body_family
+
     # Section heading
-    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_font(family, "B", 12)
     pdf.set_fill_color(230, 240, 255)
     pdf.cell(0, 8, title, fill=True, new_x="LMARGIN", new_y="NEXT")
     pdf.ln(1)
 
     if not rows:
+        # "No records" is ASCII, so the core italic font is always safe here.
         pdf.set_font("Helvetica", "I", 9)
         pdf.cell(0, 6, "No records", new_x="LMARGIN", new_y="NEXT")
         pdf.ln(4)
@@ -341,20 +428,23 @@ def _pdf_section(pdf, title: str, headers: list[str], rows: list[list[str]]) -> 
     n = len(headers)
     col_w = page_w / n
 
-    # Header row
-    pdf.set_font("Helvetica", "B", 9)
+    # Header row (labels are app-controlled ASCII)
+    pdf.set_font(family, "B", 9)
     pdf.set_fill_color(200, 220, 240)
     for h in headers:
         pdf.cell(col_w, 7, h, border=1, fill=True)
     pdf.ln()
 
-    # Data rows
-    pdf.set_font("Helvetica", "", 8)
+    # Data rows — these carry user text (notes, names), so they must be
+    # transliterated when the Unicode font is unavailable.
+    pdf.set_font(family, "", 8)
     fill = False
     pdf.set_fill_color(245, 248, 255)
     for row in rows:
-        # Wrap long text — simple truncation
+        # Truncate long cells (full text remains in the CSV/JSON exports).
         cells = [str(v)[:_PDF_MAX_CELL_LENGTH] for v in row]
+        if pdf.sanitize:
+            cells = [_latin1_safe(c) for c in cells]
         for cell in cells:
             pdf.cell(col_w, 6, cell, border=1, fill=fill)
         pdf.ln()
