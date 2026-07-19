@@ -33,6 +33,7 @@ docker run -d \
   --name puffin \
   -p 8000:8000 \
   -v puffin-data:/data \
+  -e TZ=America/New_York \
   ghcr.io/pid1/puffin:latest
 ```
 
@@ -45,6 +46,7 @@ Then open [http://localhost:8000](http://localhost:8000).
 ### Environment Variables
 
 - `PUFFIN_DB_PATH` — Path to the SQLite database file (default: `/data/puffin.db`). Normally you don't need to change this.
+- `TZ` — IANA timezone name (e.g. `America/New_York`) used to decide where one day ends and the next begins (default: `UTC`). **Set this to your local timezone.** Without it, an evening log west of UTC is counted as tomorrow — a diaper logged at 21:10 US Central lands on the next UTC day, so it won't show up in today's dashboard counts or timeline until midnight UTC. An unrecognized value falls back to UTC.
 
 ## Development
 

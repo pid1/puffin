@@ -4,6 +4,14 @@ let
   setupCommands = [
     "install-deps"
   ];
+
+  # Day boundaries ("today" counts, timeline) come from TZ; it defaults to
+  # UTC in the app, which is wrong for anyone west of it. Fall back to the
+  # host's zone so dev matches what the browser shows.
+  exportTz = ''
+    export TZ="''${TZ:-$(readlink /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||')}"
+    export TZ="''${TZ:-UTC}"
+  '';
 in
 {
   # Packages
@@ -33,10 +41,14 @@ in
     setup.exec = lib.concatStringsSep " && " setupCommands;
 
     # Interactive dev commands
-    dev.exec = "uv run uvicorn puffin.main:app --reload --host 0.0.0.0 --port 8000";
+    dev.exec = ''
+      ${exportTz}
+      uv run uvicorn puffin.main:app --reload --host 0.0.0.0 --port 8000
+    '';
 
     # Background dev commands
     dev-start.exec = ''
+      ${exportTz}
       mkdir -p .devenv/logs .devenv/pids
       nohup uv run uvicorn puffin.main:app --reload --host 0.0.0.0 --port 8000 > .devenv/logs/dev.log 2>&1 &
       echo $! > .devenv/pids/dev.pid
