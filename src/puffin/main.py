@@ -1,8 +1,11 @@
+import math
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -39,6 +42,40 @@ app = FastAPI(
 )
 
 app.add_middleware(NoCacheAPIMiddleware)
+
+
+def _json_safe(value):
+    """Replace non-finite floats with their string form, recursively.
+
+    ``NaN`` and ``Infinity`` are not valid JSON, and Python's stdlib encoder
+    raises on them rather than emitting the non-standard literals it accepts
+    on input.
+    """
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(v) for v in value]
+    return value
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Render validation errors that echo a non-finite float.
+
+    Python's json parser accepts bare ``NaN``/``Infinity`` literals, so such a
+    value reaches the schema and is correctly rejected -- but FastAPI's default
+    handler echoes the offending input back in the error detail, where the
+    encoder cannot serialize it. That turned a clean 422 into a 500 at the
+    response layer. Scrub the echoed input so the rejection is what the client
+    actually sees.
+    """
+    return JSONResponse(
+        status_code=422,
+        content={"detail": _json_safe(jsonable_encoder(exc.errors()))},
+    )
+
 
 # Mount static files
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")

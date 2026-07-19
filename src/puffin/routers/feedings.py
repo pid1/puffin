@@ -32,7 +32,7 @@ def create_feeding(data: FeedingCreate, db: Session = Depends(get_db)):
 @router.get("", response_model=list[FeedingResponse])
 def list_feedings(
     start_date: datetime | None = Query(None),
-    end_date: datetime | None = Query(None),
+    end_date: datetime | None = Query(None, description="Exclusive upper bound"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     child: ChildFilter = Depends(child_filter),

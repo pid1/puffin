@@ -372,3 +372,62 @@ def test_saved_names_preserves_original_casing(client):
     )
     resp = client.get("/api/medications/saved-names")
     assert resp.json() == ["vitamin C"]
+
+
+def test_nan_dosage_is_rejected_not_a_500(client):
+    """NaN/Infinity must validate as 422 rather than crash the handler.
+
+    ``Decimal('NaN').as_tuple().exponent`` is the string 'n' (and 'F' for
+    infinity), so comparing it against an int raises TypeError.  Pydantic only
+    converts ValueError/AssertionError into validation errors, so that escaped
+    as an unhandled 500 -- and Python's json parser accepts bare NaN/Infinity
+    literals, so any client can reach it.
+    """
+    for literal in ("NaN", "Infinity", "-Infinity"):
+        body = (
+            '{"medication_name": "Tylenol", "dosage_quantity": '
+            + literal
+            + ', "dosage_unit": "mL"}'
+        )
+        resp = client.post(
+            "/api/medications", content=body, headers={"Content-Type": "application/json"}
+        )
+        assert resp.status_code == 422, f"{literal} did not validate cleanly"
+
+
+def test_implausible_temperature_is_rejected(client):
+    """A transparently impossible reading must not reach the exports.
+
+    -500 C was accepted and rendered as -868.0 F in the PDF/CSV export.
+    """
+    for celsius in (-500, 500, 0, 60):
+        resp = client.post("/api/temperatures", json={"temperature_celsius": celsius})
+        assert resp.status_code == 422, f"{celsius} C was accepted"
+
+    # A real fever must still go through.
+    assert client.post("/api/temperatures", json={"temperature_celsius": 39.4}).status_code == 201
+
+
+def test_saved_medication_survives_a_lost_race(client, monkeypatch):
+    """Losing the check-then-insert race must not surface as a 500.
+
+    ``SavedMedication.name`` is unique and the existence check is not atomic
+    with the insert, so two parents saving the same new medication at once can
+    both pass the check. Patching the check to report "absent" while the row
+    exists reproduces the loser's path deterministically -- a plain sequential
+    duplicate returns at the check and never reaches the insert.
+
+    This matters because ``add_saved_medication`` runs *after* the medication
+    log has already been committed, so an uncaught IntegrityError showed the
+    user a failure for a save that had partly succeeded.
+    """
+    from puffin import crud
+
+    payload = {"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"}
+    assert client.post("/api/medications", json=payload).status_code == 201
+
+    monkeypatch.setattr(crud, "_saved_medication_exists", lambda db, name: False)
+    resp = client.post("/api/medications", json=payload)
+
+    assert resp.status_code == 201
+    assert client.get("/api/medications/saved-names").json().count("Tylenol") == 1

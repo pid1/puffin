@@ -391,3 +391,64 @@ def test_paired_edit_reassigns_both_records(client):
 
     assert client.get(f"/api/feedings/{left['id']}").json()["child_id"] == theo
     assert client.get(f"/api/feedings/{right['id']}").json()["child_id"] == theo
+
+
+def test_negative_duration_and_amount_are_rejected(client):
+    """Negative durations and amounts must not reach the log or the export."""
+    assert (
+        client.post(
+            "/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": -600}
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            "/api/feedings",
+            json={"feeding_type": "bottle", "amount": -5, "amount_unit": "oz"},
+        ).status_code
+        == 422
+    )
+
+
+def test_converting_breast_to_bottle_clears_duration(client):
+    """A bottle has no duration, mirroring how breast clears amount/unit.
+
+    The stale value is invisible in the timeline (which renders the bottle
+    branch) but the CSV and PDF exports print the column verbatim, so an
+    exported bottle feed carried a phantom duration.
+    """
+    feeding = client.post(
+        "/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": 12}
+    ).json()
+
+    resp = client.put(
+        f"/api/feedings/{feeding['id']}",
+        json={"feeding_type": "bottle", "amount": 4.0, "amount_unit": "oz"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["duration_minutes"] is None
+    assert resp.json()["amount"] == 4.0
+
+
+def test_offset_timestamp_is_converted_to_utc_on_write(client):
+    """A non-UTC offset must be converted, not stored as wall clock.
+
+    SQLite drops tzinfo when binding, so without a bind-side conversion
+    10:00-04:00 was written as "10:00" and read back as 10:00+00:00 -- a
+    silent four-hour shift for any client that sends a local offset.
+    """
+    from datetime import UTC, datetime
+
+    feeding = client.post(
+        "/api/feedings",
+        json={
+            "feeding_type": "bottle",
+            "amount": 3.0,
+            "amount_unit": "oz",
+            "timestamp": "2026-07-19T10:00:00-04:00",
+        },
+    ).json()
+
+    fetched = client.get(f"/api/feedings/{feeding['id']}").json()
+    stored = datetime.fromisoformat(fetched["timestamp"])
+    assert stored.astimezone(UTC) == datetime(2026, 7, 19, 14, 0, tzinfo=UTC)

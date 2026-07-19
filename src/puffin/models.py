@@ -8,14 +8,26 @@ from puffin.database import Base
 
 
 class _UTCDateTime(TypeDecorator):
-    """A DateTime that guarantees UTC tzinfo after SQLite round-trips.
+    """A DateTime that guarantees UTC tzinfo across SQLite round-trips.
 
     SQLite stores datetimes as naive strings, so timezone info is lost on read.
-    This decorator re-attaches UTC on every load.
+    This decorator normalizes to UTC on every save and re-attaches UTC on
+    every load.
     """
 
     impl = DateTime(timezone=True)
     cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, dialect) -> datetime | None:
+        # SQLite's dialect discards tzinfo when binding, so an aware value in
+        # any other offset would be written as its local wall clock and then
+        # read back as UTC -- e.g. 10:00-04:00 stored as "10:00" and returned
+        # as 10:00+00:00, a silent four-hour shift.  Convert first so the
+        # stored wall clock really is UTC.  Naive values are assumed to be UTC
+        # already, matching how they are read back.
+        if value is not None and value.tzinfo is not None:
+            return value.astimezone(UTC)
+        return value
 
     def process_result_value(self, value: datetime | None, dialect) -> datetime | None:
         if value is not None and value.tzinfo is None:
