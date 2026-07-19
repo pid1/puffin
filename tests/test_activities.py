@@ -173,3 +173,29 @@ def test_activities_timezone_included_today(client, monkeypatch):
     resp = client.get("/api/activities?date=2026-04-08")
     assert resp.status_code == 200
     assert len(resp.json()) == 1
+
+
+def test_activity_at_local_midnight_belongs_to_exactly_one_day(client, monkeypatch):
+    """A log at exactly local midnight must not appear in both adjacent days.
+
+    ``_day_bounds`` returns an *exclusive* next-midnight end and
+    ``_count_range`` honours it, but the list queries used ``<=`` -- so a
+    boundary row showed up in both daily lists and disagreed with the
+    dashboard count for the same date.  Reachable any time a user types a
+    round 00:00 time.
+    """
+    from datetime import UTC, datetime, timedelta, timezone
+
+    local_tz_offset = timezone(timedelta(hours=-5))
+    midnight_local = datetime(2026, 4, 8, 0, 0, 0, tzinfo=local_tz_offset)
+    ts_utc = midnight_local.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    client.post("/api/diapers", json={"type": "pee", "timestamp": ts_utc})
+    monkeypatch.setenv("TZ", "Etc/GMT+5")
+
+    previous_day = client.get("/api/activities?date=2026-04-07").json()
+    boundary_day = client.get("/api/activities?date=2026-04-08").json()
+
+    # Midnight opens the new day; it must not also close the previous one.
+    assert len(previous_day) == 0
+    assert len(boundary_day) == 1

@@ -2133,7 +2133,14 @@ function initExport() {
 
         let url = `/api/export?format=${encodeURIComponent(fmt)}`;
         if (start) url += `&start_date=${encodeURIComponent(start + 'T00:00:00')}`;
-        if (end) url += `&end_date=${encodeURIComponent(end + 'T23:59:59')}`;
+        // end_date is an exclusive bound, so send the following midnight rather
+        // than 23:59:59 — the latter silently dropped anything logged in the
+        // final second of the chosen day.
+        if (end) {
+            const endExclusive = new Date(end + 'T00:00:00');
+            endExclusive.setDate(endExclusive.getDate() + 1);
+            url += `&end_date=${encodeURIComponent(toDateString(endExclusive) + 'T00:00:00')}`;
+        }
 
         const childEl = document.getElementById('export-child');
         if (hasProfiles() && childEl.value !== EXPORT_ALL_CHILDREN) {

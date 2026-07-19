@@ -41,7 +41,7 @@ def get_dashboard(
 def export_data(
     export_format: str = Query("csv", alias="format", pattern="^(csv|json|pdf)$"),
     start_date: datetime | None = Query(None),
-    end_date: datetime | None = Query(None),
+    end_date: datetime | None = Query(None, description="Exclusive upper bound"),
     child: ChildFilter = Depends(child_filter),
     db: Session = Depends(get_db),
 ):

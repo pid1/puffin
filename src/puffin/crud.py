@@ -5,6 +5,7 @@ from datetime import date as date_type
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import String, cast, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from puffin.models import (
@@ -45,6 +46,11 @@ def _child_where(stmt, col, child: ChildFilter):
 # supplied".  Setting ``child_id`` to ``None`` is how a log is deliberately
 # moved back to unassigned, so it must not be skipped like other blanks.
 _NULLABLE_UPDATE_KEYS = {"child_id"}
+
+# Feeding fields that a type conversion clears.  These must be written even
+# when the new value is ``None``, which the generic "skip blanks" rule would
+# otherwise drop.
+_CLEARED_ON_CONVERT = {"amount", "amount_unit", "duration_minutes"}
 
 
 # --- Generic helpers ---
@@ -141,7 +147,7 @@ def get_diapers(
     if start_date:
         stmt = stmt.where(DiaperChange.timestamp >= start_date)
     if end_date:
-        stmt = stmt.where(DiaperChange.timestamp <= end_date)
+        stmt = stmt.where(DiaperChange.timestamp < end_date)
     stmt = _child_where(stmt, DiaperChange.child_id, child)
     stmt = stmt.offset(offset).limit(limit)
     return list(db.execute(stmt).scalars().all())
@@ -235,7 +241,7 @@ def get_feedings(
     if start_date:
         stmt = stmt.where(Feeding.timestamp >= start_date)
     if end_date:
-        stmt = stmt.where(Feeding.timestamp <= end_date)
+        stmt = stmt.where(Feeding.timestamp < end_date)
     stmt = _child_where(stmt, Feeding.child_id, child)
     stmt = stmt.offset(offset).limit(limit)
     return list(db.execute(stmt).scalars().all())
@@ -253,8 +259,15 @@ def update_feeding(db: Session, feeding_id: int, **kwargs) -> Feeding | None:
     if target_type in {"breast_left", "breast_right"}:
         kwargs["amount"] = None
         kwargs["amount_unit"] = None
+    elif target_type == "bottle":
+        # The mirror of the above: a bottle has no duration.  Without this a
+        # breast feed converted to a bottle keeps its old duration -- harmless
+        # in the timeline, which renders the bottle branch, but the CSV and PDF
+        # exports print the column verbatim and show a phantom duration.  The
+        # router only forwards non-None values, so the frontend cannot clear it.
+        kwargs["duration_minutes"] = None
     for k, v in kwargs.items():
-        if v is not None or k in {"amount", "amount_unit"} | _NULLABLE_UPDATE_KEYS:
+        if v is not None or k in _CLEARED_ON_CONVERT | _NULLABLE_UPDATE_KEYS:
             setattr(obj, k, v)
     db.commit()
     db.refresh(obj)
@@ -357,7 +370,7 @@ def get_medications(
     if start_date:
         stmt = stmt.where(Medication.timestamp >= start_date)
     if end_date:
-        stmt = stmt.where(Medication.timestamp <= end_date)
+        stmt = stmt.where(Medication.timestamp < end_date)
     stmt = _child_where(stmt, Medication.child_id, child)
     stmt = stmt.offset(offset).limit(limit)
     return list(db.execute(stmt).scalars().all())
@@ -402,13 +415,34 @@ def get_saved_medications(db: Session) -> list[str]:
     return list(db.execute(stmt).scalars().all())
 
 
-def add_saved_medication(db: Session, name: str) -> bool:
-    """Add name to saved list if no case-insensitive match exists. Returns True if added."""
+def _saved_medication_exists(db: Session, name: str) -> bool:
+    """Whether *name* is already saved, ignoring case.
+
+    Split out from ``add_saved_medication`` so a lost check-then-insert race
+    can be reproduced deterministically in tests.
+    """
     stmt = select(SavedMedication).where(func.lower(SavedMedication.name) == name.lower())
-    if db.execute(stmt).scalar_one_or_none() is not None:
+    return db.execute(stmt).scalar_one_or_none() is not None
+
+
+def add_saved_medication(db: Session, name: str) -> bool:
+    """Add name to saved list if no case-insensitive match exists. Returns True if added.
+
+    The existence check and the insert are not atomic and ``name`` is unique,
+    so two parents saving the same new medication at once can both pass the
+    check.  Losing that race is not a real failure -- the name is on the list
+    either way -- but the uncaught IntegrityError became a 500 *after* the
+    medication log itself had already been committed, so the user saw an error
+    for a save that had partly succeeded.
+    """
+    if _saved_medication_exists(db, name):
         return False
     db.add(SavedMedication(name=name))
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return False
     return True
 
 
@@ -448,7 +482,7 @@ def get_temperatures(
     if start_date:
         stmt = stmt.where(TemperatureReading.timestamp >= start_date)
     if end_date:
-        stmt = stmt.where(TemperatureReading.timestamp <= end_date)
+        stmt = stmt.where(TemperatureReading.timestamp < end_date)
     stmt = _child_where(stmt, TemperatureReading.child_id, child)
     stmt = stmt.offset(offset).limit(limit)
     return list(db.execute(stmt).scalars().all())

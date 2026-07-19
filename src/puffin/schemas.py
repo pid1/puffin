@@ -1,9 +1,20 @@
+import math
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+# Bounds for the free-numeric log fields.  These are deliberately generous --
+# the goal is to reject transparently impossible input (negative durations, a
+# -500 C body temperature that the PDF export happily renders as -868 F), not
+# to second-guess a real reading.  The frontend converts Fahrenheit to Celsius
+# before posting, so a temperature always arrives in Celsius.
+_MIN_TEMP_C = 20.0  # below profound hypothermia
+_MAX_TEMP_C = 45.0  # above survivable hyperthermia
+_MAX_FEED_MINUTES = 24 * 60
+_MAX_BOTTLE_AMOUNT = 2000.0  # generous in either mL or oz
 
 # --- Enums ---
 
@@ -131,8 +142,8 @@ class DiaperChangeResponse(BaseModel):
 class FeedingCreate(BaseModel):
     timestamp: datetime | None = None
     feeding_type: FeedingType
-    duration_minutes: int | None = None
-    amount: float | None = None
+    duration_minutes: int | None = Field(None, ge=0, le=_MAX_FEED_MINUTES)
+    amount: float | None = Field(None, gt=0, le=_MAX_BOTTLE_AMOUNT)
     amount_unit: BottleUnit | None = None
     notes: str | None = None
     session_id: str | None = None
@@ -153,8 +164,8 @@ class FeedingCreate(BaseModel):
 class FeedingUpdate(BaseModel):
     timestamp: datetime | None = None
     feeding_type: FeedingType | None = None
-    duration_minutes: int | None = None
-    amount: float | None = None
+    duration_minutes: int | None = Field(None, ge=0, le=_MAX_FEED_MINUTES)
+    amount: float | None = Field(None, gt=0, le=_MAX_BOTTLE_AMOUNT)
     amount_unit: BottleUnit | None = None
     notes: str | None = None
     bottle_type: BottleType | None = None
@@ -191,6 +202,13 @@ class FeedingResponse(BaseModel):
 
 
 def _validate_dosage_quantity(v: float) -> float:
+    # NaN and infinity must be rejected before the exponent check: for those,
+    # ``as_tuple().exponent`` is the string 'n'/'F' rather than an int, so
+    # comparing it raises TypeError -- which Pydantic does not convert into a
+    # validation error, surfacing as an unhandled 500.  Python's json parser
+    # accepts bare NaN/Infinity literals, so this is reachable from any client.
+    if not math.isfinite(v):
+        raise ValueError("Quantity must be a finite number")
     if Decimal(str(v)).as_tuple().exponent < -2:
         raise ValueError("Quantity must have at most 2 decimal places")
     if v <= 0:
@@ -246,7 +264,7 @@ class MedicationResponse(BaseModel):
 
 class TemperatureCreate(BaseModel):
     timestamp: datetime | None = None
-    temperature_celsius: float
+    temperature_celsius: float = Field(ge=_MIN_TEMP_C, le=_MAX_TEMP_C)
     location: TemperatureLocation | None = None
     notes: str | None = None
     child_id: int | None = None
@@ -254,7 +272,7 @@ class TemperatureCreate(BaseModel):
 
 class TemperatureUpdate(BaseModel):
     timestamp: datetime | None = None
-    temperature_celsius: float | None = None
+    temperature_celsius: float | None = Field(None, ge=_MIN_TEMP_C, le=_MAX_TEMP_C)
     location: TemperatureLocation | None = None
     notes: str | None = None
     child_id: int | None = None
