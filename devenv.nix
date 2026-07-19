@@ -102,6 +102,7 @@ in
 
     # Data commands
     seed.exec = "uv run python -m puffin.seed";
+    backup.exec = "uv run python -m puffin.backup";
   };
 
   enterShell = ''
@@ -132,6 +133,7 @@ in
     echo ""
     echo "Data commands:"
     echo "  seed             - Generate 14 days of demo data"
+    echo "  backup           - Snapshot the database into <db-dir>/backups"
     echo ""
     echo "Other commands:"
     echo "  install-deps     - Install dependencies with uv"
