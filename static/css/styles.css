@@ -131,6 +131,7 @@ body {
     font-family: inherit;
     min-height: 44px;
     min-width: 44px;
+    text-decoration: none; /* the settings gear is an <a> styled as a button */
 }
 
 .btn:active { transform: scale(0.97); }
@@ -719,6 +720,45 @@ body {
     font-size: 0.85rem;
     color: var(--text-secondary);
     margin: -6px 0 12px;
+}
+
+/* ===== Settings page ===== */
+/* The settings form used to sit on the modal's card surface; on its own page
+   it supplies that surface itself, so the contents read the same as before. */
+.settings-page {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+
+.back-link:hover { color: var(--text-primary); }
+
+.page-title {
+    font-size: 1.4rem;
+    margin-bottom: 16px;
+}
+
+/* The header gear on /settings is a location marker, not a control. */
+.btn-icon[aria-current="page"] {
+    cursor: default;
+    opacity: 0.55;
+}
+
+/* The modal framed these sections; on a page they need their own separation.
+   Collapses against the preceding .form-group's 16px, so the gap is 28px, not
+   44px. The first title is skipped — the page heading already spaces it. */
+.settings-page .settings-section-title:not(:first-child) {
+    margin-top: 28px;
 }
 
 /* ===== Child Profiles ===== */

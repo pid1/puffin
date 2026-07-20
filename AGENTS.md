@@ -48,11 +48,12 @@ dev          # start FastAPI dev server on port 8000
 ## Project Structure
 
 - `src/puffin/` — FastAPI application (models, schemas, crud, routers)
-- `templates/` — Jinja2 HTML templates
-- `static/` — CSS and JavaScript assets
+- `templates/` — Jinja2 HTML templates (`index.html` dashboard, `settings.html`)
+- `static/` — CSS and JavaScript assets; `common.js` is the shared layer both
+  pages load, with `app.js` (dashboard) and `settings.js` layered on top
 - `tests/` — pytest test suite
-- `tests/js/` — JS tests (`node:test`); `harness.mjs` loads `static/js/app.js`
-  unmodified and exposes its DOM-free functions
+- `tests/js/` — JS tests (`node:test`); `harness.mjs` loads `static/js/common.js`
+  and `static/js/app.js` unmodified and exposes their DOM-free functions
 
 ## Tech Stack
 

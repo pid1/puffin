@@ -11,7 +11,7 @@
     <header class="app-header">
         <h1 class="logo">🐧 Puffin</h1>
         <div class="header-actions">
-            <button id="settings-btn" class="btn btn-icon" aria-label="Open settings">⚙️</button>
+            <a href="/settings" id="settings-btn" class="btn btn-icon" aria-label="Settings">⚙️</a>
             <button id="theme-toggle" class="btn btn-icon" aria-label="Toggle dark mode">🌙</button>
         </div>
     </header>
@@ -324,52 +324,6 @@
         </div>
     </div>
 
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="modal hidden">
-        <div class="modal-backdrop"></div>
-        <div class="modal-content">
-            <h2>Settings</h2>
-            <form id="settings-form">
-                <h3 class="settings-section-title">Children</h3>
-                <p class="settings-hint">Optional. Add a child to track each one's logs separately.</p>
-                <div id="child-list" class="child-list"></div>
-                <div class="form-group child-add-row">
-                    <label class="sr-only" for="child-new-name">First name</label>
-                    <input type="text" id="child-new-name" maxlength="30" placeholder="First name">
-                    <button type="button" id="child-add-btn" class="btn btn-sm btn-secondary">+ Add a child</button>
-                </div>
-                <h3 class="settings-section-title">Breast Names</h3>
-                <div class="form-group">
-                    <label for="settings-left-name">Left breast name</label>
-                    <input type="text" id="settings-left-name" maxlength="30" placeholder="Left">
-                </div>
-                <div class="form-group">
-                    <label for="settings-right-name">Right breast name</label>
-                    <input type="text" id="settings-right-name" maxlength="30" placeholder="Right">
-                </div>
-                <h3 class="settings-section-title">Feeding Defaults</h3>
-                <div class="form-group">
-                    <label for="settings-bottle-type">Default bottle type</label>
-                    <select id="settings-bottle-type">
-                        <option value="breastmilk">Breastmilk</option>
-                        <option value="formula">Formula</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="settings-bottle-unit">Default bottle unit</label>
-                    <select id="settings-bottle-unit">
-                        <option value="oz">oz</option>
-                        <option value="mL">mL</option>
-                    </select>
-                </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary btn-lg">Save</button>
-                    <button type="button" class="btn btn-secondary modal-close">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <!-- Export Modal -->
     <div id="export-modal" class="modal hidden">
         <div class="modal-backdrop"></div>
@@ -405,29 +359,12 @@
         </div>
     </div>
 
-    <!--
-      Two-step confirmation shared by the first-profile migration offer and the
-      bulk re-assign from the unassigned view.  Its backdrop is marked static so
-      a stray click cannot dismiss a half-finished migration — every exit runs
-      through the buttons, which clean up after themselves.
-    -->
-    <div id="child-confirm-modal" class="modal hidden">
-        <div class="modal-backdrop modal-backdrop-static"></div>
-        <div class="modal-content">
-            <h2 id="child-confirm-title"></h2>
-            <p id="child-confirm-body"></p>
-            <p id="child-confirm-note" class="settings-hint hidden"></p>
-            <div class="form-actions">
-                <button type="button" id="child-confirm-primary" class="btn btn-primary btn-lg"></button>
-                <button type="button" id="child-confirm-secondary" class="btn btn-secondary"></button>
-                <button type="button" id="child-confirm-cancel" class="btn btn-secondary"></button>
-            </div>
-        </div>
-    </div>
+    {% include "_child_confirm_modal.html" %}
 
     <!-- Toast notification -->
     <div id="toast" class="toast hidden"></div>
 
+    <script src="/static/js/common.js"></script>
     <script src="/static/js/app.js"></script>
 </body>
 </html>
