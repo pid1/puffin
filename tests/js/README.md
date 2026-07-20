@@ -1,6 +1,7 @@
 # Frontend tests
 
-These cover `static/js/app.js` using Node's built-in test runner
+These cover the dashboard's scripts — `static/js/common.js` and
+`static/js/app.js` — using Node's built-in test runner
 (`node:test` + `node:assert`). There are **no npm dependencies** — the only
 requirement is the `node` binary, which devenv provides.
 
@@ -8,17 +9,25 @@ Run them with `test-js` (or `test` for both suites).
 
 ## How it works
 
-`app.js` ships as a plain browser `<script>`: top-level `function`
-declarations and a single `DOMContentLoaded` bootstrap at the bottom, with no
-module exports. `harness.mjs` evaluates the file's source in an isolated scope
-and appends an epilogue — running in that same scope — that hands back the
-functions plus getter/setters for the mutable `let` state (`selectedChild`,
-`childProfiles`, `unassignedCount`).
+Both files ship as plain browser `<script>`s: top-level `function`
+declarations and a single `DOMContentLoaded` bootstrap at the bottom of
+`app.js`, with no module exports. `harness.mjs` concatenates them in the same
+order the dashboard's `<script>` tags load them (`common.js`, then `app.js`),
+evaluates the result in an isolated scope, and appends an epilogue — running in
+that same scope — that hands back the functions plus getter/setters for the
+mutable `let` state (`selectedChild`, `childProfiles`, `unassignedCount`).
 
-The shipped file is used **byte-for-byte and never modified**, so a test that
+Concatenating reproduces the single shared scope the browser gives these
+classic scripts, so a function in `app.js` can still see a declaration in
+`common.js`. Adding a third file (e.g. `settings.js`) means adding it to
+`SOURCE_FILES` — but note `settings.js` and `app.js` each declare their own
+`DOMContentLoaded` bootstrap and are never loaded together in a browser, so
+they should not be concatenated into the same scope.
+
+The shipped files are used **byte-for-byte and never modified**, so a test that
 passes reflects the code that actually runs in the browser. If a covered
-function is renamed, the epilogue throws `ReferenceError` at load — a
-deliberate tripwire.
+function is renamed or moved out of both files, the epilogue throws
+`ReferenceError` at load — a deliberate tripwire.
 
 The harness injects a fixed `Date` (deterministic relative-time formatting), a
 Map-backed `localStorage`, a `console` that records `error` calls, and no-op

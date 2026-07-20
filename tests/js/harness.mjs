@@ -1,11 +1,11 @@
-// Test harness for static/js/app.js.
+// Test harness for the dashboard's scripts: static/js/common.js + app.js.
 //
-// app.js ships as a plain browser <script>: global `function` declarations and
-// a single DOMContentLoaded bootstrap at the very bottom, no exports. Rather
-// than refactor 2200 lines that have no tests yet, this harness evaluates the
-// source in a controlled scope and appends an epilogue -- running in that same
+// Both ship as plain browser <script>s: global `function` declarations and a
+// single DOMContentLoaded bootstrap at the very bottom of app.js, no exports.
+// Rather than refactor code that has no tests yet, this harness evaluates the
+// sources in a controlled scope and appends an epilogue -- running in that same
 // scope -- that hands back the functions and getter/setters for the mutable
-// `let` state. The shipped file is used byte-for-byte and never modified.
+// `let` state. The shipped files are used byte-for-byte and never modified.
 //
 // DOM-free functions load with no options. DOM-driven ones (the timer state
 // machine, the calendar rollover, loadChildren) need loadApp({ dom: true }),
@@ -18,7 +18,14 @@ import { createDocument } from './fake-dom.mjs';
 import { dirname, join } from 'node:path';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const APP_PATH = join(HERE, '..', '..', 'static', 'js', 'app.js');
+const STATIC_JS = join(HERE, '..', '..', 'static', 'js');
+
+// Concatenated in the same order the dashboard's <script> tags load them:
+// common.js declares the shared layer (API client, toasts, theme, modals, the
+// child-profile subsystem), app.js the dashboard on top of it. Evaluating them
+// together reproduces the single shared scope the browser gives these classic
+// scripts, so a function in one can still see a declaration in the other.
+const SOURCE_FILES = ['common.js', 'app.js'];
 
 // The surface we lift out of app.js. Each name must be a real declaration in
 // the file, or the epilogue throws ReferenceError at load (a useful tripwire
@@ -125,7 +132,9 @@ function makeTimers() {
  *            consoleErrors, override}}
  */
 export function loadApp(opts = {}) {
-    const source = readFileSync(APP_PATH, 'utf8');
+    const source = SOURCE_FILES
+        .map((name) => readFileSync(join(STATIC_JS, name), 'utf8'))
+        .join('\n');
 
     const localStorage = makeLocalStorage(opts.localStorage || {});
     const consoleErrors = [];

@@ -95,3 +95,8 @@ app.include_router(dashboard.router)
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings(request: Request):
+    return templates.TemplateResponse("settings.html", {"request": request})
