@@ -199,6 +199,29 @@ def _run_migrations(bind=None) -> None:
                 )
                 conn.commit()
 
+        # Store temperatures as entered instead of normalized to Celsius: rename
+        # ``temperature_celsius`` to ``temperature`` and reconstruct the entered
+        # value from the recorded ``unit``. Fahrenheit rows are converted back
+        # from their stored Celsius value (best-effort — earlier rounding to
+        # Celsius isn't perfectly reversible); Celsius rows are kept as-is. This
+        # runs after the ``unit`` backfill above, which it depends on. See #60.
+        insp = inspect(conn)
+        if insp.has_table("temperature_readings"):
+            temp_cols = {c["name"] for c in insp.get_columns("temperature_readings")}
+            if "temperature_celsius" in temp_cols and "temperature" not in temp_cols:
+                conn.execute(text("ALTER TABLE temperature_readings ADD COLUMN temperature FLOAT"))
+                conn.execute(
+                    text(
+                        "UPDATE temperature_readings SET temperature = CASE "
+                        "WHEN unit = 'F' THEN ROUND(temperature_celsius * 9.0 / 5.0 + 32, 1) "
+                        "ELSE temperature_celsius END"
+                    )
+                )
+                conn.execute(
+                    text("ALTER TABLE temperature_readings DROP COLUMN temperature_celsius")
+                )
+                conn.commit()
+
         insp = inspect(conn)
         if not insp.has_table("medications"):
             return

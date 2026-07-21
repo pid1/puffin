@@ -240,7 +240,8 @@ def generate_temperatures(
         temps.append(
             TemperatureReading(
                 timestamp=t,
-                temperature_celsius=temp_c,
+                temperature=temp_c,
+                unit="C",
                 location=location,
                 notes=None,
                 created_at=t,

@@ -101,7 +101,7 @@ def test_unassigned_count_spans_every_log_type(client):
         "/api/medications",
         json={"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"},
     )
-    client.post("/api/temperatures", json={"temperature_celsius": 37.0})
+    client.post("/api/temperatures", json={"temperature": 37.0, "unit": "C"})
 
     assert client.get("/api/children/unassigned").json()["count"] == 4
 
@@ -110,7 +110,7 @@ def test_bulk_assign_moves_every_unassigned_log(client, child):
     """The one-time migration offer and the later bulk re-assign share this."""
     client.post("/api/diapers", json={"type": "pee"})
     client.post("/api/feedings", json={"feeding_type": "bottle", "amount": 3, "amount_unit": "oz"})
-    client.post("/api/temperatures", json={"temperature_celsius": 37.0})
+    client.post("/api/temperatures", json={"temperature": 37.0, "unit": "C"})
 
     resp = client.post(f"/api/children/{child['id']}/assign-unassigned")
     assert resp.status_code == 200
@@ -158,7 +158,7 @@ def test_edit_log_moves_it_between_children(client, two_children):
             "/api/medications",
             {"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"},
         ),
-        ("/api/temperatures", {"temperature_celsius": 37.0}),
+        ("/api/temperatures", {"temperature": 37.0, "unit": "C"}),
     ],
 )
 def test_edit_log_can_set_child_back_to_unassigned(client, child, path, payload):
@@ -263,7 +263,7 @@ def test_export_csv_all_children_includes_child_column(client, two_children):
     maya, theo = two_children
     client.post("/api/diapers", json={"type": "pee", "child_id": maya["id"]})
     client.post("/api/diapers", json={"type": "poop", "child_id": theo["id"]})
-    client.post("/api/temperatures", json={"temperature_celsius": 37.0})
+    client.post("/api/temperatures", json={"temperature": 37.0, "unit": "C"})
 
     body = client.get("/api/export?format=csv").text
     assert body.splitlines()[1].endswith("child")
@@ -333,7 +333,7 @@ def test_create_rejects_nonexistent_child_id(client):
             "/api/medications",
             {"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"},
         ),
-        ("/api/temperatures", {"temperature_celsius": 37.2}),
+        ("/api/temperatures", {"temperature": 37.2, "unit": "C"}),
     ):
         resp = client.post(path, json={**payload, "child_id": 999})
         assert resp.status_code == 422, f"{path} accepted a nonexistent child_id"
