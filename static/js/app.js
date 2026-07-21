@@ -1023,6 +1023,7 @@ function initForms() {
         try {
             await api.post('/api/temperatures', {
                 temperature_celsius: Math.round(tempValue * 10) / 10,
+                unit: unit.toUpperCase(),
                 location,
                 notes,
                 timestamp,
@@ -1248,15 +1249,18 @@ function buildMedicationEditFields(data) {
 }
 
 function buildTemperatureEditFields(data) {
-    const tempF = Math.round((data.temperature_celsius * 9 / 5 + 32) * 10) / 10;
+    const unit = (data.unit || 'C').toUpperCase();
+    const tempValue = unit === 'F'
+        ? Math.round((data.temperature_celsius * 9 / 5 + 32) * 10) / 10
+        : Math.round(data.temperature_celsius * 10) / 10;
     return `
         <div class="form-group">
             <label for="edit-temp-value">Temperature</label>
             <div class="input-group">
-                <input type="number" id="edit-temp-value" step="0.1" value="${tempF}" required>
+                <input type="number" id="edit-temp-value" step="0.1" value="${tempValue}" required>
                 <select id="edit-temp-unit">
-                    <option value="f">°F</option>
-                    <option value="c">°C</option>
+                    <option value="f" ${unit === 'F' ? 'selected' : ''}>°F</option>
+                    <option value="c" ${unit === 'C' ? 'selected' : ''}>°C</option>
                 </select>
             </div>
         </div>
@@ -1329,6 +1333,7 @@ function buildEditBody(type) {
             const unit = document.getElementById('edit-temp-unit').value;
             if (unit === 'f') tempValue = (tempValue - 32) * 5 / 9;
             body.temperature_celsius = Math.round(tempValue * 10) / 10;
+            body.unit = unit.toUpperCase();
             const loc = document.getElementById('edit-temp-location').value;
             if (loc) body.location = loc;
             break;
@@ -1658,8 +1663,21 @@ async function loadDashboard() {
             data.last_diaper ? `Last: ${timeAgo(data.last_diaper.timestamp)}` : 'No records';
         document.getElementById('last-feeding').textContent =
             data.last_feeding ? `Last: ${timeAgo(data.last_feeding.timestamp)}` : 'No records';
-        document.getElementById('last-temp').textContent =
-            data.last_temperature ? `${data.last_temperature.temperature_celsius}°C` : 'No readings';
+        // Show the most recent reading for the viewed day in the unit it was
+        // recorded in; render no detail line when the day has no reading.
+        const tempEl = document.getElementById('last-temp');
+        const lastTemp = data.last_temperature;
+        if (lastTemp) {
+            const unit = (lastTemp.unit || 'C').toUpperCase();
+            const value = unit === 'F'
+                ? Math.round((lastTemp.temperature_celsius * 9 / 5 + 32) * 10) / 10
+                : Math.round(lastTemp.temperature_celsius * 10) / 10;
+            tempEl.textContent = `${value}°${unit}`;
+            tempEl.style.display = '';
+        } else {
+            tempEl.textContent = '';
+            tempEl.style.display = 'none';
+        }
 
         // Refresh the calendar day view
         loadDayActivities();

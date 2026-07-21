@@ -183,6 +183,22 @@ def _run_migrations(bind=None) -> None:
             conn.execute(text(f"CREATE INDEX IF NOT EXISTS {index} ON {table} (child_id)"))
             conn.commit()
 
+        # Temperature readings gain a ``unit`` column recording how each reading
+        # was entered/displayed. Legacy rows predate this and have no known
+        # entry unit; the stored value is Celsius, so they are backfilled to
+        # 'C' — displaying the true canonical value without inventing an entry
+        # unit we can't recover. See issue #58.
+        insp = inspect(conn)
+        if insp.has_table("temperature_readings"):
+            temp_cols = {c["name"] for c in insp.get_columns("temperature_readings")}
+            if "unit" not in temp_cols:
+                conn.execute(
+                    text(
+                        "ALTER TABLE temperature_readings ADD COLUMN unit TEXT NOT NULL DEFAULT 'C'"
+                    )
+                )
+                conn.commit()
+
         insp = inspect(conn)
         if not insp.has_table("medications"):
             return

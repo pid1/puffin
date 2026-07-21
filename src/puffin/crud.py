@@ -455,17 +455,30 @@ def add_saved_medication(db: Session, name: str) -> bool:
 # --- Temperature Readings ---
 
 
+def format_temperature(temperature_celsius: float, unit: str | None) -> str:
+    """Render a stored Celsius reading in its recorded unit ("C" or "F").
+
+    Readings are always stored in Celsius; ``unit`` records how the value was
+    entered so it can be displayed back in the same unit.
+    """
+    if (unit or "C").upper() == "F":
+        return f"{round(temperature_celsius * 9 / 5 + 32, 1)}°F"
+    return f"{round(temperature_celsius, 1)}°C"
+
+
 def create_temperature(
     db: Session,
     timestamp: datetime | None,
     temperature_celsius: float,
     location: str | None,
     notes: str | None,
+    unit: str = "F",
     child_id: int | None = None,
 ) -> TemperatureReading:
     obj = TemperatureReading(
         timestamp=timestamp or datetime.now(UTC),
         temperature_celsius=temperature_celsius,
+        unit=unit,
         location=location,
         notes=notes,
         child_id=child_id,
@@ -743,7 +756,8 @@ def get_activities(
             }
         )
     for t in get_temperatures(db, start_date=start, end_date=end, limit=limit, child=child):
-        temp_f = round(t.temperature_celsius * 9 / 5 + 32, 1)
+        # Render in the unit the reading was recorded in (stored as Celsius).
+        temp_str = format_temperature(t.temperature_celsius, t.unit)
         activities.append(
             {
                 "type": "temperature",
@@ -752,8 +766,8 @@ def get_activities(
                 "id": t.id,
                 "emoji": "\U0001f321\ufe0f",
                 "label": "Temperature",
-                "detail": f"{temp_f}\u00b0F",
-                "summary": f"Temp: {temp_f}\u00b0F",
+                "detail": temp_str,
+                "summary": f"Temp: {temp_str}",
                 "notes": t.notes,
             }
         )
@@ -787,7 +801,25 @@ def get_dashboard(db: Session, date_str: str | None = None, child: ChildFilter =
 
     last_diaper = _latest(DiaperChange)
     last_feeding = _latest(Feeding)
-    last_temp = _latest(TemperatureReading)
+
+    # Unlike the always-latest entries above, the last temperature is scoped to
+    # the viewed calendar day (issue #58): the most recent reading for the
+    # selected date, or None if that day has none. Defaults to today when no
+    # date is supplied.
+    temp_day = date_str or now.astimezone(_get_local_tz()).strftime("%Y-%m-%d")
+    t_start, t_end = _day_bounds(temp_day)
+    temp_stmt = (
+        select(TemperatureReading)
+        .where(
+            TemperatureReading.timestamp >= t_start,
+            TemperatureReading.timestamp < t_end,
+        )
+        .order_by(TemperatureReading.timestamp.desc())
+        .limit(1)
+    )
+    last_temp = db.execute(
+        _child_where(temp_stmt, TemperatureReading.child_id, child)
+    ).scalar_one_or_none()
 
     # Recent activities (last 3 days, excluding future)
     three_days_ago = now - timedelta(days=3)

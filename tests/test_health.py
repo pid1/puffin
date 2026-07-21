@@ -194,6 +194,77 @@ def test_delete_temperature(client):
     assert client.delete(f"/api/temperatures/{tid}").status_code == 204
 
 
+def test_create_temperature_unit_defaults_to_fahrenheit(client):
+    resp = client.post("/api/temperatures", json={"temperature_celsius": 37.5})
+    assert resp.status_code == 201
+    assert resp.json()["unit"] == "F"
+
+
+def test_create_temperature_persists_explicit_unit(client):
+    resp = client.post("/api/temperatures", json={"temperature_celsius": 37.5, "unit": "C"})
+    assert resp.status_code == 201
+    assert resp.json()["unit"] == "C"
+
+
+def test_update_temperature_unit(client):
+    tid = client.post("/api/temperatures", json={"temperature_celsius": 37.0, "unit": "C"}).json()[
+        "id"
+    ]
+    resp = client.put(f"/api/temperatures/{tid}", json={"unit": "F"})
+    assert resp.status_code == 200
+    assert resp.json()["unit"] == "F"
+
+
+def test_dashboard_last_temperature_scoped_to_viewed_day(client):
+    # A reading yesterday and one today; each day's dashboard reports its own.
+    client.post(
+        "/api/temperatures",
+        json={"temperature_celsius": 37.0, "timestamp": "2026-04-05T12:00:00Z"},
+    )
+    client.post(
+        "/api/temperatures",
+        json={"temperature_celsius": 38.0, "timestamp": "2026-04-06T12:00:00Z"},
+    )
+
+    today = client.get("/api/dashboard?date=2026-04-06").json()
+    assert today["last_temperature"]["temperature_celsius"] == 38.0
+
+    yesterday = client.get("/api/dashboard?date=2026-04-05").json()
+    assert yesterday["last_temperature"]["temperature_celsius"] == 37.0
+
+
+def test_dashboard_last_temperature_none_when_day_has_no_reading(client):
+    client.post(
+        "/api/temperatures",
+        json={"temperature_celsius": 37.0, "timestamp": "2026-04-05T12:00:00Z"},
+    )
+    # A day with no reading returns no last temperature, even though an older
+    # reading exists.
+    data = client.get("/api/dashboard?date=2026-04-06").json()
+    assert data["last_temperature"] is None
+
+
+def test_activity_feed_temperature_renders_recorded_unit(client):
+    client.post("/api/temperatures", json={"temperature_celsius": 37.0, "unit": "F"})
+    client.post("/api/temperatures", json={"temperature_celsius": 37.0, "unit": "C"})
+    activities = client.get("/api/dashboard").json()["recent_activities"]
+    details = {a["detail"] for a in activities if a["type"] == "temperature"}
+    assert details == {"98.6°F", "37.0°C"}
+
+
+def test_dashboard_last_temperature_reports_recorded_unit(client):
+    client.post(
+        "/api/temperatures",
+        json={
+            "temperature_celsius": 37.0,
+            "unit": "F",
+            "timestamp": "2026-04-06T12:00:00Z",
+        },
+    )
+    data = client.get("/api/dashboard?date=2026-04-06").json()
+    assert data["last_temperature"]["unit"] == "F"
+
+
 def test_dashboard(client):
     client.post("/api/diapers", json={"type": "pee"})
     client.post("/api/feedings", json={"feeding_type": "bottle"})

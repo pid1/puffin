@@ -278,11 +278,11 @@ def export_data(
             pdf,
             "Temperature Readings",
             *with_child(
-                ["Time", "Temp (°C)", "Location", "Notes"],
+                ["Time", "Temp", "Location", "Notes"],
                 [
                     [
                         _fmt_ts(t.timestamp, local_tz),
-                        str(t.temperature_celsius),
+                        _fmt_temperature(t),
                         str(t.location) if t.location else "",
                         t.notes or "",
                     ]
@@ -390,7 +390,9 @@ def export_data(
     writer.writerow([])
     writer.writerow(["--- Temperature Readings ---"])
     writer.writerow(
-        header(["id", "timestamp", "temperature_celsius", "location", "notes", "created_at"])
+        header(
+            ["id", "timestamp", "temperature_celsius", "unit", "location", "notes", "created_at"]
+        )
     )
     for t in temperatures:
         writer.writerow(
@@ -399,6 +401,7 @@ def export_data(
                     t.id,
                     ts(t.timestamp),
                     t.temperature_celsius,
+                    t.unit,
                     t.location,
                     t.notes,
                     ts(t.created_at),
@@ -418,6 +421,11 @@ def export_data(
 def _fmt_ts(ts: datetime, tz) -> str:
     """Format a stored UTC datetime in the local zone for the PDF."""
     return ts.astimezone(tz).strftime("%Y-%m-%d %H:%M") if ts else ""
+
+
+def _fmt_temperature(t) -> str:
+    """Render a temperature reading in its recorded unit for the PDF."""
+    return crud.format_temperature(t.temperature_celsius, t.unit)
 
 
 def _build_date_range_label(start: datetime | None, end: datetime | None) -> str:

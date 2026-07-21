@@ -35,6 +35,16 @@ def test_pdf_export_survives_smart_quotes_and_emoji(client):
     assert len(resp.content) > 1000
 
 
+def test_pdf_export_renders_temperatures_in_recorded_units(client):
+    """Mixed-unit temperature readings export without error, each in its unit."""
+    client.post("/api/temperatures", json={"temperature_celsius": 37.0, "unit": "F"})
+    client.post("/api/temperatures", json={"temperature_celsius": 37.0, "unit": "C"})
+
+    resp = client.get("/api/export?format=pdf")
+    assert resp.status_code == 200
+    assert resp.content[:5] == b"%PDF-"
+
+
 def test_pdf_uses_the_bundled_unicode_font(client):
     """The bundled DejaVu font should be found and used, not the fallback."""
     assert dashboard._FONT_REGULAR.exists(), "the bundled font is missing from the repo"
