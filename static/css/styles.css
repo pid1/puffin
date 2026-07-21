@@ -148,7 +148,11 @@ body {
 /* Quick action buttons */
 .quick-actions {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    /* Column count follows how many types the selected child shows, set on the
+       element by applyQuickAddVisibility, so the remaining buttons fill the row
+       instead of leaving gaps. Defaults to 3; the mobile rule below sets the
+       columns directly and still wins there, so small screens always stack. */
+    grid-template-columns: repeat(var(--qa-cols, 3), 1fr);
     gap: 12px;
     margin-bottom: 20px;
 }
@@ -186,7 +190,8 @@ body {
 /* ===== Cards ===== */
 .summary-cards {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    /* Mirrors .quick-actions: --sc-cols tracks the visible card count. */
+    grid-template-columns: repeat(var(--sc-cols, 3), 1fr);
     gap: 12px;
     margin-bottom: 24px;
 }
@@ -761,6 +766,20 @@ body {
     margin-top: 28px;
 }
 
+/* Splits the two save models apart: everything above applies immediately
+   (Children), everything below waits for Save (per-device preferences). The
+   divider carries its own spacing, so the section title after it opts out of
+   the 28px above to avoid doubling the gap. */
+.settings-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 28px 0 20px;
+}
+
+.settings-divider + .settings-section-title {
+    margin-top: 0;
+}
+
 /* ===== Child Profiles ===== */
 .sr-only {
     position: absolute;
@@ -829,6 +848,7 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
     padding: 8px 0;
     border-bottom: 1px solid var(--border);
 }
@@ -838,6 +858,27 @@ body {
     flex: 1;
     min-width: 0;
 }
+
+/* Quick add toggles wrap onto their own line under the name and actions. */
+.quick-add-toggles {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.quick-add-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.quick-add-toggle input { cursor: pointer; }
+.quick-add-toggle input:disabled { cursor: default; }
 
 .child-add-row {
     display: flex;

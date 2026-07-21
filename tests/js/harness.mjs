@@ -43,6 +43,9 @@ const EXPOSED_FUNCTIONS = [
     'storeSelectedChild',
     'readStoredChild',
     'validateBottleAmountUnit',
+    'getEnabledQuickAddTypes',
+    'setEnabledQuickAddTypes',
+    'clearQuickAddTypes',
     // DOM-driven (only callable when loadApp({ dom: true }))
     'startTimer',
     'endTimer',
@@ -65,7 +68,7 @@ const EXPOSED_STATE = [
     'lastKnownToday',
 ];
 
-const EXPOSED_CONSTANTS = ['UNASSIGNED_VIEW', 'SELECTED_CHILD_KEY'];
+const EXPOSED_CONSTANTS = ['UNASSIGNED_VIEW', 'SELECTED_CHILD_KEY', 'QUICK_ADD_KEYS'];
 
 // Reassignable function bindings a test can stub to isolate the function under
 // test from its heavier collaborators (fetch + render cascades).

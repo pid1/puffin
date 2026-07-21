@@ -1608,8 +1608,38 @@ function timeAgo(isoStr) {
     return formatShortDate(isoStr);
 }
 
+/**
+ * Show only the quick add buttons and summary cards enabled for the child on
+ * screen, hiding the rest so the remaining ones reflow to fill the row.
+ *
+ * Display-only: hidden types are still fetched, counted, logged, exported, and
+ * shown in the calendar below -- this trims the action row and card row and
+ * nothing else. The unassigned and whole-install views (currentChildId() null)
+ * always show everything, since there is no profile to configure.
+ */
+function applyQuickAddVisibility() {
+    const enabled = getEnabledQuickAddTypes(currentChildId());
+    QUICK_ADD_TYPES.forEach(t => {
+        const on = enabled.includes(t.key);
+        const btn = document.querySelector(`.quick-actions [data-modal="${t.modal}"]`);
+        if (btn) btn.classList.toggle('hidden', !on);
+        const card = document.querySelector(`.summary-cards .${t.cardClass}`);
+        if (card) card.classList.toggle('hidden', !on);
+    });
+    // Collapse the grids to the visible count so the survivors fill the row
+    // rather than leaving the hidden columns as gaps. The mobile media query
+    // still forces a single column underneath this.
+    const actions = document.querySelector('.quick-actions');
+    const cards = document.querySelector('.summary-cards');
+    if (actions) actions.style.setProperty('--qa-cols', enabled.length);
+    if (cards) cards.style.setProperty('--sc-cols', enabled.length);
+}
+
 async function loadDashboard() {
     try {
+        // Runs before the fetch so the visible set matches the selected child
+        // immediately, even if the request is slow or fails.
+        applyQuickAddVisibility();
         const dateStr = toDateString(currentDate);
         const data = await api.get(`/api/dashboard?date=${dateStr}${childQuery()}`);
 

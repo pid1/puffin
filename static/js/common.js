@@ -94,6 +94,67 @@ function getBreastNames() {
     };
 }
 
+/* ===== Quick Add Visibility (per child, per device) ===== */
+// Which quick add buttons -- and their matching summary cards -- a child shows
+// on the dashboard. One entry per dashboard quick action; the single source of
+// truth shared by the dashboard (which shows/hides buttons and cards from it)
+// and the settings checkboxes (one toggle per entry). `key` is what gets
+// stored; `modal`/`cardClass` are how the dashboard finds the markup.
+const QUICK_ADD_TYPES = [
+    { key: 'diaper',  label: 'Diaper',  modal: 'diaper-modal',  cardClass: 'card-diaper' },
+    { key: 'feeding', label: 'Feeding', modal: 'feeding-modal', cardClass: 'card-feeding' },
+    { key: 'health',  label: 'Health',  modal: 'health-modal',  cardClass: 'card-health' },
+];
+const QUICK_ADD_KEYS = QUICK_ADD_TYPES.map(t => t.key);
+const QUICK_ADD_KEY_PREFIX = 'puffin-quick-add-';
+
+function quickAddStorageKey(childId) {
+    return `${QUICK_ADD_KEY_PREFIX}${childId}`;
+}
+
+/**
+ * The quick add types enabled for a child, as an array of keys in registry
+ * order.
+ *
+ * Visibility is per device, stored in localStorage keyed by child id. A
+ * missing, unparseable, non-array, or empty value all mean "everything
+ * enabled" -- so existing children, and every install that upgrades, see no
+ * change until something is explicitly turned off. Only a concrete child is
+ * ever filtered: the whole-install and unassigned views pass childId null and
+ * always get the full set.
+ */
+function getEnabledQuickAddTypes(childId) {
+    if (typeof childId !== 'number') return [...QUICK_ADD_KEYS];
+    const raw = localStorage.getItem(quickAddStorageKey(childId));
+    if (!raw) return [...QUICK_ADD_KEYS];
+    let stored;
+    try {
+        stored = JSON.parse(raw);
+    } catch (err) {
+        console.error('Discarding corrupt quick-add visibility:', err);
+        return [...QUICK_ADD_KEYS];
+    }
+    if (!Array.isArray(stored)) return [...QUICK_ADD_KEYS];
+    // Filter through the registry so order is stable and any unknown key (a
+    // type since renamed or removed) can't drive the UI. An empty result --
+    // nothing recognised -- falls back to all-on rather than an empty dashboard.
+    const enabled = QUICK_ADD_KEYS.filter(k => stored.includes(k));
+    return enabled.length ? enabled : [...QUICK_ADD_KEYS];
+}
+
+function setEnabledQuickAddTypes(childId, keys) {
+    const enabled = QUICK_ADD_KEYS.filter(k => keys.includes(k));
+    // Never persist an empty set. The settings UI already blocks unchecking the
+    // last type, but a stray empty write would read back as "all enabled" and
+    // silently re-enable everything on the next load, so refuse it here too.
+    if (!enabled.length) return;
+    localStorage.setItem(quickAddStorageKey(childId), JSON.stringify(enabled));
+}
+
+function clearQuickAddTypes(childId) {
+    localStorage.removeItem(quickAddStorageKey(childId));
+}
+
 /* ===== Child Profiles ===== */
 // Profiles themselves live server-side with the logs they label; only the
 // *selection* is per-device, so two phones can view two children at once.
@@ -395,7 +456,47 @@ function renderChildList() {
             <span class="child-row-name">${escapeHtml(c.name)}</span>
             <button type="button" class="btn btn-sm btn-secondary" data-child-rename="${c.id}">Rename</button>
             <button type="button" class="btn btn-sm btn-danger" data-child-delete="${c.id}">Delete</button>
+            ${quickAddTogglesHtml(c.id)}
         </div>`).join('');
+}
+
+/**
+ * The per-child quick add checkboxes, rendered under the name/actions row.
+ * Labels match the dashboard buttons exactly, so no heading is needed. The one
+ * still-checked box is disabled when it's the last one, so the dashboard can
+ * never be emptied of every quick action.
+ */
+function quickAddTogglesHtml(childId) {
+    const enabled = getEnabledQuickAddTypes(childId);
+    const toggles = QUICK_ADD_TYPES.map(t => {
+        const checked = enabled.includes(t.key);
+        const locked = checked && enabled.length === 1;
+        return `<label class="quick-add-toggle">
+            <input type="checkbox" data-quick-add="${childId}" value="${t.key}"
+                   ${checked ? 'checked' : ''}${locked ? ' disabled' : ''}>
+            ${t.label}
+        </label>`;
+    }).join('');
+    return `<div class="quick-add-toggles" data-quick-add-row="${childId}">${toggles}</div>`;
+}
+
+/**
+ * Persist a quick add toggle the instant it changes -- no Save press, matching
+ * the surrounding add/rename/delete controls. Keeps the "at least one enabled"
+ * rule enforced by disabling whichever box is the last one still checked.
+ */
+function persistQuickAddToggle(childId, changedBox) {
+    const boxes = [...document.querySelectorAll(`[data-quick-add="${childId}"]`)];
+    const checked = boxes.filter(b => b.checked);
+    if (checked.length === 0) {
+        // The last box is normally disabled, so reaching zero shouldn't happen;
+        // restore it rather than persist an empty (which reads back as all-on).
+        changedBox.checked = true;
+        showToast('At least one type must be enabled');
+        return;
+    }
+    setEnabledQuickAddTypes(childId, checked.map(b => b.value));
+    boxes.forEach(b => { b.disabled = b.checked && checked.length === 1; });
 }
 
 function startChildRename(childId) {
@@ -437,6 +538,9 @@ function confirmChildDelete(childId) {
         onPrimary: async () => {
             try {
                 await api.del(`/api/children/${childId}`);
+                // The child's per-device visibility prefs die with the profile,
+                // so a recycled id can't inherit a deleted child's toggles.
+                clearQuickAddTypes(childId);
                 closeModal('child-confirm-modal');
                 await refreshChildUI();
                 showToast(`${child.name} deleted — their logs are now unassigned`);
@@ -467,6 +571,17 @@ function initChildSettings() {
         else if (btn.dataset.childRenameSave) saveChildRename(parseInt(btn.dataset.childRenameSave, 10));
         else if (btn.dataset.childRenameCancel) renderChildList();
         else if (btn.dataset.childDelete) confirmChildDelete(parseInt(btn.dataset.childDelete, 10));
+    });
+
+    // Quick add checkboxes autosave on toggle. They fire `change`, which the
+    // click handler above never sees; and they deliberately stay out of the
+    // Save-armed preferences, since they persist on their own like the rest of
+    // the Children section.
+    document.getElementById('child-list').addEventListener('change', (e) => {
+        const box = e.target;
+        if (box.matches && box.matches('input[data-quick-add]')) {
+            persistQuickAddToggle(parseInt(box.dataset.quickAdd, 10), box);
+        }
     });
 }
 

@@ -35,6 +35,15 @@
                 <input type="text" id="child-new-name" maxlength="30" placeholder="First name">
                 <button type="button" id="child-add-btn" class="btn btn-sm btn-secondary">+ Add a child</button>
             </div>
+
+            <!--
+              Everything above (children, including their quick add toggles)
+              saves immediately. Everything below is a per-device preference
+              that only persists when Save is pressed; the divider and hint mark
+              that boundary so the two behaviours don't read as one form.
+            -->
+            <hr class="settings-divider">
+            <p class="settings-hint">These preferences apply to this device and take effect when you press Save.</p>
             <h3 class="settings-section-title">Breast Names</h3>
             <div class="form-group">
                 <label for="settings-left-name">Left breast name</label>
