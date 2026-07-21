@@ -15,6 +15,7 @@ from puffin.schemas import (
     TemperatureCreate,
     TemperatureResponse,
     TemperatureUpdate,
+    _temperature_in_range,
 )
 
 router = APIRouter(tags=["health"])
@@ -113,7 +114,7 @@ def create_temperature(data: TemperatureCreate, db: Session = Depends(get_db)):
     return crud.create_temperature(
         db,
         timestamp=data.timestamp,
-        temperature_celsius=data.temperature_celsius,
+        temperature=data.temperature,
         unit=data.unit.value,
         location=data.location.value if data.location else None,
         notes=data.notes,
@@ -145,11 +146,26 @@ def get_temperature(temp_id: int, db: Session = Depends(get_db)):
 
 @router.put("/api/temperatures/{temp_id}", response_model=TemperatureResponse)
 def update_temperature(temp_id: int, data: TemperatureUpdate, db: Session = Depends(get_db)):
+    existing = crud.get_temperature(db, temp_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Temperature reading not found")
+
+    # A partial update may change the value or the unit independently, so
+    # range-check the resulting (value, unit) pair against the existing row.
+    # (The schema validator only covers the case where both are supplied.)
+    if data.temperature is not None or data.unit is not None:
+        eff_temp = data.temperature if data.temperature is not None else existing.temperature
+        eff_unit = data.unit.value if data.unit is not None else existing.unit
+        if not _temperature_in_range(eff_temp, eff_unit):
+            raise HTTPException(
+                status_code=422, detail=f"temperature out of range for unit {eff_unit}"
+            )
+
     updates = {}
     if data.timestamp is not None:
         updates["timestamp"] = data.timestamp
-    if data.temperature_celsius is not None:
-        updates["temperature_celsius"] = data.temperature_celsius
+    if data.temperature is not None:
+        updates["temperature"] = data.temperature
     if data.unit is not None:
         updates["unit"] = data.unit.value
     if data.location is not None:

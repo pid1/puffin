@@ -455,21 +455,20 @@ def add_saved_medication(db: Session, name: str) -> bool:
 # --- Temperature Readings ---
 
 
-def format_temperature(temperature_celsius: float, unit: str | None) -> str:
-    """Render a stored Celsius reading in its recorded unit ("C" or "F").
+def format_temperature(temperature: float, unit: str | None) -> str:
+    """Render a reading in the unit it was recorded in ("C" or "F").
 
-    Readings are always stored in Celsius; ``unit`` records how the value was
-    entered so it can be displayed back in the same unit.
+    ``temperature`` is stored exactly as entered, so no conversion is needed --
+    only the degree symbol is appended.
     """
-    if (unit or "C").upper() == "F":
-        return f"{round(temperature_celsius * 9 / 5 + 32, 1)}°F"
-    return f"{round(temperature_celsius, 1)}°C"
+    u = (unit or "C").upper()
+    return f"{round(temperature, 1)}°{u if u in ('C', 'F') else 'C'}"
 
 
 def create_temperature(
     db: Session,
     timestamp: datetime | None,
-    temperature_celsius: float,
+    temperature: float,
     location: str | None,
     notes: str | None,
     unit: str = "F",
@@ -477,7 +476,7 @@ def create_temperature(
 ) -> TemperatureReading:
     obj = TemperatureReading(
         timestamp=timestamp or datetime.now(UTC),
-        temperature_celsius=temperature_celsius,
+        temperature=temperature,
         unit=unit,
         location=location,
         notes=notes,
@@ -756,8 +755,8 @@ def get_activities(
             }
         )
     for t in get_temperatures(db, start_date=start, end_date=end, limit=limit, child=child):
-        # Render in the unit the reading was recorded in (stored as Celsius).
-        temp_str = format_temperature(t.temperature_celsius, t.unit)
+        # Render in the unit the reading was recorded in (stored as entered).
+        temp_str = format_temperature(t.temperature, t.unit)
         activities.append(
             {
                 "type": "temperature",

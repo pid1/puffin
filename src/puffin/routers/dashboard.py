@@ -390,9 +390,7 @@ def export_data(
     writer.writerow([])
     writer.writerow(["--- Temperature Readings ---"])
     writer.writerow(
-        header(
-            ["id", "timestamp", "temperature_celsius", "unit", "location", "notes", "created_at"]
-        )
+        header(["id", "timestamp", "temperature", "unit", "location", "notes", "created_at"])
     )
     for t in temperatures:
         writer.writerow(
@@ -400,7 +398,7 @@ def export_data(
                 [
                     t.id,
                     ts(t.timestamp),
-                    t.temperature_celsius,
+                    t.temperature,
                     t.unit,
                     t.location,
                     t.notes,
@@ -425,7 +423,7 @@ def _fmt_ts(ts: datetime, tz) -> str:
 
 def _fmt_temperature(t) -> str:
     """Render a temperature reading in its recorded unit for the PDF."""
-    return crud.format_temperature(t.temperature_celsius, t.unit)
+    return crud.format_temperature(t.temperature, t.unit)
 
 
 def _build_date_range_label(start: datetime | None, end: datetime | None) -> str:

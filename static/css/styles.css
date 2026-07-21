@@ -220,6 +220,10 @@ body {
 
 .card-detail {
     font-size: 0.8rem;
+    line-height: 1.2;
+    /* Reserve one line even when empty (e.g. Health card with no reading for
+       the day) so every summary card keeps the same height on mobile. */
+    min-height: 1.2em;
     color: var(--text-secondary);
     margin-top: 4px;
 }

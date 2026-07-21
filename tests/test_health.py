@@ -147,13 +147,14 @@ def test_create_temperature(client):
     resp = client.post(
         "/api/temperatures",
         json={
-            "temperature_celsius": 37.5,
+            "temperature": 37.5,
+            "unit": "C",
             "location": "rectal",
         },
     )
     assert resp.status_code == 201
     data = resp.json()
-    assert data["temperature_celsius"] == 37.5
+    assert data["temperature"] == 37.5
     assert data["location"] == "rectal"
 
 
@@ -163,80 +164,109 @@ def test_create_temperature_with_timestamp(client):
     resp = client.post(
         "/api/temperatures",
         json={
-            "temperature_celsius": 37.5,
+            "temperature": 37.5,
+            "unit": "C",
             "timestamp": custom_time,
         },
     )
     assert resp.status_code == 201
     data = resp.json()
-    assert data["temperature_celsius"] == 37.5
+    assert data["temperature"] == 37.5
     assert data["timestamp"] == custom_time
 
 
 def test_list_temperatures(client):
-    client.post("/api/temperatures", json={"temperature_celsius": 37.0})
+    client.post("/api/temperatures", json={"temperature": 37.0, "unit": "C"})
     resp = client.get("/api/temperatures")
     assert resp.status_code == 200
     assert len(resp.json()) == 1
 
 
 def test_update_temperature(client):
-    create_resp = client.post("/api/temperatures", json={"temperature_celsius": 37.0})
+    create_resp = client.post("/api/temperatures", json={"temperature": 37.0, "unit": "C"})
     tid = create_resp.json()["id"]
-    resp = client.put(f"/api/temperatures/{tid}", json={"temperature_celsius": 38.0})
+    resp = client.put(f"/api/temperatures/{tid}", json={"temperature": 38.0})
     assert resp.status_code == 200
-    assert resp.json()["temperature_celsius"] == 38.0
+    assert resp.json()["temperature"] == 38.0
 
 
 def test_delete_temperature(client):
-    create_resp = client.post("/api/temperatures", json={"temperature_celsius": 37.0})
+    create_resp = client.post("/api/temperatures", json={"temperature": 37.0, "unit": "C"})
     tid = create_resp.json()["id"]
     assert client.delete(f"/api/temperatures/{tid}").status_code == 204
 
 
+def test_temperature_is_stored_as_entered(client):
+    # A Fahrenheit reading is persisted verbatim, not converted to Celsius.
+    resp = client.post("/api/temperatures", json={"temperature": 99.1, "unit": "F"})
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["temperature"] == 99.1
+    assert data["unit"] == "F"
+
+
 def test_create_temperature_unit_defaults_to_fahrenheit(client):
-    resp = client.post("/api/temperatures", json={"temperature_celsius": 37.5})
+    resp = client.post("/api/temperatures", json={"temperature": 98.6})
     assert resp.status_code == 201
     assert resp.json()["unit"] == "F"
 
 
 def test_create_temperature_persists_explicit_unit(client):
-    resp = client.post("/api/temperatures", json={"temperature_celsius": 37.5, "unit": "C"})
+    resp = client.post("/api/temperatures", json={"temperature": 37.5, "unit": "C"})
     assert resp.status_code == 201
     assert resp.json()["unit"] == "C"
 
 
-def test_update_temperature_unit(client):
-    tid = client.post("/api/temperatures", json={"temperature_celsius": 37.0, "unit": "C"}).json()[
-        "id"
-    ]
-    resp = client.put(f"/api/temperatures/{tid}", json={"unit": "F"})
+def test_temperature_range_is_unit_aware(client):
+    def post(temp, unit):
+        return client.post("/api/temperatures", json={"temperature": temp, "unit": unit})
+
+    # 98.6 F is a normal reading; 50 F (10 C) is below the plausible range.
+    assert post(98.6, "F").status_code == 201
+    assert post(50, "F").status_code == 422
+    # The same number can be valid in one unit and rejected in the other.
+    assert post(37.0, "C").status_code == 201
+    assert post(37.0, "F").status_code == 422
+
+
+def test_update_temperature_value_and_unit(client):
+    tid = client.post("/api/temperatures", json={"temperature": 98.6, "unit": "F"}).json()["id"]
+    resp = client.put(f"/api/temperatures/{tid}", json={"temperature": 37.0, "unit": "C"})
     assert resp.status_code == 200
-    assert resp.json()["unit"] == "F"
+    body = resp.json()
+    assert body["temperature"] == 37.0
+    assert body["unit"] == "C"
+
+
+def test_update_temperature_unit_only_out_of_range_is_rejected(client):
+    # Relabelling 37.0 C as 37.0 F would mean 2.8 C — out of range, so rejected.
+    tid = client.post("/api/temperatures", json={"temperature": 37.0, "unit": "C"}).json()["id"]
+    resp = client.put(f"/api/temperatures/{tid}", json={"unit": "F"})
+    assert resp.status_code == 422
 
 
 def test_dashboard_last_temperature_scoped_to_viewed_day(client):
     # A reading yesterday and one today; each day's dashboard reports its own.
     client.post(
         "/api/temperatures",
-        json={"temperature_celsius": 37.0, "timestamp": "2026-04-05T12:00:00Z"},
+        json={"temperature": 37.0, "unit": "C", "timestamp": "2026-04-05T12:00:00Z"},
     )
     client.post(
         "/api/temperatures",
-        json={"temperature_celsius": 38.0, "timestamp": "2026-04-06T12:00:00Z"},
+        json={"temperature": 38.0, "unit": "C", "timestamp": "2026-04-06T12:00:00Z"},
     )
 
     today = client.get("/api/dashboard?date=2026-04-06").json()
-    assert today["last_temperature"]["temperature_celsius"] == 38.0
+    assert today["last_temperature"]["temperature"] == 38.0
 
     yesterday = client.get("/api/dashboard?date=2026-04-05").json()
-    assert yesterday["last_temperature"]["temperature_celsius"] == 37.0
+    assert yesterday["last_temperature"]["temperature"] == 37.0
 
 
 def test_dashboard_last_temperature_none_when_day_has_no_reading(client):
     client.post(
         "/api/temperatures",
-        json={"temperature_celsius": 37.0, "timestamp": "2026-04-05T12:00:00Z"},
+        json={"temperature": 37.0, "unit": "C", "timestamp": "2026-04-05T12:00:00Z"},
     )
     # A day with no reading returns no last temperature, even though an older
     # reading exists.
@@ -245,8 +275,8 @@ def test_dashboard_last_temperature_none_when_day_has_no_reading(client):
 
 
 def test_activity_feed_temperature_renders_recorded_unit(client):
-    client.post("/api/temperatures", json={"temperature_celsius": 37.0, "unit": "F"})
-    client.post("/api/temperatures", json={"temperature_celsius": 37.0, "unit": "C"})
+    client.post("/api/temperatures", json={"temperature": 98.6, "unit": "F"})
+    client.post("/api/temperatures", json={"temperature": 37.0, "unit": "C"})
     activities = client.get("/api/dashboard").json()["recent_activities"]
     details = {a["detail"] for a in activities if a["type"] == "temperature"}
     assert details == {"98.6°F", "37.0°C"}
@@ -256,7 +286,7 @@ def test_dashboard_last_temperature_reports_recorded_unit(client):
     client.post(
         "/api/temperatures",
         json={
-            "temperature_celsius": 37.0,
+            "temperature": 98.6,
             "unit": "F",
             "timestamp": "2026-04-06T12:00:00Z",
         },
@@ -472,11 +502,12 @@ def test_implausible_temperature_is_rejected(client):
     -500 C was accepted and rendered as -868.0 F in the PDF/CSV export.
     """
     for celsius in (-500, 500, 0, 60):
-        resp = client.post("/api/temperatures", json={"temperature_celsius": celsius})
+        resp = client.post("/api/temperatures", json={"temperature": celsius, "unit": "C"})
         assert resp.status_code == 422, f"{celsius} C was accepted"
 
     # A real fever must still go through.
-    assert client.post("/api/temperatures", json={"temperature_celsius": 39.4}).status_code == 201
+    resp = client.post("/api/temperatures", json={"temperature": 39.4, "unit": "C"})
+    assert resp.status_code == 201
 
 
 def test_saved_medication_survives_a_lost_race(client, monkeypatch):

@@ -245,16 +245,79 @@ def test_migration_backfills_temperature_unit_as_celsius(tmp_path):
         _run_migrations(bind=engine)
         with engine.connect() as conn:
             cols = {c["name"] for c in inspect(conn).get_columns("temperature_readings")}
-            units = (
-                conn.execute(text("SELECT unit FROM temperature_readings ORDER BY id"))
-                .scalars()
-                .all()
-            )
+            rows = conn.execute(
+                text("SELECT unit, temperature FROM temperature_readings ORDER BY id")
+            ).all()
     finally:
         engine.dispose()
 
     assert "unit" in cols
-    assert units == ["C", "C"]
+    assert "temperature" in cols
+    assert "temperature_celsius" not in cols
+    # Legacy rows have no known unit → treated as Celsius and kept as-is.
+    assert rows == [("C", 37.0), ("C", 38.2)]
+
+
+def test_migration_reconstructs_entered_fahrenheit(tmp_path):
+    """Storing temperatures as entered (#60): ``temperature_celsius`` is renamed
+    to ``temperature``; Fahrenheit rows are reconstructed from their stored
+    Celsius value, Celsius rows are kept as-is.
+    """
+    db_path = tmp_path / "temps_celsius_with_unit.db"
+    raw = sqlite3.connect(db_path)
+    raw.executescript(
+        """
+        CREATE TABLE feedings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME NOT NULL,
+            feeding_type TEXT NOT NULL,
+            duration_minutes INTEGER,
+            amount REAL,
+            amount_unit TEXT,
+            notes TEXT,
+            session_id TEXT,
+            bottle_type TEXT,
+            created_at DATETIME
+        );
+        CREATE TABLE temperature_readings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME NOT NULL,
+            temperature_celsius REAL NOT NULL,
+            unit TEXT NOT NULL DEFAULT 'C',
+            location TEXT,
+            notes TEXT,
+            created_at DATETIME
+        );
+        INSERT INTO temperature_readings
+            (timestamp, temperature_celsius, unit, location, notes, created_at)
+        VALUES
+            ('2026-04-01 09:00:00', 37.0, 'C', NULL, NULL, '2026-04-01 09:00:00'),
+            ('2026-04-02 09:00:00', 37.0, 'F', NULL, NULL, '2026-04-02 09:00:00');
+        """
+    )
+    raw.commit()
+    raw.close()
+
+    engine = create_engine(
+        f"sqlite:///{db_path}",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    try:
+        _run_migrations(bind=engine)
+        _run_migrations(bind=engine)
+        with engine.connect() as conn:
+            cols = {c["name"] for c in inspect(conn).get_columns("temperature_readings")}
+            rows = conn.execute(
+                text("SELECT unit, temperature FROM temperature_readings ORDER BY id")
+            ).all()
+    finally:
+        engine.dispose()
+
+    assert "temperature" in cols
+    assert "temperature_celsius" not in cols
+    # C row kept as-is; F row reconstructed from stored Celsius: 37.0 C -> 98.6 F.
+    assert rows == [("C", 37.0), ("F", 98.6)]
 
 
 def test_migration_drops_obsolete_dosage_column(legacy_engine):

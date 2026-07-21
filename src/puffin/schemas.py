@@ -9,8 +9,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 # Bounds for the free-numeric log fields.  These are deliberately generous --
 # the goal is to reject transparently impossible input (negative durations, a
 # -500 C body temperature that the PDF export happily renders as -868 F), not
-# to second-guess a real reading.  The frontend converts Fahrenheit to Celsius
-# before posting, so a temperature always arrives in Celsius.
+# to second-guess a real reading.  A temperature is stored as entered, so the
+# raw value may be Celsius or Fahrenheit; ``_temperature_in_range`` converts to
+# Celsius before applying these bounds.
 _MIN_TEMP_C = 20.0  # below profound hypothermia
 _MAX_TEMP_C = 45.0  # above survivable hyperthermia
 _MAX_FEED_MINUTES = 24 * 60
@@ -267,22 +268,47 @@ class MedicationResponse(BaseModel):
 # --- Temperature Schemas ---
 
 
+def _to_celsius(temperature: float, unit: str) -> float:
+    """Convert a raw entered temperature to Celsius for range checks."""
+    return (temperature - 32) * 5 / 9 if unit.upper() == "F" else temperature
+
+
+def _temperature_in_range(temperature: float, unit: str) -> bool:
+    return _MIN_TEMP_C <= _to_celsius(temperature, unit) <= _MAX_TEMP_C
+
+
 class TemperatureCreate(BaseModel):
     timestamp: datetime | None = None
-    temperature_celsius: float = Field(ge=_MIN_TEMP_C, le=_MAX_TEMP_C)
+    temperature: float
     unit: TemperatureUnit = TemperatureUnit.fahrenheit
     location: TemperatureLocation | None = None
     notes: str | None = None
     child_id: int | None = None
 
+    @model_validator(mode="after")
+    def _check_range(self) -> Self:
+        if not _temperature_in_range(self.temperature, self.unit.value):
+            raise ValueError(f"temperature out of range for unit {self.unit.value}")
+        return self
+
 
 class TemperatureUpdate(BaseModel):
     timestamp: datetime | None = None
-    temperature_celsius: float | None = Field(None, ge=_MIN_TEMP_C, le=_MAX_TEMP_C)
+    temperature: float | None = None
     unit: TemperatureUnit | None = None
     location: TemperatureLocation | None = None
     notes: str | None = None
     child_id: int | None = None
+
+    @model_validator(mode="after")
+    def _check_range(self) -> Self:
+        # Only validatable here when both are supplied; a partial update (e.g.
+        # temperature without unit) is range-checked in the router against the
+        # existing row's unit.
+        if self.temperature is not None and self.unit is not None:
+            if not _temperature_in_range(self.temperature, self.unit.value):
+                raise ValueError(f"temperature out of range for unit {self.unit.value}")
+        return self
 
 
 class TemperatureResponse(BaseModel):
@@ -290,7 +316,7 @@ class TemperatureResponse(BaseModel):
 
     id: int
     timestamp: datetime
-    temperature_celsius: float
+    temperature: float
     unit: TemperatureUnit = TemperatureUnit.celsius
     location: TemperatureLocation | None
     notes: str | None

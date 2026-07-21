@@ -37,8 +37,8 @@ def test_pdf_export_survives_smart_quotes_and_emoji(client):
 
 def test_pdf_export_renders_temperatures_in_recorded_units(client):
     """Mixed-unit temperature readings export without error, each in its unit."""
-    client.post("/api/temperatures", json={"temperature_celsius": 37.0, "unit": "F"})
-    client.post("/api/temperatures", json={"temperature_celsius": 37.0, "unit": "C"})
+    client.post("/api/temperatures", json={"temperature": 98.6, "unit": "F"})
+    client.post("/api/temperatures", json={"temperature": 37.0, "unit": "C"})
 
     resp = client.get("/api/export?format=pdf")
     assert resp.status_code == 200
@@ -101,6 +101,20 @@ def test_json_export_stays_utc(client):
 
     data = client.get("/api/export?format=json").json()
     assert data["feedings"][0]["timestamp"] == "2026-07-19T18:30:00Z"
+
+
+def test_json_export_temperature_is_value_as_entered_with_unit(client):
+    """Temperatures export the value as entered plus its unit -- not a Celsius
+    conversion, and not under the old ``temperature_celsius`` key.
+    """
+    client.post("/api/temperatures", json={"temperature": 98.6, "unit": "F"})
+    client.post("/api/temperatures", json={"temperature": 37.0, "unit": "C"})
+
+    temps = client.get("/api/export?format=json").json()["temperatures"]
+    by_unit = {t["unit"]: t for t in temps}
+    assert by_unit["F"]["temperature"] == 98.6
+    assert by_unit["C"]["temperature"] == 37.0
+    assert all("temperature_celsius" not in t for t in temps)
 
 
 # --- Low-severity export completeness (second-audit follow-ups) ---
