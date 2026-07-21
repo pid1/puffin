@@ -114,6 +114,7 @@ def create_temperature(data: TemperatureCreate, db: Session = Depends(get_db)):
         db,
         timestamp=data.timestamp,
         temperature_celsius=data.temperature_celsius,
+        unit=data.unit.value,
         location=data.location.value if data.location else None,
         notes=data.notes,
         child_id=data.child_id,
@@ -149,6 +150,8 @@ def update_temperature(temp_id: int, data: TemperatureUpdate, db: Session = Depe
         updates["timestamp"] = data.timestamp
     if data.temperature_celsius is not None:
         updates["temperature_celsius"] = data.temperature_celsius
+    if data.unit is not None:
+        updates["unit"] = data.unit.value
     if data.location is not None:
         updates["location"] = data.location.value
     if data.notes is not None:

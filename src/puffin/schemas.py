@@ -49,6 +49,11 @@ class TemperatureLocation(StrEnum):
     temporal = "temporal"
 
 
+class TemperatureUnit(StrEnum):
+    celsius = "C"
+    fahrenheit = "F"
+
+
 class DosageUnit(StrEnum):
     ml = "mL"
     tsp = "tsp(s)"
@@ -265,6 +270,7 @@ class MedicationResponse(BaseModel):
 class TemperatureCreate(BaseModel):
     timestamp: datetime | None = None
     temperature_celsius: float = Field(ge=_MIN_TEMP_C, le=_MAX_TEMP_C)
+    unit: TemperatureUnit = TemperatureUnit.fahrenheit
     location: TemperatureLocation | None = None
     notes: str | None = None
     child_id: int | None = None
@@ -273,6 +279,7 @@ class TemperatureCreate(BaseModel):
 class TemperatureUpdate(BaseModel):
     timestamp: datetime | None = None
     temperature_celsius: float | None = Field(None, ge=_MIN_TEMP_C, le=_MAX_TEMP_C)
+    unit: TemperatureUnit | None = None
     location: TemperatureLocation | None = None
     notes: str | None = None
     child_id: int | None = None
@@ -284,6 +291,7 @@ class TemperatureResponse(BaseModel):
     id: int
     timestamp: datetime
     temperature_celsius: float
+    unit: TemperatureUnit = TemperatureUnit.celsius
     location: TemperatureLocation | None
     notes: str | None
     child_id: int | None = None

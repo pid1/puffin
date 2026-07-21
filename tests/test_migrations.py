@@ -196,6 +196,67 @@ def test_migration_adds_amount_unit_to_current_amount_schema(tmp_path):
     assert rows[1] == ("breast_left", None, None)
 
 
+def test_migration_backfills_temperature_unit_as_celsius(tmp_path):
+    """Legacy temperature rows have no recorded unit; the stored value is
+    Celsius, so the migration backfills ``unit`` to 'C' rather than assuming an
+    entry unit it cannot recover. See issue #58.
+    """
+    db_path = tmp_path / "temps_without_unit.db"
+    raw = sqlite3.connect(db_path)
+    raw.executescript(
+        """
+        CREATE TABLE feedings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME NOT NULL,
+            feeding_type TEXT NOT NULL,
+            duration_minutes INTEGER,
+            amount REAL,
+            amount_unit TEXT,
+            notes TEXT,
+            session_id TEXT,
+            bottle_type TEXT,
+            created_at DATETIME
+        );
+        CREATE TABLE temperature_readings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME NOT NULL,
+            temperature_celsius REAL NOT NULL,
+            location TEXT,
+            notes TEXT,
+            created_at DATETIME
+        );
+        INSERT INTO temperature_readings
+            (timestamp, temperature_celsius, location, notes, created_at)
+        VALUES
+            ('2026-04-01 09:00:00', 37.0, NULL, NULL, '2026-04-01 09:00:00'),
+            ('2026-04-02 09:00:00', 38.2, 'oral', NULL, '2026-04-02 09:00:00');
+        """
+    )
+    raw.commit()
+    raw.close()
+
+    engine = create_engine(
+        f"sqlite:///{db_path}",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    try:
+        _run_migrations(bind=engine)
+        _run_migrations(bind=engine)
+        with engine.connect() as conn:
+            cols = {c["name"] for c in inspect(conn).get_columns("temperature_readings")}
+            units = (
+                conn.execute(text("SELECT unit FROM temperature_readings ORDER BY id"))
+                .scalars()
+                .all()
+            )
+    finally:
+        engine.dispose()
+
+    assert "unit" in cols
+    assert units == ["C", "C"]
+
+
 def test_migration_drops_obsolete_dosage_column(legacy_engine):
     """The old NOT NULL ``dosage`` column must go — otherwise new medication
     saves fail with a NOT NULL constraint error (issue #30)."""

@@ -129,6 +129,9 @@ class TemperatureReading(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     timestamp: Mapped[datetime] = mapped_column(_TZ_DATETIME, nullable=False, default=_utcnow)
     temperature_celsius: Mapped[float] = mapped_column(Float, nullable=False)
+    # The unit the reading was entered/displayed in ("C" or "F"). The value is
+    # always stored in Celsius above; this only records how to render it back.
+    unit: Mapped[str] = mapped_column(String, nullable=False, default="F")
     location: Mapped[str | None] = mapped_column(
         String, nullable=True
     )  # rectal, oral, axillary, temporal
