@@ -256,8 +256,9 @@ function switchBreast() {
             state.segments.push({ side: newSide, startTime: now, endTime: now });
         }
     } else {
-        current.endTime = now;
-        state.segments.push({ side: newSide, startTime: now, endTime: null });
+        // Close the current side and start the clock on the other one.
+        closeRunningSegment(state, now);
+        openRunningSegment(state, newSide, now);
     }
 
     localStorage.setItem(TIMER_KEY, JSON.stringify(state));
@@ -268,15 +269,30 @@ function switchBreast() {
     showToast(`Switched to ${sideLabel}`);
 }
 
+// --- Segment primitives ---------------------------------------------------
+// A running segment has endTime: null, and total elapsed sums every segment.
+// Freezing the clock (closing the open segment) and starting it again (opening a
+// new one) are the two transitions that pause, resume, and the End-confirmation
+// step all share. Each mutates the passed-in state; the caller persists and
+// re-renders so it stays in control of toasts and UI.
+
+// Freeze the clock: close the running (open) segment at `now`. No-op if the last
+// segment is already closed.
+function closeRunningSegment(state, now) {
+    const lastSeg = state.segments[state.segments.length - 1];
+    if (!lastSeg.endTime) lastSeg.endTime = now;
+}
+
+// Start the clock: open a fresh running segment on `side` at `now`.
+function openRunningSegment(state, side, now) {
+    state.segments.push({ side, startTime: now, endTime: null });
+}
+
 function pauseTimer() {
     const state = getTimerState();
     if (!state || !state.active || state.paused) return;
 
-    const now = new Date().toISOString();
-    const currentSeg = state.segments[state.segments.length - 1];
-    if (!currentSeg.endTime) {
-        currentSeg.endTime = now;
-    }
+    closeRunningSegment(state, new Date().toISOString());
     state.paused = true;
     localStorage.setItem(TIMER_KEY, JSON.stringify(state));
     showTimerUI();
@@ -288,12 +304,43 @@ function resumeTimer() {
     if (!state || !state.active || !state.paused) return;
 
     const lastSeg = state.segments[state.segments.length - 1];
-    const now = new Date().toISOString();
-    state.segments.push({ side: lastSeg.side, startTime: now, endTime: null });
+    openRunningSegment(state, lastSeg.side, new Date().toISOString());
     state.paused = false;
     localStorage.setItem(TIMER_KEY, JSON.stringify(state));
     showTimerUI();
     showToast('Timer resumed');
+}
+
+// The "End Feeding" button opens a Confirm/Cancel step rather than saving right
+// away. Freeze the clock for that step so time spent deciding isn't added to the
+// feed, and record whether we were the ones who paused it so a later Cancel can
+// restore the exact prior state (running vs. already-paused).
+function beginEndConfirmation() {
+    const state = getTimerState();
+    if (!state || !state.active) return;
+
+    state.resumeOnCancel = !state.paused;
+    if (!state.paused) {
+        closeRunningSegment(state, new Date().toISOString());
+        state.paused = true;
+    }
+    localStorage.setItem(TIMER_KEY, JSON.stringify(state));
+}
+
+// Back out of the End confirmation. If End paused a running timer, resume it —
+// open a fresh segment on the current side, like resumeTimer(). If the timer was
+// already paused when End was pressed, leave it paused.
+function cancelEndConfirmation() {
+    const state = getTimerState();
+    if (!state || !state.active) return;
+
+    if (state.resumeOnCancel) {
+        const lastSeg = state.segments[state.segments.length - 1];
+        openRunningSegment(state, lastSeg.side, new Date().toISOString());
+        state.paused = false;
+    }
+    delete state.resumeOnCancel;
+    localStorage.setItem(TIMER_KEY, JSON.stringify(state));
 }
 
 function getBreastTimes(segments) {
@@ -501,6 +548,10 @@ function initTimer() {
     });
 
     document.getElementById('timer-end-btn').addEventListener('click', () => {
+        // Freeze the clock while the caregiver confirms; Cancel restores it.
+        // showTimerUI() re-reads the now-paused state so the display stops.
+        beginEndConfirmation();
+        showTimerUI();
         // Two-step confirmation — hide switch and pause too
         document.getElementById('timer-end-btn').classList.add('hidden');
         document.getElementById('timer-switch-btn').classList.add('hidden');
@@ -515,19 +566,10 @@ function initTimer() {
     });
 
     document.getElementById('timer-cancel-btn').addEventListener('click', () => {
-        document.getElementById('timer-end-btn').classList.remove('hidden');
-        // Re-show switch and pause buttons if applicable
-        const state = getTimerState();
-        if (state) {
-            const currentSide = state.segments[state.segments.length - 1].side;
-            if (currentSide === 'breast_left' || currentSide === 'breast_right') {
-                document.getElementById('timer-switch-btn').classList.remove('hidden');
-            }
-            document.getElementById('timer-pause-btn').classList.remove('hidden');
-        }
-        document.getElementById('timer-confirm-btn').classList.add('hidden');
-        document.getElementById('timer-cancel-btn').classList.add('hidden');
-        document.getElementById('timer-discard-btn').classList.remove('hidden');
+        // Resume the clock (if End paused it) and let showTimerUI() restore the
+        // normal controls and restart the tick.
+        cancelEndConfirmation();
+        showTimerUI();
     });
 
     document.getElementById('timer-discard-btn').addEventListener('click', () => {

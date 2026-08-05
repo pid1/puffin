@@ -161,6 +161,82 @@ test('resumeTimer after a paused switch runs the clock on the switched-to side',
     assert.equal(last.endTime, null, 'the running segment is open');
 });
 
+// --- End confirmation freezes the clock; Cancel restores the prior state ---
+
+test('beginEndConfirmation pauses a running timer and marks it to resume on cancel', () => {
+    const app = loadApp({ dom: true, now: NOW, localStorage: { [TIMER_KEY]: JSON.stringify(runningTimer(60000)) } });
+
+    app.fns.beginEndConfirmation();
+
+    const state = JSON.parse(app.localStorage.getItem(TIMER_KEY));
+    assert.equal(state.paused, true, 'the clock is frozen so deliberation time is not recorded');
+    assert.ok(state.segments[state.segments.length - 1].endTime, 'the running segment is closed at end-click time');
+    assert.equal(state.resumeOnCancel, true, 'End paused it, so a Cancel should resume it');
+});
+
+test('beginEndConfirmation leaves an already-paused timer paused and not marked to resume', () => {
+    const app = loadApp({ dom: true, now: NOW, localStorage: { [TIMER_KEY]: JSON.stringify(pausedTimer(60000)) } });
+
+    app.fns.beginEndConfirmation();
+
+    const state = JSON.parse(app.localStorage.getItem(TIMER_KEY));
+    assert.equal(state.paused, true, 'still paused');
+    assert.equal(state.resumeOnCancel, false, 'End did not pause it, so Cancel must not resume it');
+    assert.equal(state.segments.length, 1, 'no extra segment was appended');
+});
+
+test('cancelEndConfirmation resumes a timer that End paused', () => {
+    const app = loadApp({ dom: true, now: NOW, localStorage: { [TIMER_KEY]: JSON.stringify(runningTimer(60000)) } });
+
+    app.fns.beginEndConfirmation();
+    app.fns.cancelEndConfirmation();
+
+    const state = JSON.parse(app.localStorage.getItem(TIMER_KEY));
+    assert.equal(state.paused, false, 'the clock runs again after backing out');
+    const last = state.segments[state.segments.length - 1];
+    assert.equal(last.endTime, null, 'a fresh running segment is open');
+    assert.equal(last.side, 'breast_left', 'on the same side it was on');
+    assert.ok(!('resumeOnCancel' in state), 'the resume marker is cleared');
+});
+
+test('cancelEndConfirmation keeps an already-paused timer paused', () => {
+    const app = loadApp({ dom: true, now: NOW, localStorage: { [TIMER_KEY]: JSON.stringify(pausedTimer(60000)) } });
+
+    app.fns.beginEndConfirmation();
+    app.fns.cancelEndConfirmation();
+
+    const state = JSON.parse(app.localStorage.getItem(TIMER_KEY));
+    assert.equal(state.paused, true, 'still paused — End did not start it, so Cancel must not either');
+    assert.ok(state.segments.every((s) => s.endTime), 'no running segment was opened');
+});
+
+test('endTimer after beginEndConfirmation logs the frozen time, not the wall-clock since', async () => {
+    // A feed that ran 90s and was frozen by End 5 minutes ago. If confirm used
+    // the wall clock it would log ~6.5min; it must log the frozen 90s instead.
+    const start = new Date(NOW - 5 * 60000).toISOString();
+    const frozenEnd = new Date(NOW - 5 * 60000 + 90 * 1000).toISOString();
+    const frozen = {
+        active: true,
+        paused: true,
+        resumeOnCancel: true,
+        childId: 1,
+        segments: [{ side: 'breast_left', startTime: start, endTime: frozenEnd }],
+    };
+    const posts = [];
+    const fetch = async (url, opts) => {
+        posts.push({ url, body: JSON.parse(opts.body) });
+        return { ok: true, status: 201, json: async () => ({}) };
+    };
+    const app = loadApp({ dom: true, now: NOW, fetch, localStorage: { [TIMER_KEY]: JSON.stringify(frozen) } });
+    app.state.childProfiles = [];
+    app.override.loadDashboard(() => {});
+
+    await app.fns.endTimer();
+
+    assert.equal(posts.length, 1, 'one feeding is posted');
+    assert.equal(posts[0].body.duration_minutes, 2, '90s frozen at end-click rounds to 2 minutes');
+});
+
 test('repeated switches while paused flip the side in place without piling up segments', () => {
     const app = loadApp({ dom: true, now: NOW, localStorage: { [TIMER_KEY]: JSON.stringify(pausedTimer(60000)) } });
 

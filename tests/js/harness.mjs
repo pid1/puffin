@@ -49,6 +49,8 @@ const EXPOSED_FUNCTIONS = [
     // DOM-driven (only callable when loadApp({ dom: true }))
     'startTimer',
     'endTimer',
+    'beginEndConfirmation',
+    'cancelEndConfirmation',
     'switchBreast',
     'pauseTimer',
     'resumeTimer',
