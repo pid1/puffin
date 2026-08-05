@@ -14,6 +14,17 @@ function runningTimer(agoMs, side = 'breast_left') {
     };
 }
 
+// A paused session: its single segment ran `agoMs` and was closed at NOW by the
+// pause, matching what pauseTimer() leaves behind.
+function pausedTimer(agoMs, side = 'breast_left') {
+    return {
+        active: true,
+        paused: true,
+        childId: 1,
+        segments: [{ side, startTime: new Date(NOW - agoMs).toISOString(), endTime: new Date(NOW).toISOString() }],
+    };
+}
+
 function toastText(app) {
     return app.document.getElementById('toast').textContent;
 }
@@ -119,4 +130,46 @@ test('pauseTimer closes the open segment and marks paused', () => {
     const state = JSON.parse(app.localStorage.getItem(TIMER_KEY));
     assert.equal(state.paused, true);
     assert.ok(state.segments[state.segments.length - 1].endTime, 'the running segment is closed');
+});
+
+// --- switching sides while paused: change side, keep paused, accrue no time ---
+
+test('switchBreast while paused changes side without resuming or accruing time', () => {
+    const app = loadApp({ dom: true, now: NOW, localStorage: { [TIMER_KEY]: JSON.stringify(pausedTimer(60000)) } });
+
+    app.fns.switchBreast();
+
+    const state = JSON.parse(app.localStorage.getItem(TIMER_KEY));
+    assert.equal(state.paused, true, 'still paused after the switch');
+    assert.ok(state.segments.every((s) => s.endTime), 'no running (open) segment was opened');
+    const last = state.segments[state.segments.length - 1];
+    assert.equal(last.side, 'breast_right', 'the current side flipped to the other breast');
+    assert.equal(last.startTime, last.endTime, 'the new side is a zero-length placeholder');
+    assert.equal(state.segments[0].side, 'breast_left', 'the original segment keeps its side and time');
+});
+
+test('resumeTimer after a paused switch runs the clock on the switched-to side', () => {
+    const app = loadApp({ dom: true, now: NOW, localStorage: { [TIMER_KEY]: JSON.stringify(pausedTimer(60000)) } });
+
+    app.fns.switchBreast();
+    app.fns.resumeTimer();
+
+    const state = JSON.parse(app.localStorage.getItem(TIMER_KEY));
+    assert.equal(state.paused, false, 'resumed');
+    const last = state.segments[state.segments.length - 1];
+    assert.equal(last.side, 'breast_right', 'the running segment is on the switched-to side');
+    assert.equal(last.endTime, null, 'the running segment is open');
+});
+
+test('repeated switches while paused flip the side in place without piling up segments', () => {
+    const app = loadApp({ dom: true, now: NOW, localStorage: { [TIMER_KEY]: JSON.stringify(pausedTimer(60000)) } });
+
+    app.fns.switchBreast(); // left -> right (adds a placeholder)
+    app.fns.switchBreast(); // right -> left (reuses the placeholder)
+    app.fns.switchBreast(); // left -> right (reuses the placeholder)
+
+    const state = JSON.parse(app.localStorage.getItem(TIMER_KEY));
+    assert.equal(state.segments.length, 2, 'one real segment plus a single reused placeholder');
+    assert.equal(state.paused, true, 'still paused');
+    assert.equal(state.segments[state.segments.length - 1].side, 'breast_right', 'ends on the last-selected side');
 });
