@@ -234,14 +234,31 @@ function startTimer(side) {
 
 function switchBreast() {
     const state = getTimerState();
-    if (!state || !state.active || state.paused) return;
+    if (!state || !state.active) return;
 
     const current = state.segments[state.segments.length - 1];
-    const now = new Date().toISOString();
-    current.endTime = now;
+    if (current.side !== 'breast_left' && current.side !== 'breast_right') return;
 
     const newSide = current.side === 'breast_left' ? 'breast_right' : 'breast_left';
-    state.segments.push({ side: newSide, startTime: now, endTime: null });
+    const now = new Date().toISOString();
+
+    if (state.paused) {
+        // Switching while paused changes the current side without resuming the
+        // clock. Never open a running (null endTime) segment here, or time would
+        // silently accrue during the pause. If the last segment carries no elapsed
+        // time (a placeholder from an earlier paused switch, or a switch made
+        // immediately before pausing), just flip its side; otherwise record a
+        // zero-length placeholder so the side updates but no time is counted. The
+        // running segment for the new side is created on resume.
+        if (current.startTime === current.endTime) {
+            current.side = newSide;
+        } else {
+            state.segments.push({ side: newSide, startTime: now, endTime: now });
+        }
+    } else {
+        current.endTime = now;
+        state.segments.push({ side: newSide, startTime: now, endTime: null });
+    }
 
     localStorage.setItem(TIMER_KEY, JSON.stringify(state));
     showTimerUI();
@@ -310,7 +327,7 @@ function showTimerUI() {
 
     const currentSeg = state.segments[state.segments.length - 1];
     const currentSide = currentSeg.side;
-    const canSwitch = !state.paused && (currentSide === 'breast_left' || currentSide === 'breast_right');
+    const canSwitch = currentSide === 'breast_left' || currentSide === 'breast_right';
 
     const names = getBreastNames();
     const sideLabels = {
@@ -503,7 +520,7 @@ function initTimer() {
         const state = getTimerState();
         if (state) {
             const currentSide = state.segments[state.segments.length - 1].side;
-            if (!state.paused && (currentSide === 'breast_left' || currentSide === 'breast_right')) {
+            if (currentSide === 'breast_left' || currentSide === 'breast_right') {
                 document.getElementById('timer-switch-btn').classList.remove('hidden');
             }
             document.getElementById('timer-pause-btn').classList.remove('hidden');
@@ -531,7 +548,7 @@ function initTimer() {
         const state = getTimerState();
         if (state) {
             const currentSide = state.segments[state.segments.length - 1].side;
-            if (!state.paused && (currentSide === 'breast_left' || currentSide === 'breast_right')) {
+            if (currentSide === 'breast_left' || currentSide === 'breast_right') {
                 document.getElementById('timer-switch-btn').classList.remove('hidden');
             }
             document.getElementById('timer-pause-btn').classList.remove('hidden');
