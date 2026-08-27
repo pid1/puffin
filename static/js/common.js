@@ -307,12 +307,12 @@ async function refreshChildUI() {
 
 /* --- Shared two-step confirmation --- */
 
-function showChildConfirm({ title, body, note, primary, secondary, cancel,
+function showConfirm({ title, body, note, primary, secondary, cancel,
                             onPrimary, onSecondary, onCancel }) {
-    document.getElementById('child-confirm-title').textContent = title;
-    document.getElementById('child-confirm-body').textContent = body;
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-body').textContent = body;
 
-    const noteEl = document.getElementById('child-confirm-note');
+    const noteEl = document.getElementById('confirm-note');
     noteEl.textContent = note || '';
     noteEl.classList.toggle('hidden', !note);
 
@@ -326,11 +326,11 @@ function showChildConfirm({ title, body, note, primary, secondary, cancel,
         btn.parentNode.replaceChild(fresh, btn);
         if (label && handler) fresh.addEventListener('click', handler);
     };
-    wire('child-confirm-primary', primary, onPrimary);
-    wire('child-confirm-secondary', secondary, onSecondary);
-    wire('child-confirm-cancel', cancel, onCancel);
+    wire('confirm-primary', primary, onPrimary);
+    wire('confirm-secondary', secondary, onSecondary);
+    wire('confirm-cancel', cancel, onCancel);
 
-    openModal('child-confirm-modal');
+    openModal('confirm-modal');
 }
 
 /* --- Creating a profile, and the one-time migration offer --- */
@@ -377,7 +377,7 @@ async function addChild() {
 
 function offerMigration(child, count) {
     const plural = count === 1 ? '' : 's';
-    showChildConfirm({
+    showConfirm({
         title: 'Move existing logs?',
         body: `You have ${count} care log${plural} that aren't linked to any child. `
             + `Move them all to ${child.name}?`,
@@ -389,7 +389,7 @@ function offerMigration(child, count) {
         cancel: 'Cancel',
         onPrimary: () => confirmMigration(child, count),
         onSecondary: async () => {
-            closeModal('child-confirm-modal');
+            closeModal('confirm-modal');
             await refreshChildUI();
             showToast(`${child.name} added`);
         },
@@ -399,7 +399,7 @@ function offerMigration(child, count) {
 
 function confirmMigration(child, count) {
     const plural = count === 1 ? '' : 's';
-    showChildConfirm({
+    showConfirm({
         title: 'Confirm move',
         body: `This will assign all ${count} existing log${plural} to ${child.name}. `
             + `This can't be undone in bulk.`,
@@ -425,7 +425,7 @@ async function cancelChildCreation(child) {
     } catch (err) {
         console.error('Failed to undo profile creation:', err);
     }
-    closeModal('child-confirm-modal');
+    closeModal('confirm-modal');
     await refreshChildUI();
     showToast('Profile creation cancelled');
 }
@@ -433,7 +433,7 @@ async function cancelChildCreation(child) {
 async function runBulkAssign(child) {
     try {
         const result = await api.post(`/api/children/${child.id}/assign-unassigned`);
-        closeModal('child-confirm-modal');
+        closeModal('confirm-modal');
         await refreshChildUI();
         const plural = result.assigned === 1 ? '' : 's';
         showToast(`Moved ${result.assigned} log${plural} to ${child.name}`);
@@ -529,7 +529,7 @@ async function saveChildRename(childId) {
 function confirmChildDelete(childId) {
     const child = childProfiles.find(c => c.id === childId);
     if (!child) return;
-    showChildConfirm({
+    showConfirm({
         title: `Delete ${child.name}?`,
         body: `${child.name}'s logs will be kept and moved to "Unassigned logs", `
             + `where you can re-assign them. No log data is deleted.`,
@@ -541,14 +541,14 @@ function confirmChildDelete(childId) {
                 // The child's per-device visibility prefs die with the profile,
                 // so a recycled id can't inherit a deleted child's toggles.
                 clearQuickAddTypes(childId);
-                closeModal('child-confirm-modal');
+                closeModal('confirm-modal');
                 await refreshChildUI();
                 showToast(`${child.name} deleted — their logs are now unassigned`);
             } catch (err) {
                 showToast('Error: ' + err.message);
             }
         },
-        onCancel: () => closeModal('child-confirm-modal'),
+        onCancel: () => closeModal('confirm-modal'),
     });
 }
 

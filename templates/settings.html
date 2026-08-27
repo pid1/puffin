@@ -28,7 +28,7 @@
 
         <form id="settings-form" class="settings-page">
             <h3 class="settings-section-title">Children</h3>
-            <p class="settings-hint">Optional. Add a child to track each one's logs separately.</p>
+            <p class="hint">Optional. Add a child to track each one's logs separately.</p>
             <div id="child-list" class="child-list"></div>
             <div class="form-group child-add-row">
                 <label class="sr-only" for="child-new-name">First name</label>
@@ -43,7 +43,7 @@
               that boundary so the two behaviours don't read as one form.
             -->
             <hr class="settings-divider">
-            <p class="settings-hint">These preferences apply to this device and take effect when you press Save.</p>
+            <p class="hint">These preferences apply to this device and take effect when you press Save.</p>
             <h3 class="settings-section-title">Breast Names</h3>
             <div class="form-group">
                 <label for="settings-left-name">Left breast name</label>
@@ -74,7 +74,7 @@
         </form>
     </main>
 
-    {% include "_child_confirm_modal.html" %}
+    {% include "_confirm_modal.html" %}
 
     <!-- Toast notification -->
     <div id="toast" class="toast hidden"></div>

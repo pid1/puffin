@@ -82,5 +82,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // The only modal on this page is the two-step child confirmation, whose
     // backdrop is static by design; its buttons wire themselves in
-    // showChildConfirm. Nothing else here opens a modal.
+    // showConfirm. Nothing else here opens a modal.
 });

@@ -125,12 +125,12 @@ function initChildDashboard() {
         if (!child) return;
         const count = unassignedCount;
         const plural = count === 1 ? '' : 's';
-        showChildConfirm({
+        showConfirm({
             title: `Assign all to ${child.name}?`,
             body: `This will move all ${count} unassigned log${plural} to ${child.name}.`,
             primary: 'Continue',
             cancel: 'Cancel',
-            onPrimary: () => showChildConfirm({
+            onPrimary: () => showConfirm({
                 title: 'Confirm assignment',
                 body: `This will assign ${count} log${plural} to ${child.name}. `
                     + `This can't be undone in bulk.`,
@@ -139,9 +139,9 @@ function initChildDashboard() {
                 cancel: 'Cancel',
                 onPrimary: () => runBulkAssign(child),
                 onSecondary: () => document.getElementById('unassigned-assign-btn').click(),
-                onCancel: () => closeModal('child-confirm-modal'),
+                onCancel: () => closeModal('confirm-modal'),
             }),
-            onCancel: () => closeModal('child-confirm-modal'),
+            onCancel: () => closeModal('confirm-modal'),
         });
     });
 }

@@ -691,6 +691,15 @@ body {
 /* ===== Utility ===== */
 .hidden { display: none !important; }
 
+/* Secondary explanatory text under a form field or in a dialog body.  The
+   negative top margin tucks it up under the element it annotates, so it only
+   reads correctly directly below its subject. */
+.hint {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: -6px 0 12px;
+}
+
 /* ===== Responsive ===== */
 @media (min-width: 640px) {
     .container { padding: 24px; }
@@ -723,12 +732,6 @@ body {
     letter-spacing: 0.5px;
     color: var(--text-secondary);
     margin-bottom: 12px;
-}
-
-.settings-hint {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    margin: -6px 0 12px;
 }
 
 /* ===== Settings page ===== */
