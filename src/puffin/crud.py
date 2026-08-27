@@ -1,5 +1,6 @@
 import logging
 import os
+import uuid
 from datetime import UTC, datetime, timedelta
 from datetime import date as date_type
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -50,7 +51,7 @@ _NULLABLE_UPDATE_KEYS = {"child_id"}
 # Feeding fields that a type conversion clears.  These must be written even
 # when the new value is ``None``, which the generic "skip blanks" rule would
 # otherwise drop.
-_CLEARED_ON_CONVERT = {"amount", "amount_unit", "duration_minutes"}
+_CLEARED_ON_CONVERT = {"amount", "amount_unit", "duration_minutes", "bottle_type"}
 
 
 # --- Generic helpers ---
@@ -263,8 +264,16 @@ def update_feeding(db: Session, feeding_id: int, **kwargs) -> Feeding | None:
         return None
     target_type = kwargs.get("feeding_type", obj.feeding_type)
     if target_type in {"breast_left", "breast_right"}:
+        # Checked against the merged record, not the payload: a partial update
+        # legitimately omits a duration it is not changing, so only the value
+        # the record ends up with can say whether the result is valid.
+        if kwargs.get("duration_minutes", obj.duration_minutes) is None:
+            raise ValueError("Breast feeds require a duration")
         kwargs["amount"] = None
         kwargs["amount_unit"] = None
+        # A breast feed has no bottle type.  Without this a converted record
+        # keeps its old value, and the exports print it verbatim.
+        kwargs["bottle_type"] = None
     elif target_type == "bottle":
         # The mirror of the above: a bottle has no duration.  Without this a
         # breast feed converted to a bottle keeps its old duration -- harmless
@@ -280,11 +289,60 @@ def update_feeding(db: Session, feeding_id: int, **kwargs) -> Feeding | None:
     return obj
 
 
+class PairError(ValueError):
+    """A pairing request the record cannot satisfy, reported to the caller as 422."""
+
+
+def pair_feeding(db: Session, feeding_id: int, duration_minutes: int) -> Feeding | None:
+    """Add the opposite breast to a single-sided session and link the two.
+
+    A session ended after one side only is a single unlinked record.  Adding the
+    other side has to create that record *and* stamp both with a shared
+    ``session_id`` -- the one thing a partial update cannot express, since the
+    existing row has no id to send.  Doing it here keeps both writes in one
+    transaction, so a session can never end up half-linked.
+    """
+    obj = db.get(Feeding, feeding_id)
+    if not obj:
+        return None
+    if obj.feeding_type not in {"breast_left", "breast_right"}:
+        raise PairError("Only breast feeds can be paired")
+    if obj.session_id:
+        raise PairError("Feeding is already part of a session")
+    other_side = "breast_right" if obj.feeding_type == "breast_left" else "breast_left"
+    session_id = str(uuid.uuid4())
+    obj.session_id = session_id
+    # The new side carries no notes of its own: notes belong to the session, and
+    # ``create_activities`` reads them from whichever record in the group has
+    # them.  Timestamp and child are inherited so the pair reads as one session.
+    new_side = Feeding(
+        timestamp=obj.timestamp,
+        feeding_type=other_side,
+        duration_minutes=duration_minutes,
+        session_id=session_id,
+        child_id=obj.child_id,
+    )
+    db.add(new_side)
+    db.commit()
+    db.refresh(new_side)
+    return new_side
+
+
 def delete_feeding(db: Session, feeding_id: int) -> bool:
     obj = db.get(Feeding, feeding_id)
     if not obj:
         return False
+    session_id = obj.session_id
     db.delete(obj)
+    db.flush()
+    # Removing one side of a pair leaves a session of one.  Dropping the
+    # ``session_id`` returns the survivor to a plain single-sided log -- the
+    # exact inverse of ``pair_feeding`` -- so it is edited and rendered as what
+    # it now is rather than as the remains of a session.
+    if session_id:
+        remaining = db.scalars(select(Feeding).where(Feeding.session_id == session_id)).all()
+        if len(remaining) == 1:
+            remaining[0].session_id = None
     db.commit()
     return True
 
@@ -715,7 +773,11 @@ def get_activities(
 
     # Merge paired breast feedings into a single activity item
     for _sid, group in session_groups.items():
-        group.sort(key=lambda f: f.timestamp)  # oldest first
+        # Oldest first, then by id: the two sides of a session share a
+        # timestamp, and the feed rows arrive newest-first, so without the tie
+        # break a session reads back-to-front -- and the side added later would
+        # take over the entry's id, moving the whole log out from under it.
+        group.sort(key=lambda f: (f.timestamp, f.id))
         first = group[0]
         parts = []
         for f in group:
@@ -726,17 +788,24 @@ def get_activities(
                 parts.append(short)
         detail = " · ".join(parts)
         notes = next((f.notes for f in group if f.notes), None)
+        # A group can hold a single record -- one side of a pair was removed, or
+        # a session is mid-repair.  Calling that "Both Breasts" reads as a log
+        # the caregiver never made, so a lone record is described by its own
+        # side and only a real pair claims to be both.
+        paired = len(group) > 1
         activities.append(
             {
                 "type": "feeding",
-                "subtype": "breast_both",
+                "subtype": "breast_both" if paired else first.feeding_type,
                 "timestamp": first.timestamp.isoformat(),
                 "id": first.id,
-                "secondary_id": group[1].id if len(group) > 1 else None,
+                "secondary_id": group[1].id if paired else None,
                 "emoji": "\U0001f931",
-                "label": "Both Breasts",
+                "label": "Both Breasts"
+                if paired
+                else _FEEDING_LABELS.get(first.feeding_type, first.feeding_type),
                 "detail": detail,
-                "summary": "Feeding: Both Breasts",
+                "summary": "Feeding: Both Breasts" if paired else f"Feeding: {first.feeding_type}",
                 "notes": notes,
             }
         )

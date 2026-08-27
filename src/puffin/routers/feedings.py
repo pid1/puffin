@@ -7,7 +7,13 @@ from puffin import crud
 from puffin.crud import ChildFilter
 from puffin.database import get_db
 from puffin.dependencies import child_filter, validate_child_id
-from puffin.schemas import FeedingCreate, FeedingResponse, FeedingUpdate, PeriodStats
+from puffin.schemas import (
+    FeedingCreate,
+    FeedingPair,
+    FeedingResponse,
+    FeedingUpdate,
+    PeriodStats,
+)
 
 router = APIRouter(prefix="/api/feedings", tags=["feedings"])
 
@@ -70,6 +76,19 @@ def update_feeding(feeding_id: int, data: FeedingUpdate, db: Session = Depends(g
             status_code=422,
             detail="Bottle feeds require amount and amount_unit together",
         )
+    # Judged on the merged record: a partial update that is not touching the
+    # duration still has to leave a valid one behind.
+    if target_type in {"breast_left", "breast_right"}:
+        duration = (
+            data.duration_minutes
+            if data.duration_minutes is not None
+            else existing.duration_minutes
+        )
+        if duration is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Breast feeds require a duration",
+            )
     updates = {}
     if data.timestamp is not None:
         updates["timestamp"] = data.timestamp
@@ -91,6 +110,18 @@ def update_feeding(feeding_id: int, data: FeedingUpdate, db: Session = Depends(g
         validate_child_id(db, data.child_id)
         updates["child_id"] = data.child_id
     return crud.update_feeding(db, feeding_id, **updates)
+
+
+@router.post("/{feeding_id}/pair", response_model=FeedingResponse, status_code=201)
+def pair_feeding(feeding_id: int, data: FeedingPair, db: Session = Depends(get_db)):
+    """Add the other breast to a session that was ended after one side."""
+    try:
+        obj = crud.pair_feeding(db, feeding_id, duration_minutes=data.duration_minutes)
+    except crud.PairError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not obj:
+        raise HTTPException(status_code=404, detail="Feeding not found")
+    return obj
 
 
 @router.delete("/{feeding_id}", status_code=204)
