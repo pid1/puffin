@@ -162,8 +162,15 @@ class FeedingCreate(BaseModel):
             if (self.amount is None) != (self.amount_unit is None):
                 raise ValueError("Bottle feeds require amount and amount_unit together")
         else:
+            # A breast feed with neither a duration nor an amount renders as a
+            # blank timeline entry and exports as an empty row.  Nothing that
+            # logs a feed omits the duration, so requiring it here costs the
+            # app nothing and closes the only way such a record got created.
+            if self.duration_minutes is None:
+                raise ValueError("Breast feeds require duration_minutes")
             self.amount = None
             self.amount_unit = None
+            self.bottle_type = None
         return self
 
 
@@ -186,6 +193,16 @@ class FeedingUpdate(BaseModel):
             self.amount = None
             self.amount_unit = None
         return self
+
+
+class FeedingPair(BaseModel):
+    """Adds the opposite breast to an existing single-sided session.
+
+    Only the duration is supplied -- the side is whichever one the existing
+    record is not, so a caller cannot ask for a session with two left breasts.
+    """
+
+    duration_minutes: int = Field(..., ge=1, le=_MAX_FEED_MINUTES)
 
 
 class FeedingResponse(BaseModel):

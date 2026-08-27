@@ -65,7 +65,7 @@ def test_both_pages_include_the_shared_confirm_modal(client):
     """The migration offer runs from /settings, the bulk re-assign from the
     dashboard, and both drive the same confirmation markup."""
     for path in ("/", "/settings"):
-        assert 'id="child-confirm-modal"' in client.get(path).text, path
+        assert 'id="confirm-modal"' in client.get(path).text, path
 
 
 def test_each_page_loads_common_plus_its_own_script(client):

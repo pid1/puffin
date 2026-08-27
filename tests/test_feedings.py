@@ -1,5 +1,7 @@
 def test_create_feeding(client):
-    resp = client.post("/api/feedings", json={"feeding_type": "breast_left"})
+    resp = client.post(
+        "/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": 15}
+    )
     assert resp.status_code == 201
     data = resp.json()
     assert data["feeding_type"] == "breast_left"
@@ -66,7 +68,12 @@ def test_create_bottle_feeding_unit_requires_amount(client):
 def test_create_breast_feeding_normalizes_amount_unit(client):
     resp = client.post(
         "/api/feedings",
-        json={"feeding_type": "breast_left", "amount": 3.5, "amount_unit": "oz"},
+        json={
+            "feeding_type": "breast_left",
+            "duration_minutes": 15,
+            "amount": 3.5,
+            "amount_unit": "oz",
+        },
     )
     assert resp.status_code == 201
     data = resp.json()
@@ -98,7 +105,7 @@ def test_create_feeding_invalid_type(client):
 
 
 def test_list_feedings(client):
-    client.post("/api/feedings", json={"feeding_type": "breast_left"})
+    client.post("/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": 15})
     client.post("/api/feedings", json={"feeding_type": "bottle"})
     resp = client.get("/api/feedings")
     assert resp.status_code == 200
@@ -106,7 +113,9 @@ def test_list_feedings(client):
 
 
 def test_update_feeding(client):
-    create_resp = client.post("/api/feedings", json={"feeding_type": "breast_left"})
+    create_resp = client.post(
+        "/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": 15}
+    )
     fid = create_resp.json()["id"]
     resp = client.put(f"/api/feedings/{fid}", json={"duration_minutes": 20})
     assert resp.status_code == 200
@@ -138,7 +147,12 @@ def test_update_breast_feeding_normalizes_amount_unit(client):
     fid = create_resp.json()["id"]
     resp = client.put(
         f"/api/feedings/{fid}",
-        json={"feeding_type": "breast_left", "amount": 100, "amount_unit": "mL"},
+        json={
+            "feeding_type": "breast_left",
+            "duration_minutes": 15,
+            "amount": 100,
+            "amount_unit": "mL",
+        },
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -148,7 +162,9 @@ def test_update_breast_feeding_normalizes_amount_unit(client):
 
 
 def test_delete_feeding(client):
-    create_resp = client.post("/api/feedings", json={"feeding_type": "breast_left"})
+    create_resp = client.post(
+        "/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": 15}
+    )
     fid = create_resp.json()["id"]
     assert client.delete(f"/api/feedings/{fid}").status_code == 204
     assert client.get(f"/api/feedings/{fid}").status_code == 404
@@ -452,3 +468,143 @@ def test_offset_timestamp_is_converted_to_utc_on_write(client):
     fetched = client.get(f"/api/feedings/{feeding['id']}").json()
     stored = datetime.fromisoformat(fetched["timestamp"])
     assert stored.astimezone(UTC) == datetime(2026, 7, 19, 14, 0, tzinfo=UTC)
+
+
+def test_create_breast_feeding_requires_duration(client):
+    """A breast feed with no duration renders blank and exports as an empty row.
+
+    Nothing in the app logs one -- the timer floors the duration at a minute and
+    the manual form only posts a side it has a value for -- so the only way to
+    create one was converting a bottle and leaving the field empty.
+    """
+    resp = client.post("/api/feedings", json={"feeding_type": "breast_left"})
+    assert resp.status_code == 422
+
+
+def test_update_cannot_leave_breast_feeding_without_duration(client):
+    """The same rule judged on the merged record, not the payload."""
+    bottle = client.post(
+        "/api/feedings",
+        json={"feeding_type": "bottle", "amount": 3.0, "amount_unit": "oz"},
+    ).json()
+    resp = client.put(f"/api/feedings/{bottle['id']}", json={"feeding_type": "breast_left"})
+    assert resp.status_code == 422
+    # The record is untouched, not half-converted.
+    after = client.get(f"/api/feedings/{bottle['id']}").json()
+    assert after["feeding_type"] == "bottle"
+    assert after["amount"] == 3.0
+
+
+def test_update_unrelated_field_does_not_require_resending_duration(client):
+    """A partial update must not be rejected for omitting a field it is not changing."""
+    feeding = client.post(
+        "/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": 12}
+    ).json()
+    resp = client.put(f"/api/feedings/{feeding['id']}", json={"notes": "sleepy"})
+    assert resp.status_code == 200
+    assert resp.json()["duration_minutes"] == 12
+    assert resp.json()["notes"] == "sleepy"
+
+
+def test_converting_bottle_to_breast_clears_bottle_type(client):
+    """A breast feed carrying ``bottle_type`` exports a phantom column.
+
+    ``amount``/``amount_unit`` were already cleared on conversion; ``bottle_type``
+    was left behind because it was missing from ``_CLEARED_ON_CONVERT``, so
+    writing ``None`` to it was silently skipped.
+    """
+    bottle = client.post(
+        "/api/feedings",
+        json={
+            "feeding_type": "bottle",
+            "amount": 3.0,
+            "amount_unit": "oz",
+            "bottle_type": "formula",
+        },
+    ).json()
+    resp = client.put(
+        f"/api/feedings/{bottle['id']}",
+        json={"feeding_type": "breast_left", "duration_minutes": 15},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["feeding_type"] == "breast_left"
+    assert data["bottle_type"] is None
+    assert data["amount"] is None
+    assert data["amount_unit"] is None
+
+
+def test_pair_adds_the_other_breast_and_links_both(client):
+    """The ended-early session: one side logged, the other added afterwards."""
+    left = client.post(
+        "/api/feedings",
+        json={
+            "feeding_type": "breast_left",
+            "duration_minutes": 15,
+            "timestamp": "2026-07-19T12:00:00Z",
+        },
+    ).json()
+    assert left["session_id"] is None
+
+    resp = client.post(f"/api/feedings/{left['id']}/pair", json={"duration_minutes": 8})
+    assert resp.status_code == 201
+    right = resp.json()
+
+    assert right["feeding_type"] == "breast_right"
+    assert right["duration_minutes"] == 8
+    # Both sides share the session and its timestamp, so the pair reads as one
+    # session rather than two logs that happen to be near each other.
+    assert right["session_id"] is not None
+    assert client.get(f"/api/feedings/{left['id']}").json()["session_id"] == right["session_id"]
+    assert right["timestamp"] == left["timestamp"]
+
+
+def test_pair_inherits_the_child_of_the_existing_side(client):
+    maya = client.post("/api/children", json={"name": "Maya"}).json()["id"]
+    left = client.post(
+        "/api/feedings",
+        json={"feeding_type": "breast_left", "duration_minutes": 15, "child_id": maya},
+    ).json()
+    right = client.post(f"/api/feedings/{left['id']}/pair", json={"duration_minutes": 8}).json()
+    assert right["child_id"] == maya
+
+
+def test_pair_uses_the_opposite_side(client):
+    right = client.post(
+        "/api/feedings", json={"feeding_type": "breast_right", "duration_minutes": 9}
+    ).json()
+    added = client.post(f"/api/feedings/{right['id']}/pair", json={"duration_minutes": 4}).json()
+    assert added["feeding_type"] == "breast_left"
+
+
+def test_pair_rejects_an_already_paired_session(client):
+    left = client.post(
+        "/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": 15}
+    ).json()
+    client.post(f"/api/feedings/{left['id']}/pair", json={"duration_minutes": 8})
+    resp = client.post(f"/api/feedings/{left['id']}/pair", json={"duration_minutes": 5})
+    assert resp.status_code == 422
+
+
+def test_pair_rejects_a_bottle(client):
+    bottle = client.post(
+        "/api/feedings",
+        json={"feeding_type": "bottle", "amount": 3.0, "amount_unit": "oz"},
+    ).json()
+    resp = client.post(f"/api/feedings/{bottle['id']}/pair", json={"duration_minutes": 8})
+    assert resp.status_code == 422
+
+
+def test_pair_missing_feeding_is_404(client):
+    assert client.post("/api/feedings/9999/pair", json={"duration_minutes": 8}).status_code == 404
+
+
+def test_deleting_one_side_unlinks_the_survivor(client):
+    """The inverse of pairing: a session of one is no longer a session."""
+    left = client.post(
+        "/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": 15}
+    ).json()
+    right = client.post(f"/api/feedings/{left['id']}/pair", json={"duration_minutes": 8}).json()
+
+    assert client.delete(f"/api/feedings/{right['id']}").status_code == 204
+    assert client.get(f"/api/feedings/{left['id']}").json()["session_id"] is None

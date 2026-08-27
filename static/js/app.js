@@ -125,12 +125,12 @@ function initChildDashboard() {
         if (!child) return;
         const count = unassignedCount;
         const plural = count === 1 ? '' : 's';
-        showChildConfirm({
+        showConfirm({
             title: `Assign all to ${child.name}?`,
             body: `This will move all ${count} unassigned log${plural} to ${child.name}.`,
             primary: 'Continue',
             cancel: 'Cancel',
-            onPrimary: () => showChildConfirm({
+            onPrimary: () => showConfirm({
                 title: 'Confirm assignment',
                 body: `This will assign ${count} log${plural} to ${child.name}. `
                     + `This can't be undone in bulk.`,
@@ -139,9 +139,9 @@ function initChildDashboard() {
                 cancel: 'Cancel',
                 onPrimary: () => runBulkAssign(child),
                 onSecondary: () => document.getElementById('unassigned-assign-btn').click(),
-                onCancel: () => closeModal('child-confirm-modal'),
+                onCancel: () => closeModal('confirm-modal'),
             }),
-            onCancel: () => closeModal('child-confirm-modal'),
+            onCancel: () => closeModal('confirm-modal'),
         });
     });
 }
@@ -1118,9 +1118,10 @@ async function openEditModal(type, id, secondaryId = null) {
         } else {
             data = await api.get(endpoints[type]);
         }
+        const isBottle = type === 'feeding' && data.feeding_type === 'bottle';
         const titles = {
             diaper: 'Edit Diaper Change',
-            feeding: secondaryData ? 'Edit Both Breasts' : 'Edit Feeding',
+            feeding: isBottle ? 'Edit Bottle' : 'Edit Breastfeed',
             medication: 'Edit Medication',
             temperature: 'Edit Temperature',
         };
@@ -1130,6 +1131,14 @@ async function openEditModal(type, id, secondaryId = null) {
         form.dataset.editType = type;
         form.dataset.editId = id;
         form.dataset.originalTimestamp = toLocalDatetime(data.timestamp);
+        // The breast form is judged against the session it opened with: which
+        // sides had records, and what each held. Every branch of the save --
+        // flip, pair, unpair -- is a comparison against this snapshot.
+        if (type === 'feeding' && !isBottle) {
+            form.dataset.breastBefore = JSON.stringify(breastSidesOf(data, secondaryData));
+        } else {
+            delete form.dataset.breastBefore;
+        }
         if (secondaryData) {
             form.dataset.editSecondaryId = secondaryId;
         } else {
@@ -1142,11 +1151,101 @@ async function openEditModal(type, id, secondaryId = null) {
     }
 }
 
+/**
+ * Work out what a breast-feed edit does to the underlying records.
+ *
+ * The form shows one duration field per side, so a single save can mean four
+ * different things: a plain duration change, moving a lone feed to the side it
+ * actually happened on, adding a second side to a session that was ended early,
+ * or dropping one side of a pair.  Which one it is falls out of comparing what
+ * the session held against what the form now holds.
+ *
+ * ``before`` carries the records the session opened with, keyed by side and
+ * ``null`` for a side that has none; ``after`` carries the two raw field
+ * values.  Kept free of the DOM so each branch can be tested directly.
+ */
+function planBreastEdit(before, after) {
+    const minutes = (v) => {
+        if (v === '' || v === null || v === undefined) return null;
+        const n = parseInt(v, 10);
+        return Number.isFinite(n) && n > 0 ? n : null;
+    };
+    const SIDES = ['breast_left', 'breast_right'];
+    const wanted = {
+        breast_left: minutes(after.breast_left),
+        breast_right: minutes(after.breast_right),
+    };
+    const wantedSides = SIDES.filter((side) => wanted[side] !== null);
+    const heldSides = SIDES.filter((side) => before[side]);
+
+    // Every side cleared. Deleting the whole session through the duration
+    // fields would be a destructive edit disguised as a blank form, so this is
+    // reported back and refused rather than acted on.
+    if (wantedSides.length === 0) return { action: 'empty' };
+
+    // Durations to write on records that survive on the side they started on.
+    const updates = wantedSides
+        .filter((side) => before[side] && wanted[side] !== before[side].duration_minutes)
+        .map((side) => ({ id: before[side].id, duration_minutes: wanted[side] }));
+
+    if (heldSides.length === 2) {
+        if (wantedSides.length === 2) return { action: 'update', updates };
+        const dropped = SIDES.find((side) => wanted[side] === null);
+        return {
+            action: 'unpair',
+            deleteId: before[dropped].id,
+            droppedSide: dropped,
+            droppedMinutes: before[dropped].duration_minutes,
+            updates,
+        };
+    }
+
+    const held = heldSides[0];
+    if (wantedSides.length === 2) {
+        const added = SIDES.find((side) => side !== held);
+        return {
+            action: 'pair',
+            pairId: before[held].id,
+            addedSide: added,
+            addedMinutes: wanted[added],
+            updates,
+        };
+    }
+    if (wantedSides[0] === held) return { action: 'update', updates };
+    // The lone side moved across: the record is flipped in place rather than
+    // deleted and recreated, so its id, timestamp and notes survive the edit.
+    return {
+        action: 'flip',
+        id: before[held].id,
+        toSide: wantedSides[0],
+        duration_minutes: wanted[wantedSides[0]],
+    };
+}
+
+/**
+ * Index a breast session's records by side.
+ *
+ * A session is one record or two, in no guaranteed order, and the edit form
+ * needs to address each side by name -- including the side that has no record
+ * yet, which is what makes adding it possible.
+ */
+function breastSidesOf(data, secondaryData = null) {
+    const sides = { breast_left: null, breast_right: null };
+    for (const record of [data, secondaryData]) {
+        if (record) sides[record.feeding_type] = record;
+    }
+    return sides;
+}
+
 function buildEditFields(type, data, secondaryData = null) {
     let html;
     switch (type) {
         case 'diaper': html = buildDiaperEditFields(data); break;
-        case 'feeding': html = buildFeedingEditFields(data, secondaryData); break;
+        case 'feeding':
+            html = data.feeding_type === 'bottle'
+                ? buildBottleEditFields(data)
+                : buildBreastEditFields(breastSidesOf(data, secondaryData));
+            break;
         case 'medication': html = buildMedicationEditFields(data); break;
         case 'temperature': html = buildTemperatureEditFields(data); break;
     }
@@ -1200,52 +1299,40 @@ function buildDiaperEditFields(data) {
     `;
 }
 
-function buildFeedingEditFields(data, secondaryData = null) {
-    if (secondaryData) {
-        const leftData = data.feeding_type === 'breast_left' ? data : secondaryData;
-        const rightData = data.feeding_type === 'breast_right' ? data : secondaryData;
-        const names = getBreastNames();
-        const notes = leftData.notes || rightData.notes || '';
-        return `
-            <input type="hidden" id="edit-left-id" value="${leftData.id}">
-            <input type="hidden" id="edit-right-id" value="${rightData.id}">
-            <div class="form-group">
-                <label for="edit-left-duration">🤱 ${escapeHtml(names.left)} (minutes)</label>
-                <input type="number" id="edit-left-duration" min="1" max="120" value="${leftData.duration_minutes || ''}">
-            </div>
-            <div class="form-group">
-                <label for="edit-right-duration">🤱 ${escapeHtml(names.right)} (minutes)</label>
-                <input type="number" id="edit-right-duration" min="1" max="120" value="${rightData.duration_minutes || ''}">
-            </div>
-            <div class="form-group">
-                <label for="edit-timestamp">Time</label>
-                <input type="datetime-local" id="edit-timestamp" value="${toLocalDatetime(leftData.timestamp)}">
-            </div>
-            <div class="form-group">
-                <label for="edit-notes">Notes</label>
-                <textarea id="edit-notes" rows="2">${escapeHtml(notes)}</textarea>
-            </div>
-        `;
-    }
-    const isBottle = data.feeding_type === 'bottle';
+function buildBreastEditFields(before) {
     const names = getBreastNames();
+    const left = before.breast_left;
+    const right = before.breast_right;
+    // Notes and time belong to the session, so they come from whichever side
+    // carries them rather than from a fixed one.
+    const anchor = left || right;
+    const notes = (left && left.notes) || (right && right.notes) || '';
+    return `
+        <div class="form-group">
+            <label for="edit-left-duration">🤱 ${escapeHtml(names.left)} (minutes)</label>
+            <input type="number" id="edit-left-duration" min="1" max="120" value="${left ? left.duration_minutes : ''}">
+        </div>
+        <div class="form-group">
+            <label for="edit-right-duration">🤱 ${escapeHtml(names.right)} (minutes)</label>
+            <input type="number" id="edit-right-duration" min="1" max="120" value="${right ? right.duration_minutes : ''}">
+        </div>
+        <p class="hint">Clear a side to remove it from this feeding.</p>
+        <div class="form-group">
+            <label for="edit-timestamp">Time</label>
+            <input type="datetime-local" id="edit-timestamp" value="${toLocalDatetime(anchor.timestamp)}">
+        </div>
+        <div class="form-group">
+            <label for="edit-notes">Notes</label>
+            <textarea id="edit-notes" rows="2">${escapeHtml(notes)}</textarea>
+        </div>
+    `;
+}
+
+function buildBottleEditFields(data) {
     const bottleTypeVal = data.bottle_type || 'breastmilk';
     const bottleUnitVal = data.amount_unit || getDefaultBottleUnit();
     return `
         <div class="form-group">
-            <label>Type</label>
-            <div class="btn-group">
-                <button type="button" class="btn btn-option ${data.feeding_type === 'breast_left' ? 'selected' : ''}" data-value="breast_left" data-field="edit-feeding-type">🤱 ${escapeHtml(names.left)}</button>
-                <button type="button" class="btn btn-option ${data.feeding_type === 'breast_right' ? 'selected' : ''}" data-value="breast_right" data-field="edit-feeding-type">🤱 ${escapeHtml(names.right)}</button>
-                <button type="button" class="btn btn-option ${isBottle ? 'selected' : ''}" data-value="bottle" data-field="edit-feeding-type">🍼 Bottle</button>
-            </div>
-            <input type="hidden" id="edit-feeding-type" value="${data.feeding_type}">
-        </div>
-        <div class="form-group" id="edit-duration-group" ${isBottle ? 'style="display:none"' : ''}>
-            <label for="edit-duration">Duration (minutes)</label>
-            <input type="number" id="edit-duration" min="1" max="120" value="${data.duration_minutes || ''}">
-        </div>
-        <div class="form-group" id="edit-oz-group" ${isBottle ? '' : 'style="display:none"'}>
             <label for="edit-amount">Amount</label>
             <div class="input-group">
                 <input type="number" id="edit-amount" min="0.01" step="0.01" value="${data.amount || ''}">
@@ -1255,7 +1342,7 @@ function buildFeedingEditFields(data, secondaryData = null) {
                 </select>
             </div>
         </div>
-        <div class="form-group" id="edit-bottle-type-group" ${isBottle ? '' : 'style="display:none"'}>
+        <div class="form-group">
             <label for="edit-bottle-type">Bottle Type</label>
             <select id="edit-bottle-type">
                 <option value="breastmilk" ${bottleTypeVal === 'breastmilk' ? 'selected' : ''}>Breastmilk</option>
@@ -1338,6 +1425,102 @@ function buildTemperatureEditFields(data) {
     `;
 }
 
+/**
+ * Apply a breast-feed edit, whatever shape it turns out to be.
+ *
+ * Returns false when the save was refused or cancelled, so the caller leaves
+ * the modal open instead of reporting a success that did not happen.
+ */
+async function saveBreastEdit(form) {
+    const before = JSON.parse(form.dataset.breastBefore);
+    const plan = planBreastEdit(before, {
+        breast_left: document.getElementById('edit-left-duration').value,
+        breast_right: document.getElementById('edit-right-duration').value,
+    });
+
+    if (plan.action === 'empty') {
+        showToast('Enter a time for at least one side, or use Delete.');
+        return false;
+    }
+
+    // Time, notes and child belong to the session, so they go to every record
+    // it still has. The router keys off model_fields_set, so child_id has to be
+    // sent explicitly -- omitting it silently leaves the association alone.
+    const timestamp = document.getElementById('edit-timestamp').value;
+    const session = { notes: document.getElementById('edit-notes').value };
+    if (timestamp && timestamp !== form.dataset.originalTimestamp) {
+        session.timestamp = new Date(timestamp).toISOString();
+    }
+    const childEl = document.getElementById('edit-child');
+    if (childEl) session.child_id = childEl.value ? parseInt(childEl.value, 10) : null;
+
+    if (plan.action === 'unpair' && !(await confirmDroppedSide(plan))) {
+        // Cancelling means the side stays, so the field goes back to what it
+        // held -- leaving it blank would show a removal that did not happen.
+        const field = plan.droppedSide === 'breast_left' ? 'edit-left-duration' : 'edit-right-duration';
+        document.getElementById(field).value = plan.droppedMinutes;
+        return false;
+    }
+
+    const survivors = ['breast_left', 'breast_right']
+        .filter((side) => before[side] && before[side].id !== plan.deleteId)
+        .map((side) => before[side].id);
+
+    // Order matters on a flip: the duration and the side move together, so they
+    // travel in one request rather than leaving the record briefly inconsistent.
+    if (plan.action === 'flip') {
+        await api.put(`/api/feedings/${plan.id}`, {
+            ...session,
+            feeding_type: plan.toSide,
+            duration_minutes: plan.duration_minutes,
+        });
+        return true;
+    }
+
+    for (const update of plan.updates) {
+        await api.put(`/api/feedings/${update.id}`, { ...session, ...update });
+    }
+    // Records the edit did not otherwise touch still need the session fields.
+    for (const id of survivors) {
+        if (!plan.updates.some((u) => u.id === id)) {
+            await api.put(`/api/feedings/${id}`, session);
+        }
+    }
+
+    if (plan.action === 'pair') {
+        await api.post(`/api/feedings/${plan.pairId}/pair`, {
+            duration_minutes: plan.addedMinutes,
+        });
+    } else if (plan.action === 'unpair') {
+        await api.del(`/api/feedings/${plan.deleteId}`);
+    }
+    return true;
+}
+
+/** Confirm dropping a side before the record is deleted. */
+function confirmDroppedSide(plan) {
+    const names = getBreastNames();
+    const sideName = plan.droppedSide === 'breast_left' ? names.left : names.right;
+    const minutes = plan.droppedMinutes;
+    const unit = minutes === 1 ? 'minute' : 'minutes';
+    return new Promise((resolve) => {
+        showConfirm({
+            title: 'Remove Side',
+            body: `Really remove ${minutes} ${unit} from ${sideName}?`,
+            primary: 'Confirm',
+            cancel: 'Cancel',
+            onPrimary: () => {
+                closeModal('confirm-modal');
+                resolve(true);
+            },
+            onCancel: () => {
+                closeModal('confirm-modal');
+                resolve(false);
+            },
+        });
+    });
+}
+
 function buildEditBody(type) {
     const timestamp = document.getElementById('edit-timestamp').value;
     const notes = document.getElementById('edit-notes').value;
@@ -1358,22 +1541,19 @@ function buildEditBody(type) {
         case 'diaper':
             body.type = document.getElementById('edit-diaper-type').value;
             break;
+        // Breast feeds are saved by saveBreastEdit, which handles the pairing
+        // the duration fields imply; only bottles reach buildEditBody.
         case 'feeding': {
-            body.feeding_type = document.getElementById('edit-feeding-type').value;
-            if (body.feeding_type === 'bottle') {
-                const amount = document.getElementById('edit-amount').value;
-                const amountUnit = document.getElementById('edit-amount-unit').value;
-                if (amount) {
-                    if (!validateBottleAmountUnit(amount, amountUnit)) return null;
-                    body.amount = parseFloat(amount);
-                    body.amount_unit = amountUnit;
-                }
-                const btEl = document.getElementById('edit-bottle-type');
-                if (btEl) body.bottle_type = btEl.value;
-            } else {
-                const dur = document.getElementById('edit-duration').value;
-                if (dur) body.duration_minutes = parseInt(dur);
+            const amount = document.getElementById('edit-amount').value;
+            const amountUnit = document.getElementById('edit-amount-unit').value;
+            if (!amount) {
+                showToast('Enter an amount');
+                return null;
             }
+            if (!validateBottleAmountUnit(amount, amountUnit)) return null;
+            body.amount = parseFloat(amount);
+            body.amount_unit = amountUnit;
+            body.bottle_type = document.getElementById('edit-bottle-type').value;
             break;
         }
         case 'medication':
@@ -1402,18 +1582,6 @@ function initEditOptionButtons() {
             btn.closest('.btn-group').querySelectorAll('.btn-option').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
             document.getElementById(field).value = value;
-
-            // Toggle duration vs amount/bottle-type for feeding edits
-            if (field === 'edit-feeding-type') {
-                const durGroup = document.getElementById('edit-duration-group');
-                const ozGroup = document.getElementById('edit-oz-group');
-                const btGroup = document.getElementById('edit-bottle-type-group');
-                if (durGroup && ozGroup) {
-                    durGroup.style.display = value === 'bottle' ? 'none' : '';
-                    ozGroup.style.display = value === 'bottle' ? '' : 'none';
-                }
-                if (btGroup) btGroup.style.display = value === 'bottle' ? '' : 'none';
-            }
         });
     });
 }
@@ -1431,37 +1599,9 @@ function initEditForm() {
             temperature: `/api/temperatures/${id}`,
         };
         try {
-            const leftIdEl = document.getElementById('edit-left-id');
-            const rightIdEl = document.getElementById('edit-right-id');
-            if (type === 'feeding' && leftIdEl && rightIdEl) {
-                const timestamp = document.getElementById('edit-timestamp').value;
-                const notes = document.getElementById('edit-notes').value;
-                const originalTimestamp = form.dataset.originalTimestamp;
-                const baseBody = { notes };
-                if (timestamp && timestamp !== originalTimestamp) {
-                    baseBody.timestamp = new Date(timestamp).toISOString();
-                }
-                // This branch hand-builds its bodies instead of going through
-                // buildEditBody, so the Child select — which is rendered for
-                // paired feeds too — has to be read here as well. The router
-                // keys off model_fields_set, so omitting child_id is a no-op
-                // and the reassignment would silently do nothing.
-                const pairedChildEl = document.getElementById('edit-child');
-                if (pairedChildEl) {
-                    baseBody.child_id = pairedChildEl.value
-                        ? parseInt(pairedChildEl.value, 10)
-                        : null;
-                }
-                const leftDur = document.getElementById('edit-left-duration').value;
-                const rightDur = document.getElementById('edit-right-duration').value;
-                const leftBody = { ...baseBody };
-                if (leftDur) leftBody.duration_minutes = parseInt(leftDur);
-                const rightBody = { ...baseBody };
-                if (rightDur) rightBody.duration_minutes = parseInt(rightDur);
-                await Promise.all([
-                    api.put(`/api/feedings/${leftIdEl.value}`, leftBody),
-                    api.put(`/api/feedings/${rightIdEl.value}`, rightBody),
-                ]);
+            if (type === 'feeding' && form.dataset.breastBefore) {
+                const saved = await saveBreastEdit(form);
+                if (!saved) return;
             } else {
                 const body = buildEditBody(type);
                 if (!body) return;
@@ -1479,9 +1619,11 @@ function initEditForm() {
         const form = document.getElementById('edit-form');
         const type = form.dataset.editType;
         const id = form.dataset.editId;
-        const leftIdEl = document.getElementById('edit-left-id');
-        const rightIdEl = document.getElementById('edit-right-id');
-        const isBoth = type === 'feeding' && leftIdEl && rightIdEl;
+        const before = form.dataset.breastBefore ? JSON.parse(form.dataset.breastBefore) : null;
+        const sessionIds = before
+            ? ['breast_left', 'breast_right'].filter((side) => before[side]).map((side) => before[side].id)
+            : [];
+        const isBoth = sessionIds.length > 1;
         const msg = isBoth ? 'Delete both breast feeding records?' : 'Delete this entry?';
         if (!confirm(msg)) return;
         const endpoints = {
@@ -1492,10 +1634,7 @@ function initEditForm() {
         };
         try {
             if (isBoth) {
-                await Promise.all([
-                    api.del(`/api/feedings/${leftIdEl.value}`),
-                    api.del(`/api/feedings/${rightIdEl.value}`),
-                ]);
+                await Promise.all(sessionIds.map((sid) => api.del(`/api/feedings/${sid}`)));
             } else {
                 await api.del(endpoints[type]);
             }

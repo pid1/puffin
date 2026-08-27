@@ -43,6 +43,7 @@ const EXPOSED_FUNCTIONS = [
     'storeSelectedChild',
     'readStoredChild',
     'validateBottleAmountUnit',
+    'planBreastEdit',
     'getEnabledQuickAddTypes',
     'setEnabledQuickAddTypes',
     'clearQuickAddTypes',

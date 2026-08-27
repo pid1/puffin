@@ -199,3 +199,52 @@ def test_activity_at_local_midnight_belongs_to_exactly_one_day(client, monkeypat
     # Midnight opens the new day; it must not also close the previous one.
     assert len(previous_day) == 0
     assert len(boundary_day) == 1
+
+
+def test_lone_record_in_a_session_is_labelled_by_its_own_side(client):
+    """A session of one is not "Both Breasts".
+
+    The grouping branch takes every feeding carrying a ``session_id``, so a pair
+    that lost a side used to keep announcing both -- a log the caregiver never
+    made.  Deleting a side now unlinks the survivor, and this covers the
+    rendering directly for any record that still carries a stale id.
+    """
+    from datetime import UTC, datetime
+
+    client.post(
+        "/api/feedings",
+        json={
+            "feeding_type": "breast_right",
+            "duration_minutes": 7,
+            "session_id": "session-with-one-record",
+        },
+    )
+
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
+    activities = client.get(f"/api/activities?date={today}").json()
+    feedings = [a for a in activities if a["type"] == "feeding"]
+    assert len(feedings) == 1
+    assert feedings[0]["subtype"] == "breast_right"
+    assert feedings[0]["label"] == "Right Breast"
+    assert feedings[0]["secondary_id"] is None
+
+
+def test_paired_session_reads_in_the_order_the_sides_were_logged(client):
+    """Both sides share a timestamp, so the tie has to break on something stable.
+
+    Feeds are queried newest-first, which without a tie break renders a session
+    back-to-front and hands the entry's id to whichever side was added last --
+    moving the log out from under a caregiver who just paired it.
+    """
+    from datetime import UTC, datetime
+
+    left = client.post(
+        "/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": 15}
+    ).json()
+    client.post(f"/api/feedings/{left['id']}/pair", json={"duration_minutes": 8})
+
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
+    activities = client.get(f"/api/activities?date={today}").json()
+    entry = next(a for a in activities if a.get("subtype") == "breast_both")
+    assert entry["detail"] == "Left: 15min · Right: 8min"
+    assert entry["id"] == left["id"]

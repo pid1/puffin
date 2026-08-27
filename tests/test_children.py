@@ -69,7 +69,8 @@ def test_delete_child_unassigns_logs_rather_than_deleting_them(client, child):
     cid = child["id"]
     diaper = client.post("/api/diapers", json={"type": "pee", "child_id": cid}).json()
     feeding = client.post(
-        "/api/feedings", json={"feeding_type": "breast_left", "child_id": cid}
+        "/api/feedings",
+        json={"feeding_type": "breast_left", "duration_minutes": 15, "child_id": cid},
     ).json()
 
     assert client.delete(f"/api/children/{cid}").status_code == 204
@@ -96,7 +97,7 @@ def test_delete_child_leaves_other_childs_logs_alone(client, two_children):
 
 def test_unassigned_count_spans_every_log_type(client):
     client.post("/api/diapers", json={"type": "pee"})
-    client.post("/api/feedings", json={"feeding_type": "breast_left"})
+    client.post("/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": 15})
     client.post(
         "/api/medications",
         json={"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"},
@@ -153,7 +154,7 @@ def test_edit_log_moves_it_between_children(client, two_children):
     ("path", "payload"),
     [
         ("/api/diapers", {"type": "pee"}),
-        ("/api/feedings", {"feeding_type": "breast_left"}),
+        ("/api/feedings", {"feeding_type": "breast_left", "duration_minutes": 15}),
         (
             "/api/medications",
             {"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"},
@@ -195,7 +196,10 @@ def test_dashboard_counts_only_the_selected_child(client, two_children):
 def test_dashboard_last_activity_is_scoped(client, two_children):
     """ "Last fed" must never report the other child's feeding."""
     maya, theo = two_children
-    client.post("/api/feedings", json={"feeding_type": "breast_left", "child_id": maya["id"]})
+    client.post(
+        "/api/feedings",
+        json={"feeding_type": "breast_left", "duration_minutes": 15, "child_id": maya["id"]},
+    )
     theos = client.post(
         "/api/feedings",
         json={"feeding_type": "bottle", "amount": 3, "amount_unit": "oz", "child_id": theo["id"]},
