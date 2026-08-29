@@ -1,8 +1,9 @@
 import logging
 import os
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC
 from datetime import date as date_type
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import String, cast, func, select
@@ -102,7 +103,9 @@ def warn_if_tz_unconfigured() -> None:
         )
 
 
-def _period_count(db: Session, model, timestamp_col, period: str, child: ChildFilter = None) -> int:
+def _period_count(
+    db: Session, model, timestamp_col, period: str, child: ChildFilter = None
+) -> int:
     local_tz = _get_local_tz()
     now = datetime.now(local_tz)
     if period == "today":
@@ -134,7 +137,10 @@ def create_diaper(
     child_id: int | None = None,
 ) -> DiaperChange:
     obj = DiaperChange(
-        timestamp=timestamp or datetime.now(UTC), type=type_, notes=notes, child_id=child_id
+        timestamp=timestamp or datetime.now(UTC),
+        type=type_,
+        notes=notes,
+        child_id=child_id,
     )
     db.add(obj)
     db.commit()
@@ -187,9 +193,13 @@ def delete_diaper(db: Session, diaper_id: int) -> bool:
 
 def diaper_stats(db: Session, child: ChildFilter = None) -> dict[str, int]:
     return {
-        "today": _period_count(db, DiaperChange, DiaperChange.timestamp, "today", child),
+        "today": _period_count(
+            db, DiaperChange, DiaperChange.timestamp, "today", child
+        ),
         "week": _period_count(db, DiaperChange, DiaperChange.timestamp, "week", child),
-        "month": _period_count(db, DiaperChange, DiaperChange.timestamp, "month", child),
+        "month": _period_count(
+            db, DiaperChange, DiaperChange.timestamp, "month", child
+        ),
     }
 
 
@@ -340,14 +350,18 @@ def delete_feeding(db: Session, feeding_id: int) -> bool:
     # exact inverse of ``pair_feeding`` -- so it is edited and rendered as what
     # it now is rather than as the remains of a session.
     if session_id:
-        remaining = db.scalars(select(Feeding).where(Feeding.session_id == session_id)).all()
+        remaining = db.scalars(
+            select(Feeding).where(Feeding.session_id == session_id)
+        ).all()
         if len(remaining) == 1:
             remaining[0].session_id = None
     db.commit()
     return True
 
 
-def _feeding_session_count(db: Session, start: datetime, child: ChildFilter = None) -> int:
+def _feeding_session_count(
+    db: Session, start: datetime, child: ChildFilter = None
+) -> int:
     """Count unique feeding sessions from *start* to now.
 
     Breast feedings that share a ``session_id`` are counted as one session.
@@ -355,16 +369,25 @@ def _feeding_session_count(db: Session, start: datetime, child: ChildFilter = No
     individually by falling back to their row ``id``.
     """
     session_key = func.coalesce(Feeding.session_id, cast(Feeding.id, String))
-    stmt = select(func.count(func.distinct(session_key))).where(Feeding.timestamp >= start)
+    stmt = select(func.count(func.distinct(session_key))).where(
+        Feeding.timestamp >= start
+    )
     stmt = _child_where(stmt, Feeding.child_id, child)
     return db.execute(stmt).scalar() or 0
 
 
 def _count_range(
-    db: Session, model, timestamp_col, start: datetime, end: datetime, child: ChildFilter = None
+    db: Session,
+    model,
+    timestamp_col,
+    start: datetime,
+    end: datetime,
+    child: ChildFilter = None,
 ) -> int:
     stmt = (
-        select(func.count()).select_from(model).where(timestamp_col >= start, timestamp_col < end)
+        select(func.count())
+        .select_from(model)
+        .where(timestamp_col >= start, timestamp_col < end)
     )
     stmt = _child_where(stmt, model.child_id, child)
     return db.execute(stmt).scalar() or 0
@@ -485,7 +508,9 @@ def _saved_medication_exists(db: Session, name: str) -> bool:
     Split out from ``add_saved_medication`` so a lost check-then-insert race
     can be reproduced deterministically in tests.
     """
-    stmt = select(SavedMedication).where(func.lower(SavedMedication.name) == name.lower())
+    stmt = select(SavedMedication).where(
+        func.lower(SavedMedication.name) == name.lower()
+    )
     return db.execute(stmt).scalar_one_or_none() is not None
 
 
@@ -568,7 +593,9 @@ def get_temperature(db: Session, temp_id: int) -> TemperatureReading | None:
     return db.get(TemperatureReading, temp_id)
 
 
-def update_temperature(db: Session, temp_id: int, **kwargs) -> TemperatureReading | None:
+def update_temperature(
+    db: Session, temp_id: int, **kwargs
+) -> TemperatureReading | None:
     obj = db.get(TemperatureReading, temp_id)
     if not obj:
         return None
@@ -707,12 +734,18 @@ def _day_bounds(date_str: str) -> tuple[datetime, datetime]:
     y, m, d = map(int, date_str.split("-"))
     today = date_type(y, m, d)
     tomorrow = today + timedelta(days=1)
-    start = datetime(today.year, today.month, today.day, tzinfo=local_tz).astimezone(UTC)
-    end = datetime(tomorrow.year, tomorrow.month, tomorrow.day, tzinfo=local_tz).astimezone(UTC)
+    start = datetime(today.year, today.month, today.day, tzinfo=local_tz).astimezone(
+        UTC
+    )
+    end = datetime(
+        tomorrow.year, tomorrow.month, tomorrow.day, tzinfo=local_tz
+    ).astimezone(UTC)
     return start, end
 
 
-def get_activities_for_date(db: Session, date_str: str, child: ChildFilter = None) -> list[dict]:
+def get_activities_for_date(
+    db: Session, date_str: str, child: ChildFilter = None
+) -> list[dict]:
     """Return activities for a local calendar date (YYYY-MM-DD)."""
     start, end = _day_bounds(date_str)
     return get_activities(db, start=start, end=end, child=child)
@@ -742,7 +775,9 @@ def get_activities(
                 "notes": d.notes,
             }
         )
-    feedings = get_feedings(db, start_date=start, end_date=end, limit=limit, child=child)
+    feedings = get_feedings(
+        db, start_date=start, end_date=end, limit=limit, child=child
+    )
 
     # Separate individually-logged feedings from paired (session_id) ones
     session_groups: dict[str, list] = {}
@@ -752,7 +787,9 @@ def get_activities(
         else:
             if f.amount is not None and f.amount_unit:
                 bottle_label = "Formula" if f.bottle_type == "formula" else "Breastmilk"
-                detail = f"{bottle_label} · {_format_bottle_amount(f.amount, f.amount_unit)}"
+                detail = (
+                    f"{bottle_label} · {_format_bottle_amount(f.amount, f.amount_unit)}"
+                )
             elif f.duration_minutes:
                 detail = f"{f.duration_minutes} min"
             else:
@@ -801,15 +838,23 @@ def get_activities(
                 "id": first.id,
                 "secondary_id": group[1].id if paired else None,
                 "emoji": "\U0001f931",
-                "label": "Both Breasts"
-                if paired
-                else _FEEDING_LABELS.get(first.feeding_type, first.feeding_type),
+                "label": (
+                    "Both Breasts"
+                    if paired
+                    else _FEEDING_LABELS.get(first.feeding_type, first.feeding_type)
+                ),
                 "detail": detail,
-                "summary": "Feeding: Both Breasts" if paired else f"Feeding: {first.feeding_type}",
+                "summary": (
+                    "Feeding: Both Breasts"
+                    if paired
+                    else f"Feeding: {first.feeding_type}"
+                ),
                 "notes": notes,
             }
         )
-    for m in get_medications(db, start_date=start, end_date=end, limit=limit, child=child):
+    for m in get_medications(
+        db, start_date=start, end_date=end, limit=limit, child=child
+    ):
         activities.append(
             {
                 "type": "medication",
@@ -823,7 +868,9 @@ def get_activities(
                 "notes": m.notes,
             }
         )
-    for t in get_temperatures(db, start_date=start, end_date=end, limit=limit, child=child):
+    for t in get_temperatures(
+        db, start_date=start, end_date=end, limit=limit, child=child
+    ):
         # Render in the unit the reading was recorded in (stored as entered).
         temp_str = format_temperature(t.temperature, t.unit)
         activities.append(
@@ -847,7 +894,9 @@ def get_activities(
 # --- Dashboard ---
 
 
-def get_dashboard(db: Session, date_str: str | None = None, child: ChildFilter = None) -> dict:
+def get_dashboard(
+    db: Session, date_str: str | None = None, child: ChildFilter = None
+) -> dict:
     now = datetime.now(UTC)
 
     # Stats
@@ -857,15 +906,21 @@ def get_dashboard(db: Session, date_str: str | None = None, child: ChildFilter =
 
     if date_str:
         start, end = _day_bounds(date_str)
-        d_stats["today"] = _count_range(db, DiaperChange, DiaperChange.timestamp, start, end, child)
+        d_stats["today"] = _count_range(
+            db, DiaperChange, DiaperChange.timestamp, start, end, child
+        )
         f_stats["today"] = _feeding_session_count_range(db, start, end, child)
-        med_today = _count_range(db, Medication, Medication.timestamp, start, end, child)
+        med_today = _count_range(
+            db, Medication, Medication.timestamp, start, end, child
+        )
 
     # Last entries — scoped to the same child as the counts, so "last fed 2h
     # ago" never reports another child's feeding.
     def _latest(model):
         stmt = select(model).order_by(model.timestamp.desc()).limit(1)
-        return db.execute(_child_where(stmt, model.child_id, child)).scalar_one_or_none()
+        return db.execute(
+            _child_where(stmt, model.child_id, child)
+        ).scalar_one_or_none()
 
     last_diaper = _latest(DiaperChange)
     last_feeding = _latest(Feeding)

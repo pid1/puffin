@@ -59,7 +59,13 @@ def legacy_engine(tmp_path):
         "VALUES (?, ?, ?, ?, ?)",
         [
             ("2026-04-01 10:00:00", "Tylenol", "2.5 ml", None, "2026-04-01 10:00:00"),
-            ("2026-04-02 10:00:00", "Vitamin D", "400 IU (1 drop)", None, "2026-04-02 10:00:00"),
+            (
+                "2026-04-02 10:00:00",
+                "Vitamin D",
+                "400 IU (1 drop)",
+                None,
+                "2026-04-02 10:00:00",
+            ),
             ("2026-04-03 10:00:00", "tylenol", "2.5 ml", None, "2026-04-03 10:00:00"),
         ],
     )
@@ -69,7 +75,14 @@ def legacy_engine(tmp_path):
         "VALUES (?, ?, ?, ?, ?, ?)",
         [
             ("2026-04-01 09:00:00", "bottle", None, 3.5, None, "2026-04-01 09:00:00"),
-            ("2026-04-01 10:00:00", "breast_left", 12, None, None, "2026-04-01 10:00:00"),
+            (
+                "2026-04-01 10:00:00",
+                "breast_left",
+                12,
+                None,
+                None,
+                "2026-04-01 10:00:00",
+            ),
         ],
     )
     raw.commit()
@@ -127,7 +140,9 @@ def test_migration_leaves_existing_logs_unassigned(legacy_engine):
     """
     with legacy_engine.connect() as conn:
         for table in ("feedings", "medications"):
-            rows = conn.execute(text(f"SELECT child_id FROM {table}")).fetchall()  # noqa: S608
+            rows = conn.execute(
+                text(f"SELECT child_id FROM {table}")
+            ).fetchall()  # noqa: S608
             assert rows, f"expected seeded rows in {table}"
             assert all(child_id is None for (child_id,) in rows)
 
@@ -150,8 +165,7 @@ def test_migration_is_idempotent_for_child_id(legacy_engine):
 def test_migration_adds_amount_unit_to_current_amount_schema(tmp_path):
     db_path = tmp_path / "amount_without_unit.db"
     raw = sqlite3.connect(db_path)
-    raw.executescript(
-        """
+    raw.executescript("""
         CREATE TABLE feedings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp DATETIME NOT NULL,
@@ -168,8 +182,7 @@ def test_migration_adds_amount_unit_to_current_amount_schema(tmp_path):
         VALUES
             ('2026-04-01 09:00:00', 'bottle', NULL, 120, NULL, '2026-04-01 09:00:00'),
             ('2026-04-01 10:00:00', 'breast_left', 12, NULL, NULL, '2026-04-01 10:00:00');
-        """
-    )
+        """)
     raw.commit()
     raw.close()
 
@@ -184,7 +197,9 @@ def test_migration_adds_amount_unit_to_current_amount_schema(tmp_path):
         with engine.connect() as conn:
             cols = {c["name"] for c in inspect(conn).get_columns("feedings")}
             rows = conn.execute(
-                text("SELECT feeding_type, amount, amount_unit FROM feedings ORDER BY id")
+                text(
+                    "SELECT feeding_type, amount, amount_unit FROM feedings ORDER BY id"
+                )
             ).fetchall()
     finally:
         engine.dispose()
@@ -203,8 +218,7 @@ def test_migration_backfills_temperature_unit_as_celsius(tmp_path):
     """
     db_path = tmp_path / "temps_without_unit.db"
     raw = sqlite3.connect(db_path)
-    raw.executescript(
-        """
+    raw.executescript("""
         CREATE TABLE feedings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp DATETIME NOT NULL,
@@ -230,8 +244,7 @@ def test_migration_backfills_temperature_unit_as_celsius(tmp_path):
         VALUES
             ('2026-04-01 09:00:00', 37.0, NULL, NULL, '2026-04-01 09:00:00'),
             ('2026-04-02 09:00:00', 38.2, 'oral', NULL, '2026-04-02 09:00:00');
-        """
-    )
+        """)
     raw.commit()
     raw.close()
 
@@ -244,7 +257,9 @@ def test_migration_backfills_temperature_unit_as_celsius(tmp_path):
         _run_migrations(bind=engine)
         _run_migrations(bind=engine)
         with engine.connect() as conn:
-            cols = {c["name"] for c in inspect(conn).get_columns("temperature_readings")}
+            cols = {
+                c["name"] for c in inspect(conn).get_columns("temperature_readings")
+            }
             rows = conn.execute(
                 text("SELECT unit, temperature FROM temperature_readings ORDER BY id")
             ).all()
@@ -265,8 +280,7 @@ def test_migration_reconstructs_entered_fahrenheit(tmp_path):
     """
     db_path = tmp_path / "temps_celsius_with_unit.db"
     raw = sqlite3.connect(db_path)
-    raw.executescript(
-        """
+    raw.executescript("""
         CREATE TABLE feedings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp DATETIME NOT NULL,
@@ -293,8 +307,7 @@ def test_migration_reconstructs_entered_fahrenheit(tmp_path):
         VALUES
             ('2026-04-01 09:00:00', 37.0, 'C', NULL, NULL, '2026-04-01 09:00:00'),
             ('2026-04-02 09:00:00', 37.0, 'F', NULL, NULL, '2026-04-02 09:00:00');
-        """
-    )
+        """)
     raw.commit()
     raw.close()
 
@@ -307,7 +320,9 @@ def test_migration_reconstructs_entered_fahrenheit(tmp_path):
         _run_migrations(bind=engine)
         _run_migrations(bind=engine)
         with engine.connect() as conn:
-            cols = {c["name"] for c in inspect(conn).get_columns("temperature_readings")}
+            cols = {
+                c["name"] for c in inspect(conn).get_columns("temperature_readings")
+            }
             rows = conn.execute(
                 text("SELECT unit, temperature FROM temperature_readings ORDER BY id")
             ).all()
@@ -345,7 +360,9 @@ def test_migration_seeds_saved_medications(legacy_engine):
     with legacy_engine.connect() as conn:
         names = [
             r[0]
-            for r in conn.execute(text("SELECT name FROM saved_medications ORDER BY id")).fetchall()
+            for r in conn.execute(
+                text("SELECT name FROM saved_medications ORDER BY id")
+            ).fetchall()
         ]
     # "tylenol" should be deduped against "Tylenol" (first casing wins)
     assert names == ["Tylenol", "Vitamin D"]

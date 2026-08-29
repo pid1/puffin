@@ -135,7 +135,9 @@ def test_csv_feeding_includes_bottle_type_and_session_id(client):
 
     # Header carries the columns...
     feeding_header = next(
-        line for line in body.splitlines() if line.startswith("id,timestamp,feeding_type")
+        line
+        for line in body.splitlines()
+        if line.startswith("id,timestamp,feeding_type")
     )
     assert "bottle_type" in feeding_header
     assert "session_id" in feeding_header
@@ -146,7 +148,9 @@ def test_csv_feeding_includes_bottle_type_and_session_id(client):
 def test_pdf_folds_bottle_type_into_the_type_label():
     """The PDF has no bottle_type column, so it's surfaced in the type label."""
     assert dashboard._feeding_type_label("bottle", "formula") == "bottle (formula)"
-    assert dashboard._feeding_type_label("bottle", "breastmilk") == "bottle (breastmilk)"
+    assert (
+        dashboard._feeding_type_label("bottle", "breastmilk") == "bottle (breastmilk)"
+    )
     assert dashboard._feeding_type_label("bottle", None) == "bottle"
     assert dashboard._feeding_type_label("breast_left", None) == "breast_left"
 
@@ -175,6 +179,8 @@ def test_export_is_not_capped(client):
 
     # A plain list endpoint is capped at 200; the export is not capped at all.
     body = client.get("/api/export?format=csv").text
-    diaper_rows = [line for line in body.splitlines() if line and line.split(",")[0].isdigit()]
+    diaper_rows = [
+        line for line in body.splitlines() if line and line.split(",")[0].isdigit()
+    ]
     # 120 diapers all present (plus any other types, but we posted only diapers).
     assert len(diaper_rows) == 120

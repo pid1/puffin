@@ -57,7 +57,9 @@ def test_reason_appears_in_filename(tmp_path):
 
     assert "pre-migration" in pre.name
     assert "manual" in manual.name
-    assert pre.name != manual.name, "microsecond stamp keeps same-second backups distinct"
+    assert (
+        pre.name != manual.name
+    ), "microsecond stamp keeps same-second backups distinct"
 
 
 def test_missing_database_is_a_noop(tmp_path):

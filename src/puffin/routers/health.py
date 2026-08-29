@@ -55,7 +55,12 @@ def list_medications(
     db: Session = Depends(get_db),
 ):
     return crud.get_medications(
-        db, start_date=start_date, end_date=end_date, limit=limit, offset=offset, child=child
+        db,
+        start_date=start_date,
+        end_date=end_date,
+        limit=limit,
+        offset=offset,
+        child=child,
     )
 
 
@@ -76,7 +81,9 @@ def get_medication(medication_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/api/medications/{medication_id}", response_model=MedicationResponse)
-def update_medication(medication_id: int, data: MedicationUpdate, db: Session = Depends(get_db)):
+def update_medication(
+    medication_id: int, data: MedicationUpdate, db: Session = Depends(get_db)
+):
     updates = {}
     if data.timestamp is not None:
         updates["timestamp"] = data.timestamp
@@ -132,7 +139,12 @@ def list_temperatures(
     db: Session = Depends(get_db),
 ):
     return crud.get_temperatures(
-        db, start_date=start_date, end_date=end_date, limit=limit, offset=offset, child=child
+        db,
+        start_date=start_date,
+        end_date=end_date,
+        limit=limit,
+        offset=offset,
+        child=child,
     )
 
 
@@ -145,7 +157,9 @@ def get_temperature(temp_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/api/temperatures/{temp_id}", response_model=TemperatureResponse)
-def update_temperature(temp_id: int, data: TemperatureUpdate, db: Session = Depends(get_db)):
+def update_temperature(
+    temp_id: int, data: TemperatureUpdate, db: Session = Depends(get_db)
+):
     existing = crud.get_temperature(db, temp_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Temperature reading not found")
@@ -154,7 +168,9 @@ def update_temperature(temp_id: int, data: TemperatureUpdate, db: Session = Depe
     # range-check the resulting (value, unit) pair against the existing row.
     # (The schema validator only covers the case where both are supplied.)
     if data.temperature is not None or data.unit is not None:
-        eff_temp = data.temperature if data.temperature is not None else existing.temperature
+        eff_temp = (
+            data.temperature if data.temperature is not None else existing.temperature
+        )
         eff_unit = data.unit.value if data.unit is not None else existing.unit
         if not _temperature_in_range(eff_temp, eff_unit):
             raise HTTPException(

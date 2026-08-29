@@ -105,7 +105,9 @@ def test_create_feeding_invalid_type(client):
 
 
 def test_list_feedings(client):
-    client.post("/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": 15})
+    client.post(
+        "/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": 15}
+    )
     client.post("/api/feedings", json={"feeding_type": "bottle"})
     resp = client.get("/api/feedings")
     assert resp.status_code == 200
@@ -182,11 +184,19 @@ def test_feeding_stats_paired_session_counts_as_one(client):
     session_id = "test-session-abc"
     client.post(
         "/api/feedings",
-        json={"feeding_type": "breast_left", "duration_minutes": 8, "session_id": session_id},
+        json={
+            "feeding_type": "breast_left",
+            "duration_minutes": 8,
+            "session_id": session_id,
+        },
     )
     client.post(
         "/api/feedings",
-        json={"feeding_type": "breast_right", "duration_minutes": 6, "session_id": session_id},
+        json={
+            "feeding_type": "breast_right",
+            "duration_minutes": 6,
+            "session_id": session_id,
+        },
     )
     resp = client.get("/api/feedings/stats")
     assert resp.status_code == 200
@@ -199,11 +209,19 @@ def test_feeding_stats_mixed_sessions(client):
     # One paired breast session
     client.post(
         "/api/feedings",
-        json={"feeding_type": "breast_left", "duration_minutes": 8, "session_id": session_id},
+        json={
+            "feeding_type": "breast_left",
+            "duration_minutes": 8,
+            "session_id": session_id,
+        },
     )
     client.post(
         "/api/feedings",
-        json={"feeding_type": "breast_right", "duration_minutes": 6, "session_id": session_id},
+        json={
+            "feeding_type": "breast_right",
+            "duration_minutes": 6,
+            "session_id": session_id,
+        },
     )
     # One individual bottle feed
     client.post(
@@ -231,7 +249,9 @@ def test_feeding_stats_timezone_today(client, monkeypatch):
 
     # Build a timestamp that is 00:30 in local time today
     local_now = datetime.now(local_tz_offset)
-    local_midnight_plus_30m = local_now.replace(hour=0, minute=30, second=0, microsecond=0)
+    local_midnight_plus_30m = local_now.replace(
+        hour=0, minute=30, second=0, microsecond=0
+    )
     # Convert to UTC ISO string for the API
     ts_utc = local_midnight_plus_30m.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -305,9 +325,7 @@ def test_migration_adds_session_id_column(setup_db):
         poolclass=StaticPool,
     )
     with old_engine.connect() as conn:
-        conn.execute(
-            text(
-                """
+        conn.execute(text("""
             CREATE TABLE feedings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp DATETIME NOT NULL,
@@ -317,9 +335,7 @@ def test_migration_adds_session_id_column(setup_db):
                 notes TEXT,
                 created_at DATETIME
             )
-            """
-            )
-        )
+            """))
         conn.commit()
 
     # Confirm the column is absent before migration
@@ -401,7 +417,8 @@ def test_paired_edit_reassigns_both_records(client):
     base = {"notes": "", "child_id": theo}
     for feeding, duration in ((left, 10), (right, 8)):
         resp = client.put(
-            f"/api/feedings/{feeding['id']}", json={**base, "duration_minutes": duration}
+            f"/api/feedings/{feeding['id']}",
+            json={**base, "duration_minutes": duration},
         )
         assert resp.status_code == 200
 
@@ -413,7 +430,8 @@ def test_negative_duration_and_amount_are_rejected(client):
     """Negative durations and amounts must not reach the log or the export."""
     assert (
         client.post(
-            "/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": -600}
+            "/api/feedings",
+            json={"feeding_type": "breast_left", "duration_minutes": -600},
         ).status_code
         == 422
     )
@@ -487,7 +505,9 @@ def test_update_cannot_leave_breast_feeding_without_duration(client):
         "/api/feedings",
         json={"feeding_type": "bottle", "amount": 3.0, "amount_unit": "oz"},
     ).json()
-    resp = client.put(f"/api/feedings/{bottle['id']}", json={"feeding_type": "breast_left"})
+    resp = client.put(
+        f"/api/feedings/{bottle['id']}", json={"feeding_type": "breast_left"}
+    )
     assert resp.status_code == 422
     # The record is untouched, not half-converted.
     after = client.get(f"/api/feedings/{bottle['id']}").json()
@@ -555,7 +575,10 @@ def test_pair_adds_the_other_breast_and_links_both(client):
     # Both sides share the session and its timestamp, so the pair reads as one
     # session rather than two logs that happen to be near each other.
     assert right["session_id"] is not None
-    assert client.get(f"/api/feedings/{left['id']}").json()["session_id"] == right["session_id"]
+    assert (
+        client.get(f"/api/feedings/{left['id']}").json()["session_id"]
+        == right["session_id"]
+    )
     assert right["timestamp"] == left["timestamp"]
 
 
@@ -565,7 +588,9 @@ def test_pair_inherits_the_child_of_the_existing_side(client):
         "/api/feedings",
         json={"feeding_type": "breast_left", "duration_minutes": 15, "child_id": maya},
     ).json()
-    right = client.post(f"/api/feedings/{left['id']}/pair", json={"duration_minutes": 8}).json()
+    right = client.post(
+        f"/api/feedings/{left['id']}/pair", json={"duration_minutes": 8}
+    ).json()
     assert right["child_id"] == maya
 
 
@@ -573,7 +598,9 @@ def test_pair_uses_the_opposite_side(client):
     right = client.post(
         "/api/feedings", json={"feeding_type": "breast_right", "duration_minutes": 9}
     ).json()
-    added = client.post(f"/api/feedings/{right['id']}/pair", json={"duration_minutes": 4}).json()
+    added = client.post(
+        f"/api/feedings/{right['id']}/pair", json={"duration_minutes": 4}
+    ).json()
     assert added["feeding_type"] == "breast_left"
 
 
@@ -591,12 +618,17 @@ def test_pair_rejects_a_bottle(client):
         "/api/feedings",
         json={"feeding_type": "bottle", "amount": 3.0, "amount_unit": "oz"},
     ).json()
-    resp = client.post(f"/api/feedings/{bottle['id']}/pair", json={"duration_minutes": 8})
+    resp = client.post(
+        f"/api/feedings/{bottle['id']}/pair", json={"duration_minutes": 8}
+    )
     assert resp.status_code == 422
 
 
 def test_pair_missing_feeding_is_404(client):
-    assert client.post("/api/feedings/9999/pair", json={"duration_minutes": 8}).status_code == 404
+    assert (
+        client.post("/api/feedings/9999/pair", json={"duration_minutes": 8}).status_code
+        == 404
+    )
 
 
 def test_deleting_one_side_unlinks_the_survivor(client):
@@ -604,7 +636,9 @@ def test_deleting_one_side_unlinks_the_survivor(client):
     left = client.post(
         "/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": 15}
     ).json()
-    right = client.post(f"/api/feedings/{left['id']}/pair", json={"duration_minutes": 8}).json()
+    right = client.post(
+        f"/api/feedings/{left['id']}/pair", json={"duration_minutes": 8}
+    ).json()
 
     assert client.delete(f"/api/feedings/{right['id']}").status_code == 204
     assert client.get(f"/api/feedings/{left['id']}").json()["session_id"] is None

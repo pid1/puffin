@@ -7,7 +7,12 @@ from puffin import crud
 from puffin.crud import ChildFilter
 from puffin.database import get_db
 from puffin.dependencies import child_filter, validate_child_id
-from puffin.schemas import DiaperChangeCreate, DiaperChangeResponse, DiaperChangeUpdate, PeriodStats
+from puffin.schemas import (
+    DiaperChangeCreate,
+    DiaperChangeResponse,
+    DiaperChangeUpdate,
+    PeriodStats,
+)
 
 router = APIRouter(prefix="/api/diapers", tags=["diapers"])
 
@@ -34,7 +39,12 @@ def list_diapers(
     db: Session = Depends(get_db),
 ):
     return crud.get_diapers(
-        db, start_date=start_date, end_date=end_date, limit=limit, offset=offset, child=child
+        db,
+        start_date=start_date,
+        end_date=end_date,
+        limit=limit,
+        offset=offset,
+        child=child,
     )
 
 
@@ -55,7 +65,9 @@ def get_diaper(diaper_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{diaper_id}", response_model=DiaperChangeResponse)
-def update_diaper(diaper_id: int, data: DiaperChangeUpdate, db: Session = Depends(get_db)):
+def update_diaper(
+    diaper_id: int, data: DiaperChangeUpdate, db: Session = Depends(get_db)
+):
     updates = {}
     if data.timestamp is not None:
         updates["timestamp"] = data.timestamp

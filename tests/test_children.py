@@ -83,7 +83,9 @@ def test_delete_child_unassigns_logs_rather_than_deleting_them(client, child):
 
 def test_delete_child_leaves_other_childs_logs_alone(client, two_children):
     maya, theo = two_children
-    kept = client.post("/api/diapers", json={"type": "pee", "child_id": theo["id"]}).json()
+    kept = client.post(
+        "/api/diapers", json={"type": "pee", "child_id": theo["id"]}
+    ).json()
     client.post("/api/diapers", json={"type": "poop", "child_id": maya["id"]})
 
     client.delete(f"/api/children/{maya['id']}")
@@ -97,10 +99,16 @@ def test_delete_child_leaves_other_childs_logs_alone(client, two_children):
 
 def test_unassigned_count_spans_every_log_type(client):
     client.post("/api/diapers", json={"type": "pee"})
-    client.post("/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": 15})
+    client.post(
+        "/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": 15}
+    )
     client.post(
         "/api/medications",
-        json={"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"},
+        json={
+            "medication_name": "Tylenol",
+            "dosage_quantity": 2.5,
+            "dosage_unit": "mL",
+        },
     )
     client.post("/api/temperatures", json={"temperature": 37.0, "unit": "C"})
 
@@ -110,7 +118,10 @@ def test_unassigned_count_spans_every_log_type(client):
 def test_bulk_assign_moves_every_unassigned_log(client, child):
     """The one-time migration offer and the later bulk re-assign share this."""
     client.post("/api/diapers", json={"type": "pee"})
-    client.post("/api/feedings", json={"feeding_type": "bottle", "amount": 3, "amount_unit": "oz"})
+    client.post(
+        "/api/feedings",
+        json={"feeding_type": "bottle", "amount": 3, "amount_unit": "oz"},
+    )
     client.post("/api/temperatures", json={"temperature": 37.0, "unit": "C"})
 
     resp = client.post(f"/api/children/{child['id']}/assign-unassigned")
@@ -119,12 +130,19 @@ def test_bulk_assign_moves_every_unassigned_log(client, child):
     assert client.get("/api/children/unassigned").json()["count"] == 0
 
 
-def test_bulk_assign_leaves_already_assigned_logs_with_their_child(client, two_children):
+def test_bulk_assign_leaves_already_assigned_logs_with_their_child(
+    client, two_children
+):
     maya, theo = two_children
-    theos = client.post("/api/diapers", json={"type": "pee", "child_id": theo["id"]}).json()
+    theos = client.post(
+        "/api/diapers", json={"type": "pee", "child_id": theo["id"]}
+    ).json()
     client.post("/api/diapers", json={"type": "poop"})  # unassigned
 
-    assert client.post(f"/api/children/{maya['id']}/assign-unassigned").json()["assigned"] == 1
+    assert (
+        client.post(f"/api/children/{maya['id']}/assign-unassigned").json()["assigned"]
+        == 1
+    )
     assert client.get(f"/api/diapers/{theos['id']}").json()["child_id"] == theo["id"]
 
 
@@ -143,7 +161,9 @@ def test_create_log_with_child(client, child):
 
 def test_edit_log_moves_it_between_children(client, two_children):
     maya, theo = two_children
-    log = client.post("/api/diapers", json={"type": "pee", "child_id": maya["id"]}).json()
+    log = client.post(
+        "/api/diapers", json={"type": "pee", "child_id": maya["id"]}
+    ).json()
 
     resp = client.put(f"/api/diapers/{log['id']}", json={"child_id": theo["id"]})
     assert resp.status_code == 200
@@ -173,7 +193,9 @@ def test_edit_log_can_set_child_back_to_unassigned(client, child, path, payload)
 
 def test_edit_without_child_id_leaves_association_untouched(client, child):
     """Omitting child_id must not silently orphan the log."""
-    log = client.post("/api/diapers", json={"type": "pee", "child_id": child["id"]}).json()
+    log = client.post(
+        "/api/diapers", json={"type": "pee", "child_id": child["id"]}
+    ).json()
 
     resp = client.put(f"/api/diapers/{log['id']}", json={"notes": "updated"})
     assert resp.json()["child_id"] == child["id"]
@@ -189,8 +211,18 @@ def test_dashboard_counts_only_the_selected_child(client, two_children):
     client.post("/api/diapers", json={"type": "poop", "child_id": maya["id"]})
     client.post("/api/diapers", json={"type": "pee", "child_id": theo["id"]})
 
-    assert client.get(f"/api/dashboard?child_id={maya['id']}").json()["diaper_stats"]["today"] == 2
-    assert client.get(f"/api/dashboard?child_id={theo['id']}").json()["diaper_stats"]["today"] == 1
+    assert (
+        client.get(f"/api/dashboard?child_id={maya['id']}").json()["diaper_stats"][
+            "today"
+        ]
+        == 2
+    )
+    assert (
+        client.get(f"/api/dashboard?child_id={theo['id']}").json()["diaper_stats"][
+            "today"
+        ]
+        == 1
+    )
 
 
 def test_dashboard_last_activity_is_scoped(client, two_children):
@@ -198,11 +230,20 @@ def test_dashboard_last_activity_is_scoped(client, two_children):
     maya, theo = two_children
     client.post(
         "/api/feedings",
-        json={"feeding_type": "breast_left", "duration_minutes": 15, "child_id": maya["id"]},
+        json={
+            "feeding_type": "breast_left",
+            "duration_minutes": 15,
+            "child_id": maya["id"],
+        },
     )
     theos = client.post(
         "/api/feedings",
-        json={"feeding_type": "bottle", "amount": 3, "amount_unit": "oz", "child_id": theo["id"]},
+        json={
+            "feeding_type": "bottle",
+            "amount": 3,
+            "amount_unit": "oz",
+            "child_id": theo["id"],
+        },
     ).json()
 
     last = client.get(f"/api/dashboard?child_id={theo['id']}").json()["last_feeding"]
@@ -332,7 +373,10 @@ def test_create_rejects_nonexistent_child_id(client):
     """
     for path, payload in (
         ("/api/diapers", {"type": "pee"}),
-        ("/api/feedings", {"feeding_type": "bottle", "amount": 3.0, "amount_unit": "oz"}),
+        (
+            "/api/feedings",
+            {"feeding_type": "bottle", "amount": 3.0, "amount_unit": "oz"},
+        ),
         (
             "/api/medications",
             {"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"},
@@ -352,7 +396,9 @@ def test_update_rejects_nonexistent_child_id(client):
     in another tab — orphans an *existing* log.
     """
     child_id = client.post("/api/children", json={"name": "Theo"}).json()["id"]
-    diaper_id = client.post("/api/diapers", json={"type": "pee", "child_id": child_id}).json()["id"]
+    diaper_id = client.post(
+        "/api/diapers", json={"type": "pee", "child_id": child_id}
+    ).json()["id"]
 
     resp = client.put(f"/api/diapers/{diaper_id}", json={"child_id": 424242})
     assert resp.status_code == 422

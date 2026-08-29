@@ -45,7 +45,12 @@ def list_feedings(
     db: Session = Depends(get_db),
 ):
     return crud.get_feedings(
-        db, start_date=start_date, end_date=end_date, limit=limit, offset=offset, child=child
+        db,
+        start_date=start_date,
+        end_date=end_date,
+        limit=limit,
+        offset=offset,
+        child=child,
     )
 
 
@@ -70,7 +75,9 @@ def update_feeding(feeding_id: int, data: FeedingUpdate, db: Session = Depends(g
     existing = crud.get_feeding(db, feeding_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Feeding not found")
-    target_type = data.feeding_type.value if data.feeding_type else existing.feeding_type
+    target_type = (
+        data.feeding_type.value if data.feeding_type else existing.feeding_type
+    )
     if target_type == "bottle" and (data.amount is None) != (data.amount_unit is None):
         raise HTTPException(
             status_code=422,
