@@ -6,10 +6,10 @@ Self-hosted, no accounts, no cloud — just a single SQLite database.
 
 ## Screenshots
 
-| | | | |
-|---|---|---|---|
+|                                  |                                          |                                      |                                    |
+| -------------------------------- | ---------------------------------------- | ------------------------------------ | ---------------------------------- |
 | ![Dashboard](docs/dashboard.png) | ![Feeding Timer](docs/feeding-timer.png) | ![Log Feeding](docs/log-feeding.png) | ![Log Diaper](docs/log-diaper.png) |
-| Dashboard & timeline | Live feeding timer | Log a feeding | Log a diaper change |
+| Dashboard & timeline             | Live feeding timer                       | Log a feeding                        | Log a diaper change                |
 
 ## Features
 

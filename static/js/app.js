@@ -1,58 +1,71 @@
 /* ===== UUID Helper ===== */
 function generateUUID() {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-        return crypto.randomUUID();
-    }
-    // Fallback for non-secure contexts (HTTP)
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
+    return crypto.randomUUID();
+  }
+  // Fallback for non-secure contexts (HTTP)
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
 function updateBottleUnitLabels() {
-    const defaultUnit = getDefaultBottleUnit();
-    const selects = [
-        document.getElementById('feeding-bottle-unit-timer-select'),
-        document.getElementById('feeding-bottle-unit-manual-select'),
-    ];
-    for (const sel of selects) {
-        if (!sel) continue;
-        sel.querySelector('option[value="oz"]').textContent = 'oz' + (defaultUnit === 'oz' ? ' (default)' : '');
-        sel.querySelector('option[value="mL"]').textContent = 'mL' + (defaultUnit === 'mL' ? ' (default)' : '');
-        sel.value = defaultUnit;
-    }
+  const defaultUnit = getDefaultBottleUnit();
+  const selects = [
+    document.getElementById("feeding-bottle-unit-timer-select"),
+    document.getElementById("feeding-bottle-unit-manual-select"),
+  ];
+  for (const sel of selects) {
+    if (!sel) continue;
+    sel.querySelector('option[value="oz"]').textContent =
+      "oz" + (defaultUnit === "oz" ? " (default)" : "");
+    sel.querySelector('option[value="mL"]').textContent =
+      "mL" + (defaultUnit === "mL" ? " (default)" : "");
+    sel.value = defaultUnit;
+  }
 }
 
 function updateBottleTypeLabels() {
-    const defaultType = getDefaultBottleType();
-    const selects = [
-        document.getElementById('feeding-bottle-type-timer-select'),
-        document.getElementById('feeding-bottle-type-manual-select'),
-    ];
-    for (const sel of selects) {
-        if (!sel) continue;
-        sel.querySelector('option[value="breastmilk"]').textContent =
-            'Breastmilk' + (defaultType === 'breastmilk' ? ' (default)' : '');
-        sel.querySelector('option[value="formula"]').textContent =
-            'Formula' + (defaultType === 'formula' ? ' (default)' : '');
-        sel.value = defaultType;
-    }
+  const defaultType = getDefaultBottleType();
+  const selects = [
+    document.getElementById("feeding-bottle-type-timer-select"),
+    document.getElementById("feeding-bottle-type-manual-select"),
+  ];
+  for (const sel of selects) {
+    if (!sel) continue;
+    sel.querySelector('option[value="breastmilk"]').textContent =
+      "Breastmilk" + (defaultType === "breastmilk" ? " (default)" : "");
+    sel.querySelector('option[value="formula"]').textContent =
+      "Formula" + (defaultType === "formula" ? " (default)" : "");
+    sel.value = defaultType;
+  }
 }
 
 function updateBreastLabels() {
-    const names = getBreastNames();
-    // Feeding modal type buttons
-    const leftBtns = document.querySelectorAll('[data-value="breast_left"]');
-    leftBtns.forEach(btn => { btn.textContent = `🤱 ${names.left}`; });
-    const rightBtns = document.querySelectorAll('[data-value="breast_right"]');
-    rightBtns.forEach(btn => { btn.textContent = `🤱 ${names.right}`; });
-    // Manual mode labels
-    const leftLabel = document.querySelector('label[for="feeding-left-duration"]');
-    if (leftLabel) leftLabel.textContent = `🤱 ${names.left} breast (minutes)`;
-    const rightLabel = document.querySelector('label[for="feeding-right-duration"]');
-    if (rightLabel) rightLabel.textContent = `🤱 ${names.right} breast (minutes)`;
+  const names = getBreastNames();
+  // Feeding modal type buttons
+  const leftBtns = document.querySelectorAll('[data-value="breast_left"]');
+  leftBtns.forEach((btn) => {
+    btn.textContent = `🤱 ${names.left}`;
+  });
+  const rightBtns = document.querySelectorAll('[data-value="breast_right"]');
+  rightBtns.forEach((btn) => {
+    btn.textContent = `🤱 ${names.right}`;
+  });
+  // Manual mode labels
+  const leftLabel = document.querySelector(
+    'label[for="feeding-left-duration"]',
+  );
+  if (leftLabel) leftLabel.textContent = `🤱 ${names.left} breast (minutes)`;
+  const rightLabel = document.querySelector(
+    'label[for="feeding-right-duration"]',
+  );
+  if (rightLabel) rightLabel.textContent = `🤱 ${names.right} breast (minutes)`;
 }
 
 /**
@@ -64,8 +77,8 @@ function updateBreastLabels() {
  * way to reach it until the page was reloaded.
  */
 function reloadAfterLogChange() {
-    if (hasProfiles()) return refreshChildUI();
-    return loadDashboard();
+  if (hasProfiles()) return refreshChildUI();
+  return loadDashboard();
 }
 
 /* ===== Dashboard wiring for the shared layer ===== */
@@ -73,200 +86,233 @@ function reloadAfterLogChange() {
 // common.js keeps the child subsystem page-agnostic; these hooks add back the
 // parts only the dashboard owns.
 onChildDataChanged = () => {
-    renderExportChildOptions();
-    loadDashboard();
+  renderExportChildOptions();
+  loadDashboard();
 };
 
 onModalOpen = (id) => {
-    if (id === 'feeding-modal') {
-        loadLastBreastFeeding();
-        loadNoteSuggestions('/api/feedings', 'feeding-note-suggestions', 'feeding-notes');
-        updateBottleTypeLabels();
-        updateBottleUnitLabels();
-    } else if (id === 'diaper-modal') {
-        loadNoteSuggestions('/api/diapers', 'diaper-note-suggestions', 'diaper-notes');
-    } else if (id === 'health-modal') {
-        loadSavedMedNames();
-        loadMedDosageMap();
-        loadNoteSuggestions('/api/medications', 'med-note-suggestions', 'med-notes');
-        loadNoteSuggestions('/api/temperatures', 'temp-note-suggestions', 'temp-notes');
-    }
+  if (id === "feeding-modal") {
+    loadLastBreastFeeding();
+    loadNoteSuggestions(
+      "/api/feedings",
+      "feeding-note-suggestions",
+      "feeding-notes",
+    );
+    updateBottleTypeLabels();
+    updateBottleUnitLabels();
+  } else if (id === "diaper-modal") {
+    loadNoteSuggestions(
+      "/api/diapers",
+      "diaper-note-suggestions",
+      "diaper-notes",
+    );
+  } else if (id === "health-modal") {
+    loadSavedMedNames();
+    loadMedDosageMap();
+    loadNoteSuggestions(
+      "/api/medications",
+      "med-note-suggestions",
+      "med-notes",
+    );
+    loadNoteSuggestions(
+      "/api/temperatures",
+      "temp-note-suggestions",
+      "temp-notes",
+    );
+  }
 };
 
 onModalClose = (id) => {
-    if (id === 'health-modal') {
-        resetMedAutocomplete();
-    }
-    // Reset feeding modal to timer mode
-    if (id === 'feeding-modal') {
-        document.getElementById('feeding-timer-mode').classList.remove('hidden');
-        document.getElementById('feeding-manual-mode').classList.add('hidden');
-        document.getElementById('feeding-bottle-timer').classList.add('hidden');
-        const timerRow = document.getElementById('timer-toggle-row');
-        if (timerRow) timerRow.classList.remove('hidden');
-        document.getElementById('feeding-save-btn').disabled = true;
-        document.getElementById('feeding-save-btn').textContent = 'Start';
-    }
+  if (id === "health-modal") {
+    resetMedAutocomplete();
+  }
+  // Reset feeding modal to timer mode
+  if (id === "feeding-modal") {
+    document.getElementById("feeding-timer-mode").classList.remove("hidden");
+    document.getElementById("feeding-manual-mode").classList.add("hidden");
+    document.getElementById("feeding-bottle-timer").classList.add("hidden");
+    const timerRow = document.getElementById("timer-toggle-row");
+    if (timerRow) timerRow.classList.remove("hidden");
+    document.getElementById("feeding-save-btn").disabled = true;
+    document.getElementById("feeding-save-btn").textContent = "Start";
+  }
 };
 
 /** Wires the child controls the dashboard owns: the switcher and the bulk re-assign. */
 function initChildDashboard() {
-    document.getElementById('child-switcher').addEventListener('change', (e) => {
-        const raw = e.target.value;
-        selectedChild = raw === UNASSIGNED_VIEW ? UNASSIGNED_VIEW : parseInt(raw, 10);
-        storeSelectedChild(selectedChild);
-        renderChildHeader();
-        loadDashboard();
-    });
+  document.getElementById("child-switcher").addEventListener("change", (e) => {
+    const raw = e.target.value;
+    selectedChild =
+      raw === UNASSIGNED_VIEW ? UNASSIGNED_VIEW : parseInt(raw, 10);
+    storeSelectedChild(selectedChild);
+    renderChildHeader();
+    loadDashboard();
+  });
 
-    document.getElementById('unassigned-assign-btn').addEventListener('click', () => {
-        const targetId = parseInt(document.getElementById('unassigned-assign-target').value, 10);
-        const child = childProfiles.find(c => c.id === targetId);
-        if (!child) return;
-        const count = unassignedCount;
-        const plural = count === 1 ? '' : 's';
-        showConfirm({
-            title: `Assign all to ${child.name}?`,
-            body: `This will move all ${count} unassigned log${plural} to ${child.name}.`,
-            primary: 'Continue',
-            cancel: 'Cancel',
-            onPrimary: () => showConfirm({
-                title: 'Confirm assignment',
-                body: `This will assign ${count} log${plural} to ${child.name}. `
-                    + `This can't be undone in bulk.`,
-                primary: `Confirm — assign to ${child.name}`,
-                secondary: 'Go back',
-                cancel: 'Cancel',
-                onPrimary: () => runBulkAssign(child),
-                onSecondary: () => document.getElementById('unassigned-assign-btn').click(),
-                onCancel: () => closeModal('confirm-modal'),
-            }),
-            onCancel: () => closeModal('confirm-modal'),
-        });
+  document
+    .getElementById("unassigned-assign-btn")
+    .addEventListener("click", () => {
+      const targetId = parseInt(
+        document.getElementById("unassigned-assign-target").value,
+        10,
+      );
+      const child = childProfiles.find((c) => c.id === targetId);
+      if (!child) return;
+      const count = unassignedCount;
+      const plural = count === 1 ? "" : "s";
+      showConfirm({
+        title: `Assign all to ${child.name}?`,
+        body: `This will move all ${count} unassigned log${plural} to ${child.name}.`,
+        primary: "Continue",
+        cancel: "Cancel",
+        onPrimary: () =>
+          showConfirm({
+            title: "Confirm assignment",
+            body:
+              `This will assign ${count} log${plural} to ${child.name}. ` +
+              `This can't be undone in bulk.`,
+            primary: `Confirm — assign to ${child.name}`,
+            secondary: "Go back",
+            cancel: "Cancel",
+            onPrimary: () => runBulkAssign(child),
+            onSecondary: () =>
+              document.getElementById("unassigned-assign-btn").click(),
+            onCancel: () => closeModal("confirm-modal"),
+          }),
+        onCancel: () => closeModal("confirm-modal"),
+      });
     });
 }
 
-
-
 /* ===== Option Buttons ===== */
 function initOptionButtons() {
-    document.querySelectorAll('.btn-option').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const field = btn.dataset.field;
-            const value = btn.dataset.value;
-            // Deselect siblings
-            btn.closest('.btn-group').querySelectorAll('.btn-option').forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-            const input = document.getElementById(field);
-            input.value = value;
-            input.dispatchEvent(new Event('change'));
-        });
+  document.querySelectorAll(".btn-option").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const field = btn.dataset.field;
+      const value = btn.dataset.value;
+      // Deselect siblings
+      btn
+        .closest(".btn-group")
+        .querySelectorAll(".btn-option")
+        .forEach((b) => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      const input = document.getElementById(field);
+      input.value = value;
+      input.dispatchEvent(new Event("change"));
     });
+  });
 }
 
 /* ===== Tabs ===== */
 function initTabs() {
-    document.querySelectorAll('.tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            const parent = tab.closest('.modal-content');
-            parent.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            parent.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
-            tab.classList.add('active');
-            document.getElementById(tab.dataset.tab).classList.add('active');
-        });
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const parent = tab.closest(".modal-content");
+      parent
+        .querySelectorAll(".tab")
+        .forEach((t) => t.classList.remove("active"));
+      parent
+        .querySelectorAll(".tab-content")
+        .forEach((tc) => tc.classList.remove("active"));
+      tab.classList.add("active");
+      document.getElementById(tab.dataset.tab).classList.add("active");
     });
+  });
 }
 
 /* ===== Breastfeeding Timer ===== */
-const TIMER_KEY = 'puffin-feeding-timer';
+const TIMER_KEY = "puffin-feeding-timer";
 let timerInterval = null;
 
 function getTimerState() {
-    const raw = localStorage.getItem(TIMER_KEY);
-    if (!raw) return null;
-    let state;
-    try {
-        state = JSON.parse(raw);
-    } catch (err) {
-        // A truncated or corrupt write (storage quota, a tab killed mid
-        // setItem) must not throw here: getTimerState runs first thing in
-        // initTimer, so an uncaught parse error aborts the rest of
-        // DOMContentLoaded -- no form listeners, no calendar, no data load --
-        // and the page stays a dead shell across reloads until localStorage is
-        // cleared by hand. Drop the unreadable state and start clean instead.
-        console.error('Discarding corrupt timer state:', err);
-        localStorage.removeItem(TIMER_KEY);
-        return null;
-    }
-    // Migrate old format (pre-switching)
-    if (state.active && !state.segments) {
-        state.segments = [{ side: state.side, startTime: state.startTime, endTime: null }];
-        delete state.side;
-        delete state.startTime;
-        localStorage.setItem(TIMER_KEY, JSON.stringify(state));
-    }
-    return state;
+  const raw = localStorage.getItem(TIMER_KEY);
+  if (!raw) return null;
+  let state;
+  try {
+    state = JSON.parse(raw);
+  } catch (err) {
+    // A truncated or corrupt write (storage quota, a tab killed mid
+    // setItem) must not throw here: getTimerState runs first thing in
+    // initTimer, so an uncaught parse error aborts the rest of
+    // DOMContentLoaded -- no form listeners, no calendar, no data load --
+    // and the page stays a dead shell across reloads until localStorage is
+    // cleared by hand. Drop the unreadable state and start clean instead.
+    console.error("Discarding corrupt timer state:", err);
+    localStorage.removeItem(TIMER_KEY);
+    return null;
+  }
+  // Migrate old format (pre-switching)
+  if (state.active && !state.segments) {
+    state.segments = [
+      { side: state.side, startTime: state.startTime, endTime: null },
+    ];
+    delete state.side;
+    delete state.startTime;
+    localStorage.setItem(TIMER_KEY, JSON.stringify(state));
+  }
+  return state;
 }
 
 function startTimer(side) {
-    // An active session lives only in localStorage until it is ended, so
-    // overwriting it destroys every segment recorded so far with no way back.
-    // Reaching Start with a timer already running means a mis-tap, not an
-    // intent to discard a feed in progress.
-    const existing = getTimerState();
-    if (existing && existing.active) {
-        showTimerUI();
-        showToast('A feeding is already in progress');
-        return;
-    }
-    const state = {
-        active: true,
-        // The timer belongs to whoever was selected when it started, and keeps
-        // that child even if the user switches profiles mid-feed.  Only one
-        // timer runs at a time; simultaneous per-child timers (tandem feeding)
-        // are a separate feature.
-        childId: currentChildId(),
-        segments: [{ side, startTime: new Date().toISOString(), endTime: null }],
-    };
-    localStorage.setItem(TIMER_KEY, JSON.stringify(state));
+  // An active session lives only in localStorage until it is ended, so
+  // overwriting it destroys every segment recorded so far with no way back.
+  // Reaching Start with a timer already running means a mis-tap, not an
+  // intent to discard a feed in progress.
+  const existing = getTimerState();
+  if (existing && existing.active) {
     showTimerUI();
+    showToast("A feeding is already in progress");
+    return;
+  }
+  const state = {
+    active: true,
+    // The timer belongs to whoever was selected when it started, and keeps
+    // that child even if the user switches profiles mid-feed.  Only one
+    // timer runs at a time; simultaneous per-child timers (tandem feeding)
+    // are a separate feature.
+    childId: currentChildId(),
+    segments: [{ side, startTime: new Date().toISOString(), endTime: null }],
+  };
+  localStorage.setItem(TIMER_KEY, JSON.stringify(state));
+  showTimerUI();
 }
 
 function switchBreast() {
-    const state = getTimerState();
-    if (!state || !state.active) return;
+  const state = getTimerState();
+  if (!state || !state.active) return;
 
-    const current = state.segments[state.segments.length - 1];
-    if (current.side !== 'breast_left' && current.side !== 'breast_right') return;
+  const current = state.segments[state.segments.length - 1];
+  if (current.side !== "breast_left" && current.side !== "breast_right") return;
 
-    const newSide = current.side === 'breast_left' ? 'breast_right' : 'breast_left';
-    const now = new Date().toISOString();
+  const newSide =
+    current.side === "breast_left" ? "breast_right" : "breast_left";
+  const now = new Date().toISOString();
 
-    if (state.paused) {
-        // Switching while paused changes the current side without resuming the
-        // clock. Never open a running (null endTime) segment here, or time would
-        // silently accrue during the pause. If the last segment carries no elapsed
-        // time (a placeholder from an earlier paused switch, or a switch made
-        // immediately before pausing), just flip its side; otherwise record a
-        // zero-length placeholder so the side updates but no time is counted. The
-        // running segment for the new side is created on resume.
-        if (current.startTime === current.endTime) {
-            current.side = newSide;
-        } else {
-            state.segments.push({ side: newSide, startTime: now, endTime: now });
-        }
+  if (state.paused) {
+    // Switching while paused changes the current side without resuming the
+    // clock. Never open a running (null endTime) segment here, or time would
+    // silently accrue during the pause. If the last segment carries no elapsed
+    // time (a placeholder from an earlier paused switch, or a switch made
+    // immediately before pausing), just flip its side; otherwise record a
+    // zero-length placeholder so the side updates but no time is counted. The
+    // running segment for the new side is created on resume.
+    if (current.startTime === current.endTime) {
+      current.side = newSide;
     } else {
-        // Close the current side and start the clock on the other one.
-        closeRunningSegment(state, now);
-        openRunningSegment(state, newSide, now);
+      state.segments.push({ side: newSide, startTime: now, endTime: now });
     }
+  } else {
+    // Close the current side and start the clock on the other one.
+    closeRunningSegment(state, now);
+    openRunningSegment(state, newSide, now);
+  }
 
-    localStorage.setItem(TIMER_KEY, JSON.stringify(state));
-    showTimerUI();
+  localStorage.setItem(TIMER_KEY, JSON.stringify(state));
+  showTimerUI();
 
-    const names = getBreastNames();
-    const sideLabel = newSide === 'breast_left' ? names.left : names.right;
-    showToast(`Switched to ${sideLabel}`);
+  const names = getBreastNames();
+  const sideLabel = newSide === "breast_left" ? names.left : names.right;
+  showToast(`Switched to ${sideLabel}`);
 }
 
 // --- Segment primitives ---------------------------------------------------
@@ -279,36 +325,36 @@ function switchBreast() {
 // Freeze the clock: close the running (open) segment at `now`. No-op if the last
 // segment is already closed.
 function closeRunningSegment(state, now) {
-    const lastSeg = state.segments[state.segments.length - 1];
-    if (!lastSeg.endTime) lastSeg.endTime = now;
+  const lastSeg = state.segments[state.segments.length - 1];
+  if (!lastSeg.endTime) lastSeg.endTime = now;
 }
 
 // Start the clock: open a fresh running segment on `side` at `now`.
 function openRunningSegment(state, side, now) {
-    state.segments.push({ side, startTime: now, endTime: null });
+  state.segments.push({ side, startTime: now, endTime: null });
 }
 
 function pauseTimer() {
-    const state = getTimerState();
-    if (!state || !state.active || state.paused) return;
+  const state = getTimerState();
+  if (!state || !state.active || state.paused) return;
 
-    closeRunningSegment(state, new Date().toISOString());
-    state.paused = true;
-    localStorage.setItem(TIMER_KEY, JSON.stringify(state));
-    showTimerUI();
-    showToast('Timer paused');
+  closeRunningSegment(state, new Date().toISOString());
+  state.paused = true;
+  localStorage.setItem(TIMER_KEY, JSON.stringify(state));
+  showTimerUI();
+  showToast("Timer paused");
 }
 
 function resumeTimer() {
-    const state = getTimerState();
-    if (!state || !state.active || !state.paused) return;
+  const state = getTimerState();
+  if (!state || !state.active || !state.paused) return;
 
-    const lastSeg = state.segments[state.segments.length - 1];
-    openRunningSegment(state, lastSeg.side, new Date().toISOString());
-    state.paused = false;
-    localStorage.setItem(TIMER_KEY, JSON.stringify(state));
-    showTimerUI();
-    showToast('Timer resumed');
+  const lastSeg = state.segments[state.segments.length - 1];
+  openRunningSegment(state, lastSeg.side, new Date().toISOString());
+  state.paused = false;
+  localStorage.setItem(TIMER_KEY, JSON.stringify(state));
+  showTimerUI();
+  showToast("Timer resumed");
 }
 
 // The "End Feeding" button opens a Confirm/Cancel step rather than saving right
@@ -316,839 +362,945 @@ function resumeTimer() {
 // feed, and record whether we were the ones who paused it so a later Cancel can
 // restore the exact prior state (running vs. already-paused).
 function beginEndConfirmation() {
-    const state = getTimerState();
-    if (!state || !state.active) return;
+  const state = getTimerState();
+  if (!state || !state.active) return;
 
-    state.resumeOnCancel = !state.paused;
-    if (!state.paused) {
-        closeRunningSegment(state, new Date().toISOString());
-        state.paused = true;
-    }
-    localStorage.setItem(TIMER_KEY, JSON.stringify(state));
+  state.resumeOnCancel = !state.paused;
+  if (!state.paused) {
+    closeRunningSegment(state, new Date().toISOString());
+    state.paused = true;
+  }
+  localStorage.setItem(TIMER_KEY, JSON.stringify(state));
 }
 
 // Back out of the End confirmation. If End paused a running timer, resume it —
 // open a fresh segment on the current side, like resumeTimer(). If the timer was
 // already paused when End was pressed, leave it paused.
 function cancelEndConfirmation() {
-    const state = getTimerState();
-    if (!state || !state.active) return;
+  const state = getTimerState();
+  if (!state || !state.active) return;
 
-    if (state.resumeOnCancel) {
-        const lastSeg = state.segments[state.segments.length - 1];
-        openRunningSegment(state, lastSeg.side, new Date().toISOString());
-        state.paused = false;
-    }
-    delete state.resumeOnCancel;
-    localStorage.setItem(TIMER_KEY, JSON.stringify(state));
+  if (state.resumeOnCancel) {
+    const lastSeg = state.segments[state.segments.length - 1];
+    openRunningSegment(state, lastSeg.side, new Date().toISOString());
+    state.paused = false;
+  }
+  delete state.resumeOnCancel;
+  localStorage.setItem(TIMER_KEY, JSON.stringify(state));
 }
 
 function getBreastTimes(segments) {
-    const times = { breast_left: 0, breast_right: 0 };
-    for (const seg of segments) {
-        const end = seg.endTime ? new Date(seg.endTime).getTime() : Date.now();
-        const start = new Date(seg.startTime).getTime();
-        if (seg.side in times) {
-            times[seg.side] += Math.max(0, end - start);
-        }
+  const times = { breast_left: 0, breast_right: 0 };
+  for (const seg of segments) {
+    const end = seg.endTime ? new Date(seg.endTime).getTime() : Date.now();
+    const start = new Date(seg.startTime).getTime();
+    if (seg.side in times) {
+      times[seg.side] += Math.max(0, end - start);
     }
-    return times;
+  }
+  return times;
 }
 
 function formatDurationShort(ms) {
-    const totalSec = Math.floor(Math.max(0, ms) / 1000);
-    const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
-    const s = String(totalSec % 60).padStart(2, '0');
-    return `${m}:${s}`;
+  const totalSec = Math.floor(Math.max(0, ms) / 1000);
+  const m = String(Math.floor(totalSec / 60)).padStart(2, "0");
+  const s = String(totalSec % 60).padStart(2, "0");
+  return `${m}:${s}`;
 }
 
 function showTimerUI() {
-    const state = getTimerState();
-    if (!state || !state.active) {
-        document.getElementById('timer-section').classList.add('hidden');
-        if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-        return;
+  const state = getTimerState();
+  if (!state || !state.active) {
+    document.getElementById("timer-section").classList.add("hidden");
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
     }
+    return;
+  }
 
-    document.getElementById('timer-section').classList.remove('hidden');
+  document.getElementById("timer-section").classList.remove("hidden");
 
-    const currentSeg = state.segments[state.segments.length - 1];
-    const currentSide = currentSeg.side;
-    const canSwitch = currentSide === 'breast_left' || currentSide === 'breast_right';
+  const currentSeg = state.segments[state.segments.length - 1];
+  const currentSide = currentSeg.side;
+  const canSwitch =
+    currentSide === "breast_left" || currentSide === "breast_right";
 
-    const names = getBreastNames();
-    const sideLabels = {
-        breast_left: `${names.left} Breast`,
-        breast_right: `${names.right} Breast`,
-        bottle: 'Bottle',
-    };
-    document.getElementById('timer-side').textContent = sideLabels[currentSide] || currentSide;
+  const names = getBreastNames();
+  const sideLabels = {
+    breast_left: `${names.left} Breast`,
+    breast_right: `${names.right} Breast`,
+    bottle: "Bottle",
+  };
+  document.getElementById("timer-side").textContent =
+    sideLabels[currentSide] || currentSide;
 
-    // Show/hide switch button
-    const switchBtn = document.getElementById('timer-switch-btn');
-    if (canSwitch) {
-        switchBtn.classList.remove('hidden');
-        const otherLabel = currentSide === 'breast_left' ? names.right : names.left;
-        switchBtn.textContent = `Switch to ${otherLabel}`;
+  // Show/hide switch button
+  const switchBtn = document.getElementById("timer-switch-btn");
+  if (canSwitch) {
+    switchBtn.classList.remove("hidden");
+    const otherLabel = currentSide === "breast_left" ? names.right : names.left;
+    switchBtn.textContent = `Switch to ${otherLabel}`;
+  } else {
+    switchBtn.classList.add("hidden");
+  }
+
+  // Show pause or resume button
+  const pauseBtn = document.getElementById("timer-pause-btn");
+  pauseBtn.classList.remove("hidden");
+  pauseBtn.textContent = state.paused ? "Resume" : "Pause";
+
+  // Reset end/confirm UI
+  document.getElementById("timer-end-btn").classList.remove("hidden");
+  const confirmBtn = document.getElementById("timer-confirm-btn");
+  confirmBtn.classList.add("hidden");
+  confirmBtn.disabled = false;
+  document.getElementById("timer-cancel-btn").classList.add("hidden");
+  document.getElementById("timer-discard-btn").classList.remove("hidden");
+  document.getElementById("timer-discard-confirm-btn").classList.add("hidden");
+  document.getElementById("timer-discard-back-btn").classList.add("hidden");
+
+  const breastTimesEl = document.getElementById("timer-breast-times");
+
+  function updateDisplay() {
+    // Compute total elapsed from all segments
+    let totalMs = 0;
+    for (const seg of state.segments) {
+      const end = seg.endTime ? new Date(seg.endTime).getTime() : Date.now();
+      totalMs += Math.max(0, end - new Date(seg.startTime).getTime());
+    }
+    const totalSec = Math.floor(totalMs / 1000);
+    const h = String(Math.floor(totalSec / 3600)).padStart(2, "0");
+    const m = String(Math.floor((totalSec % 3600) / 60)).padStart(2, "0");
+    const s = String(totalSec % 60).padStart(2, "0");
+    document.getElementById("timer-digits").textContent = `${h}:${m}:${s}`;
+
+    // Per-breast times (only for switchable feeds)
+    if (currentSide === "breast_left" || currentSide === "breast_right") {
+      const bt = getBreastTimes(state.segments);
+      const leftAbbr = names.left.charAt(0).toUpperCase();
+      const rightAbbr = names.right.charAt(0).toUpperCase();
+      const leftLabel = leftAbbr === rightAbbr ? names.left : leftAbbr;
+      const rightLabel = leftAbbr === rightAbbr ? names.right : rightAbbr;
+      breastTimesEl.innerHTML =
+        `<span class="${currentSide === "breast_left" ? "active-breast" : ""}">${leftLabel}: ${formatDurationShort(bt.breast_left)}</span>` +
+        `<span class="breast-sep">•</span>` +
+        `<span class="${currentSide === "breast_right" ? "active-breast" : ""}">${rightLabel}: ${formatDurationShort(bt.breast_right)}</span>`;
+      breastTimesEl.classList.remove("hidden");
     } else {
-        switchBtn.classList.add('hidden');
+      breastTimesEl.classList.add("hidden");
     }
+  }
 
-    // Show pause or resume button
-    const pauseBtn = document.getElementById('timer-pause-btn');
-    pauseBtn.classList.remove('hidden');
-    pauseBtn.textContent = state.paused ? 'Resume' : 'Pause';
-
-    // Reset end/confirm UI
-    document.getElementById('timer-end-btn').classList.remove('hidden');
-    const confirmBtn = document.getElementById('timer-confirm-btn');
-    confirmBtn.classList.add('hidden');
-    confirmBtn.disabled = false;
-    document.getElementById('timer-cancel-btn').classList.add('hidden');
-    document.getElementById('timer-discard-btn').classList.remove('hidden');
-    document.getElementById('timer-discard-confirm-btn').classList.add('hidden');
-    document.getElementById('timer-discard-back-btn').classList.add('hidden');
-
-    const breastTimesEl = document.getElementById('timer-breast-times');
-
-    function updateDisplay() {
-        // Compute total elapsed from all segments
-        let totalMs = 0;
-        for (const seg of state.segments) {
-            const end = seg.endTime ? new Date(seg.endTime).getTime() : Date.now();
-            totalMs += Math.max(0, end - new Date(seg.startTime).getTime());
-        }
-        const totalSec = Math.floor(totalMs / 1000);
-        const h = String(Math.floor(totalSec / 3600)).padStart(2, '0');
-        const m = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
-        const s = String(totalSec % 60).padStart(2, '0');
-        document.getElementById('timer-digits').textContent = `${h}:${m}:${s}`;
-
-        // Per-breast times (only for switchable feeds)
-        if (currentSide === 'breast_left' || currentSide === 'breast_right') {
-            const bt = getBreastTimes(state.segments);
-            const leftAbbr = names.left.charAt(0).toUpperCase();
-            const rightAbbr = names.right.charAt(0).toUpperCase();
-            const leftLabel = leftAbbr === rightAbbr ? names.left : leftAbbr;
-            const rightLabel = leftAbbr === rightAbbr ? names.right : rightAbbr;
-            breastTimesEl.innerHTML =
-                `<span class="${currentSide === 'breast_left' ? 'active-breast' : ''}">${leftLabel}: ${formatDurationShort(bt.breast_left)}</span>` +
-                `<span class="breast-sep">•</span>` +
-                `<span class="${currentSide === 'breast_right' ? 'active-breast' : ''}">${rightLabel}: ${formatDurationShort(bt.breast_right)}</span>`;
-            breastTimesEl.classList.remove('hidden');
-        } else {
-            breastTimesEl.classList.add('hidden');
-        }
-    }
-
-    updateDisplay();
-    clearInterval(timerInterval);
-    timerInterval = state.paused ? null : setInterval(updateDisplay, 1000);
+  updateDisplay();
+  clearInterval(timerInterval);
+  timerInterval = state.paused ? null : setInterval(updateDisplay, 1000);
 }
 
 function cancelTimer() {
-    localStorage.removeItem(TIMER_KEY);
-    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-    showTimerUI();
-    showToast('Feeding session cancelled');
+  localStorage.removeItem(TIMER_KEY);
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+  showTimerUI();
+  showToast("Feeding session cancelled");
 }
 
 async function endTimer() {
-    const state = getTimerState();
-    if (!state) return;
+  const state = getTimerState();
+  if (!state) return;
 
-    // Close the last open segment
-    const lastSeg = state.segments[state.segments.length - 1];
-    if (!lastSeg.endTime) {
-        lastSeg.endTime = new Date().toISOString();
+  // Close the last open segment
+  const lastSeg = state.segments[state.segments.length - 1];
+  if (!lastSeg.endTime) {
+    lastSeg.endTime = new Date().toISOString();
+  }
+
+  // Aggregate time per breast
+  const totals = {};
+  const starts = {};
+  for (const seg of state.segments) {
+    const start = new Date(seg.startTime).getTime();
+    const end = new Date(seg.endTime).getTime();
+    const dur = Math.max(0, end - start);
+    if (!totals[seg.side]) {
+      totals[seg.side] = 0;
+      starts[seg.side] = seg.startTime;
     }
+    totals[seg.side] += dur;
+  }
 
-    // Aggregate time per breast
-    const totals = {};
-    const starts = {};
-    for (const seg of state.segments) {
-        const start = new Date(seg.startTime).getTime();
-        const end = new Date(seg.endTime).getTime();
-        const dur = Math.max(0, end - start);
-        if (!totals[seg.side]) {
-            totals[seg.side] = 0;
-            starts[seg.side] = seg.startTime;
-        }
-        totals[seg.side] += dur;
+  const confirmBtn = document.getElementById("timer-confirm-btn");
+  confirmBtn.disabled = true;
+  try {
+    // Save one entry per breast used; link paired breasts with a shared session_id
+    const activeSides = Object.entries(totals).filter(([, ms]) => ms >= 1000);
+    // Nothing reached the 1s threshold (an accidental Start then End). Posting
+    // nothing but toasting "Feeding logged: " with an empty side list reads as
+    // a successful save; clear the timer and say plainly that nothing was
+    // recorded instead.
+    if (activeSides.length === 0) {
+      localStorage.removeItem(TIMER_KEY);
+      showTimerUI();
+      showToast("Timer discarded — nothing to log");
+      confirmBtn.disabled = false;
+      return;
     }
-
-    const confirmBtn = document.getElementById('timer-confirm-btn');
-    confirmBtn.disabled = true;
-    try {
-        // Save one entry per breast used; link paired breasts with a shared session_id
-        const activeSides = Object.entries(totals).filter(([, ms]) => ms >= 1000);
-        // Nothing reached the 1s threshold (an accidental Start then End). Posting
-        // nothing but toasting "Feeding logged: " with an empty side list reads as
-        // a successful save; clear the timer and say plainly that nothing was
-        // recorded instead.
-        if (activeSides.length === 0) {
-            localStorage.removeItem(TIMER_KEY);
-            showTimerUI();
-            showToast('Timer discarded — nothing to log');
-            confirmBtn.disabled = false;
-            return;
-        }
-        const sessionId = activeSides.length > 1 ? generateUUID() : null;
-        const promises = [];
-        for (const [side, totalMs] of activeSides) {
-            const durationMinutes = Math.max(1, Math.round(totalMs / 60000));
-            const body = {
-                timestamp: starts[side],
-                feeding_type: side,
-                duration_minutes: durationMinutes,
-                // A timer started before profiles existed has no childId.
-                child_id: state.childId ?? null,
-            };
-            if (sessionId) body.session_id = sessionId;
-            promises.push(api.post('/api/feedings', body));
-        }
-        await Promise.all(promises);
-
-        localStorage.removeItem(TIMER_KEY);
-        showTimerUI();
-
-        // Build toast message
-        const sides = Object.entries(totals).filter(([, ms]) => ms >= 1000);
-        const names = getBreastNames();
-        const sideLabels = { breast_left: names.left, breast_right: names.right };
-        if (sides.length === 1) {
-            const dur = Math.max(1, Math.round(sides[0][1] / 60000));
-            showToast(`Feeding logged: ${sideLabels[sides[0][0]] || sides[0][0]} ${dur}min`);
-        } else {
-            const parts = sides.map(([s, ms]) => {
-                const dur = Math.max(1, Math.round(ms / 60000));
-                return `${sideLabels[s] || s} ${dur}min`;
-            });
-            showToast(`Feeding logged: ${parts.join(' + ')}`);
-        }
-        reloadAfterLogChange();
-    } catch (e) {
-        confirmBtn.disabled = false;
-        showToast('Error saving feeding: ' + e.message);
+    const sessionId = activeSides.length > 1 ? generateUUID() : null;
+    const promises = [];
+    for (const [side, totalMs] of activeSides) {
+      const durationMinutes = Math.max(1, Math.round(totalMs / 60000));
+      const body = {
+        timestamp: starts[side],
+        feeding_type: side,
+        duration_minutes: durationMinutes,
+        // A timer started before profiles existed has no childId.
+        child_id: state.childId ?? null,
+      };
+      if (sessionId) body.session_id = sessionId;
+      promises.push(api.post("/api/feedings", body));
     }
+    await Promise.all(promises);
+
+    localStorage.removeItem(TIMER_KEY);
+    showTimerUI();
+
+    // Build toast message
+    const sides = Object.entries(totals).filter(([, ms]) => ms >= 1000);
+    const names = getBreastNames();
+    const sideLabels = { breast_left: names.left, breast_right: names.right };
+    if (sides.length === 1) {
+      const dur = Math.max(1, Math.round(sides[0][1] / 60000));
+      showToast(
+        `Feeding logged: ${sideLabels[sides[0][0]] || sides[0][0]} ${dur}min`,
+      );
+    } else {
+      const parts = sides.map(([s, ms]) => {
+        const dur = Math.max(1, Math.round(ms / 60000));
+        return `${sideLabels[s] || s} ${dur}min`;
+      });
+      showToast(`Feeding logged: ${parts.join(" + ")}`);
+    }
+    reloadAfterLogChange();
+  } catch (e) {
+    confirmBtn.disabled = false;
+    showToast("Error saving feeding: " + e.message);
+  }
 }
 
 function initTimer() {
+  showTimerUI();
+
+  document
+    .getElementById("timer-switch-btn")
+    .addEventListener("click", switchBreast);
+
+  document.getElementById("timer-pause-btn").addEventListener("click", () => {
+    const pauseBtn = document.getElementById("timer-pause-btn");
+    if (pauseBtn.textContent === "Resume") {
+      resumeTimer();
+    } else {
+      pauseTimer();
+    }
+  });
+
+  document.getElementById("timer-end-btn").addEventListener("click", () => {
+    // Freeze the clock while the caregiver confirms; Cancel restores it.
+    // showTimerUI() re-reads the now-paused state so the display stops.
+    beginEndConfirmation();
     showTimerUI();
+    // Two-step confirmation — hide switch and pause too
+    document.getElementById("timer-end-btn").classList.add("hidden");
+    document.getElementById("timer-switch-btn").classList.add("hidden");
+    document.getElementById("timer-pause-btn").classList.add("hidden");
+    document.getElementById("timer-discard-btn").classList.add("hidden");
+    document.getElementById("timer-confirm-btn").classList.remove("hidden");
+    document.getElementById("timer-cancel-btn").classList.remove("hidden");
+  });
 
-    document.getElementById('timer-switch-btn').addEventListener('click', switchBreast);
+  document.getElementById("timer-confirm-btn").addEventListener("click", () => {
+    endTimer();
+  });
 
-    document.getElementById('timer-pause-btn').addEventListener('click', () => {
-        const pauseBtn = document.getElementById('timer-pause-btn');
-        if (pauseBtn.textContent === 'Resume') {
-            resumeTimer();
-        } else {
-            pauseTimer();
+  document.getElementById("timer-cancel-btn").addEventListener("click", () => {
+    // Resume the clock (if End paused it) and let showTimerUI() restore the
+    // normal controls and restart the tick.
+    cancelEndConfirmation();
+    showTimerUI();
+  });
+
+  document.getElementById("timer-discard-btn").addEventListener("click", () => {
+    document.getElementById("timer-end-btn").classList.add("hidden");
+    document.getElementById("timer-switch-btn").classList.add("hidden");
+    document.getElementById("timer-pause-btn").classList.add("hidden");
+    document.getElementById("timer-discard-btn").classList.add("hidden");
+    document
+      .getElementById("timer-discard-confirm-btn")
+      .classList.remove("hidden");
+    document
+      .getElementById("timer-discard-back-btn")
+      .classList.remove("hidden");
+  });
+
+  document
+    .getElementById("timer-discard-confirm-btn")
+    .addEventListener("click", () => {
+      cancelTimer();
+    });
+
+  document
+    .getElementById("timer-discard-back-btn")
+    .addEventListener("click", () => {
+      document.getElementById("timer-end-btn").classList.remove("hidden");
+      const state = getTimerState();
+      if (state) {
+        const currentSide = state.segments[state.segments.length - 1].side;
+        if (currentSide === "breast_left" || currentSide === "breast_right") {
+          document
+            .getElementById("timer-switch-btn")
+            .classList.remove("hidden");
         }
-    });
-
-    document.getElementById('timer-end-btn').addEventListener('click', () => {
-        // Freeze the clock while the caregiver confirms; Cancel restores it.
-        // showTimerUI() re-reads the now-paused state so the display stops.
-        beginEndConfirmation();
-        showTimerUI();
-        // Two-step confirmation — hide switch and pause too
-        document.getElementById('timer-end-btn').classList.add('hidden');
-        document.getElementById('timer-switch-btn').classList.add('hidden');
-        document.getElementById('timer-pause-btn').classList.add('hidden');
-        document.getElementById('timer-discard-btn').classList.add('hidden');
-        document.getElementById('timer-confirm-btn').classList.remove('hidden');
-        document.getElementById('timer-cancel-btn').classList.remove('hidden');
-    });
-
-    document.getElementById('timer-confirm-btn').addEventListener('click', () => {
-        endTimer();
-    });
-
-    document.getElementById('timer-cancel-btn').addEventListener('click', () => {
-        // Resume the clock (if End paused it) and let showTimerUI() restore the
-        // normal controls and restart the tick.
-        cancelEndConfirmation();
-        showTimerUI();
-    });
-
-    document.getElementById('timer-discard-btn').addEventListener('click', () => {
-        document.getElementById('timer-end-btn').classList.add('hidden');
-        document.getElementById('timer-switch-btn').classList.add('hidden');
-        document.getElementById('timer-pause-btn').classList.add('hidden');
-        document.getElementById('timer-discard-btn').classList.add('hidden');
-        document.getElementById('timer-discard-confirm-btn').classList.remove('hidden');
-        document.getElementById('timer-discard-back-btn').classList.remove('hidden');
-    });
-
-    document.getElementById('timer-discard-confirm-btn').addEventListener('click', () => {
-        cancelTimer();
-    });
-
-    document.getElementById('timer-discard-back-btn').addEventListener('click', () => {
-        document.getElementById('timer-end-btn').classList.remove('hidden');
-        const state = getTimerState();
-        if (state) {
-            const currentSide = state.segments[state.segments.length - 1].side;
-            if (currentSide === 'breast_left' || currentSide === 'breast_right') {
-                document.getElementById('timer-switch-btn').classList.remove('hidden');
-            }
-            document.getElementById('timer-pause-btn').classList.remove('hidden');
-        }
-        document.getElementById('timer-discard-confirm-btn').classList.add('hidden');
-        document.getElementById('timer-discard-back-btn').classList.add('hidden');
-        document.getElementById('timer-discard-btn').classList.remove('hidden');
+        document.getElementById("timer-pause-btn").classList.remove("hidden");
+      }
+      document
+        .getElementById("timer-discard-confirm-btn")
+        .classList.add("hidden");
+      document.getElementById("timer-discard-back-btn").classList.add("hidden");
+      document.getElementById("timer-discard-btn").classList.remove("hidden");
     });
 }
 
 /* ===== Last Feeding Info ===== */
 async function loadLastBreastFeeding() {
-    const infoEl = document.getElementById('last-feeding-info');
-    try {
-        // Scoped like every other read: this banner drives the next-feed
-        // decision, so showing a sibling's session here is actively misleading.
-        const feedings = await api.get(`/api/feedings?limit=20${childQuery()}`);
-        const now = Date.now();
+  const infoEl = document.getElementById("last-feeding-info");
+  try {
+    // Scoped like every other read: this banner drives the next-feed
+    // decision, so showing a sibling's session here is actively misleading.
+    const feedings = await api.get(`/api/feedings?limit=20${childQuery()}`);
+    const now = Date.now();
 
-        // Find the most recent breast feeding session. Feedings sharing a session_id
-        // were recorded together and belong to the same session; feedings with no
-        // session_id are each their own standalone session.
-        let lastSessionId = undefined;
-        let lastSessionFeedings = [];
-        for (const f of feedings) {
-            if (new Date(f.timestamp).getTime() > now) continue;
-            if (f.feeding_type !== 'breast_left' && f.feeding_type !== 'breast_right') continue;
+    // Find the most recent breast feeding session. Feedings sharing a session_id
+    // were recorded together and belong to the same session; feedings with no
+    // session_id are each their own standalone session.
+    let lastSessionId = undefined;
+    let lastSessionFeedings = [];
+    for (const f of feedings) {
+      if (new Date(f.timestamp).getTime() > now) continue;
+      if (f.feeding_type !== "breast_left" && f.feeding_type !== "breast_right")
+        continue;
 
-            if (lastSessionFeedings.length === 0) {
-                lastSessionFeedings.push(f);
-                lastSessionId = f.session_id;
-            } else if (lastSessionId && f.session_id === lastSessionId) {
-                lastSessionFeedings.push(f);
-            } else {
-                break;
-            }
-        }
-
-        if (lastSessionFeedings.length === 0) {
-            infoEl.classList.add('hidden');
-            return;
-        }
-
-        const parts = [];
-        const names = getBreastNames();
-        const lastLeft = lastSessionFeedings.find(f => f.feeding_type === 'breast_left');
-        const lastRight = lastSessionFeedings.find(f => f.feeding_type === 'breast_right');
-        if (lastLeft) parts.push(`${names.left}: ${lastLeft.duration_minutes || '?'}min`);
-        if (lastRight) parts.push(`${names.right}: ${lastRight.duration_minutes || '?'}min`);
-
-        const mostRecent = lastSessionFeedings.reduce((a, b) =>
-            new Date(a.timestamp) > new Date(b.timestamp) ? a : b);
-
-        infoEl.innerHTML =
-            `<strong>Last session:</strong> ${parts.join(' • ')}` +
-            ` <span class="text-secondary">(${timeAgo(mostRecent.timestamp)})</span>`;
-        infoEl.classList.remove('hidden');
-    } catch (e) {
-        console.error('Failed to load last feeding info:', e);
-        infoEl.classList.add('hidden');
+      if (lastSessionFeedings.length === 0) {
+        lastSessionFeedings.push(f);
+        lastSessionId = f.session_id;
+      } else if (lastSessionId && f.session_id === lastSessionId) {
+        lastSessionFeedings.push(f);
+      } else {
+        break;
+      }
     }
+
+    if (lastSessionFeedings.length === 0) {
+      infoEl.classList.add("hidden");
+      return;
+    }
+
+    const parts = [];
+    const names = getBreastNames();
+    const lastLeft = lastSessionFeedings.find(
+      (f) => f.feeding_type === "breast_left",
+    );
+    const lastRight = lastSessionFeedings.find(
+      (f) => f.feeding_type === "breast_right",
+    );
+    if (lastLeft)
+      parts.push(`${names.left}: ${lastLeft.duration_minutes || "?"}min`);
+    if (lastRight)
+      parts.push(`${names.right}: ${lastRight.duration_minutes || "?"}min`);
+
+    const mostRecent = lastSessionFeedings.reduce((a, b) =>
+      new Date(a.timestamp) > new Date(b.timestamp) ? a : b,
+    );
+
+    infoEl.innerHTML =
+      `<strong>Last session:</strong> ${parts.join(" • ")}` +
+      ` <span class="text-secondary">(${timeAgo(mostRecent.timestamp)})</span>`;
+    infoEl.classList.remove("hidden");
+  } catch (e) {
+    console.error("Failed to load last feeding info:", e);
+    infoEl.classList.add("hidden");
+  }
 }
 
 /* ===== Feeding Form: Timer toggle ===== */
 function initFeedingForm() {
-    const timerCheckbox = document.getElementById('start-timer');
-    const timerToggleRow = document.getElementById('timer-toggle-row');
-    const timerMode = document.getElementById('feeding-timer-mode');
-    const manualMode = document.getElementById('feeding-manual-mode');
-    const bottleOzTimerGroup = document.getElementById('feeding-bottle-timer');
-    const bottleOzTimerInput = document.getElementById('feeding-bottle-timer-input');
-    const saveBtn = document.getElementById('feeding-save-btn');
+  const timerCheckbox = document.getElementById("start-timer");
+  const timerToggleRow = document.getElementById("timer-toggle-row");
+  const timerMode = document.getElementById("feeding-timer-mode");
+  const manualMode = document.getElementById("feeding-manual-mode");
+  const bottleOzTimerGroup = document.getElementById("feeding-bottle-timer");
+  const bottleOzTimerInput = document.getElementById(
+    "feeding-bottle-timer-input",
+  );
+  const saveBtn = document.getElementById("feeding-save-btn");
 
-    function updateMode() {
-        const isTimer = timerCheckbox.checked;
-        timerMode.classList.toggle('hidden', !isTimer);
-        manualMode.classList.toggle('hidden', isTimer);
-        if (isTimer) {
-            updateTimerBtnState();
-        } else {
-            saveBtn.textContent = 'Save';
-            updateManualBtnState();
-        }
+  function updateMode() {
+    const isTimer = timerCheckbox.checked;
+    timerMode.classList.toggle("hidden", !isTimer);
+    manualMode.classList.toggle("hidden", isTimer);
+    if (isTimer) {
+      updateTimerBtnState();
+    } else {
+      saveBtn.textContent = "Save";
+      updateManualBtnState();
     }
+  }
 
-    function updateTimerBtnState() {
-        const ft = document.getElementById('feeding-type').value;
-        if (!ft) {
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Start';
-            bottleOzTimerGroup.classList.add('hidden');
-            if (timerToggleRow) timerToggleRow.classList.remove('hidden');
-            return;
-        }
-        if (ft === 'bottle') {
-            // Bottle: hide timer toggle, show amount, require a value, set button to Save
-            if (timerToggleRow) timerToggleRow.classList.add('hidden');
-            bottleOzTimerGroup.classList.remove('hidden');
-            saveBtn.textContent = 'Save';
-            const hasAmount = !!bottleOzTimerInput.value;
-            saveBtn.disabled = !hasAmount;
-        } else {
-            // Breast: show timer toggle, hide amount, enable Start
-            if (timerToggleRow) timerToggleRow.classList.remove('hidden');
-            bottleOzTimerGroup.classList.add('hidden');
-            saveBtn.textContent = 'Start';
-            saveBtn.disabled = false;
-        }
+  function updateTimerBtnState() {
+    const ft = document.getElementById("feeding-type").value;
+    if (!ft) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Start";
+      bottleOzTimerGroup.classList.add("hidden");
+      if (timerToggleRow) timerToggleRow.classList.remove("hidden");
+      return;
     }
-
-    function updateManualBtnState() {
-        const l = document.getElementById('feeding-left-duration').value;
-        const r = document.getElementById('feeding-right-duration').value;
-        const b = document.getElementById('feeding-bottle').value;
-        saveBtn.disabled = !(l || r || b);
+    if (ft === "bottle") {
+      // Bottle: hide timer toggle, show amount, require a value, set button to Save
+      if (timerToggleRow) timerToggleRow.classList.add("hidden");
+      bottleOzTimerGroup.classList.remove("hidden");
+      saveBtn.textContent = "Save";
+      const hasAmount = !!bottleOzTimerInput.value;
+      saveBtn.disabled = !hasAmount;
+    } else {
+      // Breast: show timer toggle, hide amount, enable Start
+      if (timerToggleRow) timerToggleRow.classList.remove("hidden");
+      bottleOzTimerGroup.classList.add("hidden");
+      saveBtn.textContent = "Start";
+      saveBtn.disabled = false;
     }
+  }
 
-    timerCheckbox.addEventListener('change', updateMode);
+  function updateManualBtnState() {
+    const l = document.getElementById("feeding-left-duration").value;
+    const r = document.getElementById("feeding-right-duration").value;
+    const b = document.getElementById("feeding-bottle").value;
+    saveBtn.disabled = !(l || r || b);
+  }
 
-    // React to feeding type selection (via initOptionButtons dispatching change)
-    document.getElementById('feeding-type').addEventListener('change', () => {
-        if (timerCheckbox.checked) {
-            updateTimerBtnState();
-        } else {
-            updateManualBtnState();
-        }
-    });
+  timerCheckbox.addEventListener("change", updateMode);
 
-    bottleOzTimerInput.addEventListener('input', updateTimerBtnState);
+  // React to feeding type selection (via initOptionButtons dispatching change)
+  document.getElementById("feeding-type").addEventListener("change", () => {
+    if (timerCheckbox.checked) {
+      updateTimerBtnState();
+    } else {
+      updateManualBtnState();
+    }
+  });
 
-    // Manual mode: enable save when any field is entered
-    ['feeding-left-duration', 'feeding-right-duration', 'feeding-bottle'].forEach(id => {
-        document.getElementById(id).addEventListener('input', updateManualBtnState);
-    });
+  bottleOzTimerInput.addEventListener("input", updateTimerBtnState);
 
-    updateMode();
+  // Manual mode: enable save when any field is entered
+  ["feeding-left-duration", "feeding-right-duration", "feeding-bottle"].forEach(
+    (id) => {
+      document
+        .getElementById(id)
+        .addEventListener("input", updateManualBtnState);
+    },
+  );
+
+  updateMode();
 }
 
 /* ===== Medication Autocomplete ===== */
 let savedMedNames = []; // sorted A→Z from /api/medications/saved-names
-let medDosageMap = {};  // name -> { dosage_quantity, dosage_unit } from recent logs
+let medDosageMap = {}; // name -> { dosage_quantity, dosage_unit } from recent logs
 
 async function loadSavedMedNames() {
-    try {
-        savedMedNames = await api.get('/api/medications/saved-names');
-    } catch (e) {
-        console.error('Failed to load saved medication names:', e);
-        savedMedNames = [];
-    }
+  try {
+    savedMedNames = await api.get("/api/medications/saved-names");
+  } catch (e) {
+    console.error("Failed to load saved medication names:", e);
+    savedMedNames = [];
+  }
 }
 
 async function loadMedDosageMap() {
-    try {
-        // Scoped to the selected child: this map autofills the dosage form, so
-        // an unscoped fetch can pre-fill a newborn's dose from an older
-        // sibling's record.
-        const meds = await api.get(`/api/medications?limit=50${childQuery()}`);
-        medDosageMap = {};
-        const seen = new Set();
-        for (const m of meds) {
-            const name = m.medication_name;
-            if (!seen.has(name.toLowerCase())) {
-                seen.add(name.toLowerCase());
-                medDosageMap[name.toLowerCase()] = { dosage_quantity: m.dosage_quantity, dosage_unit: m.dosage_unit };
-            }
-        }
-    } catch (e) {
-        console.error('Failed to load medication dosage map:', e);
+  try {
+    // Scoped to the selected child: this map autofills the dosage form, so
+    // an unscoped fetch can pre-fill a newborn's dose from an older
+    // sibling's record.
+    const meds = await api.get(`/api/medications?limit=50${childQuery()}`);
+    medDosageMap = {};
+    const seen = new Set();
+    for (const m of meds) {
+      const name = m.medication_name;
+      if (!seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        medDosageMap[name.toLowerCase()] = {
+          dosage_quantity: m.dosage_quantity,
+          dosage_unit: m.dosage_unit,
+        };
+      }
     }
+  } catch (e) {
+    console.error("Failed to load medication dosage map:", e);
+  }
 }
 
 function resetMedAutocomplete() {
-    const chipDisplay = document.getElementById('med-chip-display');
-    const nameInput = document.getElementById('med-name-input');
-    const hiddenInput = document.getElementById('med-name');
-    const dropdown = document.getElementById('med-dropdown');
-    chipDisplay.classList.add('hidden');
-    nameInput.classList.remove('hidden');
-    nameInput.value = '';
-    hiddenInput.value = '';
-    dropdown.classList.add('hidden');
-    dropdown.innerHTML = '';
+  const chipDisplay = document.getElementById("med-chip-display");
+  const nameInput = document.getElementById("med-name-input");
+  const hiddenInput = document.getElementById("med-name");
+  const dropdown = document.getElementById("med-dropdown");
+  chipDisplay.classList.add("hidden");
+  nameInput.classList.remove("hidden");
+  nameInput.value = "";
+  hiddenInput.value = "";
+  dropdown.classList.add("hidden");
+  dropdown.innerHTML = "";
 }
 
 function selectMedName(name) {
-    const chipDisplay = document.getElementById('med-chip-display');
-    const chipText = document.getElementById('med-chip-text');
-    const nameInput = document.getElementById('med-name-input');
-    const hiddenInput = document.getElementById('med-name');
-    const dropdown = document.getElementById('med-dropdown');
+  const chipDisplay = document.getElementById("med-chip-display");
+  const chipText = document.getElementById("med-chip-text");
+  const nameInput = document.getElementById("med-name-input");
+  const hiddenInput = document.getElementById("med-name");
+  const dropdown = document.getElementById("med-dropdown");
 
-    chipText.textContent = name;
-    hiddenInput.value = name;
-    chipDisplay.classList.remove('hidden');
-    nameInput.classList.add('hidden');
-    dropdown.classList.add('hidden');
-    dropdown.innerHTML = '';
+  chipText.textContent = name;
+  hiddenInput.value = name;
+  chipDisplay.classList.remove("hidden");
+  nameInput.classList.add("hidden");
+  dropdown.classList.add("hidden");
+  dropdown.innerHTML = "";
 
-    // Auto-fill dosage if fields are empty
-    const qtyInput = document.getElementById('med-dosage-qty');
-    const unitSelect = document.getElementById('med-dosage-unit');
-    const match = medDosageMap[name.toLowerCase()];
-    if (match && !qtyInput.value) {
-        qtyInput.value = match.dosage_quantity;
-        unitSelect.value = match.dosage_unit;
-    }
+  // Auto-fill dosage if fields are empty
+  const qtyInput = document.getElementById("med-dosage-qty");
+  const unitSelect = document.getElementById("med-dosage-unit");
+  const match = medDosageMap[name.toLowerCase()];
+  if (match && !qtyInput.value) {
+    qtyInput.value = match.dosage_quantity;
+    unitSelect.value = match.dosage_unit;
+  }
 }
 
 function renderMedDropdown(query) {
-    const dropdown = document.getElementById('med-dropdown');
-    const q = query.trim().toLowerCase();
-    let matches;
-    if (q === '') {
-        matches = savedMedNames;
-    } else {
-        matches = savedMedNames.filter(n => n.toLowerCase().includes(q));
-    }
+  const dropdown = document.getElementById("med-dropdown");
+  const q = query.trim().toLowerCase();
+  let matches;
+  if (q === "") {
+    matches = savedMedNames;
+  } else {
+    matches = savedMedNames.filter((n) => n.toLowerCase().includes(q));
+  }
 
-    const items = [];
-    for (const name of matches) {
-        items.push(`<div class="med-dropdown-item" role="option" data-name="${escapeAttr(name)}">${escapeHtml(name)}</div>`);
-    }
+  const items = [];
+  for (const name of matches) {
+    items.push(
+      `<div class="med-dropdown-item" role="option" data-name="${escapeAttr(name)}">${escapeHtml(name)}</div>`,
+    );
+  }
 
-    // Show "+ Add" only when query is non-empty and no exact case-insensitive match exists
-    const hasExact = savedMedNames.some(n => n.toLowerCase() === q);
-    if (q !== '' && !hasExact) {
-        items.push(`<div class="med-dropdown-item add-new" role="option" data-add="${escapeAttr(query.trim())}">+ Add &ldquo;${escapeHtml(query.trim())}&rdquo;</div>`);
-    }
+  // Show "+ Add" only when query is non-empty and no exact case-insensitive match exists
+  const hasExact = savedMedNames.some((n) => n.toLowerCase() === q);
+  if (q !== "" && !hasExact) {
+    items.push(
+      `<div class="med-dropdown-item add-new" role="option" data-add="${escapeAttr(query.trim())}">+ Add &ldquo;${escapeHtml(query.trim())}&rdquo;</div>`,
+    );
+  }
 
-    if (items.length === 0) {
-        dropdown.classList.add('hidden');
-        return;
-    }
+  if (items.length === 0) {
+    dropdown.classList.add("hidden");
+    return;
+  }
 
-    dropdown.innerHTML = items.join('');
-    dropdown.classList.remove('hidden');
+  dropdown.innerHTML = items.join("");
+  dropdown.classList.remove("hidden");
 
-    dropdown.querySelectorAll('.med-dropdown-item').forEach(el => {
-        el.addEventListener('mousedown', (e) => {
-            e.preventDefault(); // prevent blur before click
-            const name = el.dataset.name || el.dataset.add;
-            selectMedName(name);
-        });
+  dropdown.querySelectorAll(".med-dropdown-item").forEach((el) => {
+    el.addEventListener("mousedown", (e) => {
+      e.preventDefault(); // prevent blur before click
+      const name = el.dataset.name || el.dataset.add;
+      selectMedName(name);
     });
+  });
 }
 
 function initMedAutocomplete() {
-    const nameInput = document.getElementById('med-name-input');
-    const dropdown = document.getElementById('med-dropdown');
-    const dismissBtn = document.getElementById('med-chip-dismiss');
+  const nameInput = document.getElementById("med-name-input");
+  const dropdown = document.getElementById("med-dropdown");
+  const dismissBtn = document.getElementById("med-chip-dismiss");
 
-    nameInput.addEventListener('focus', () => {
-        renderMedDropdown(nameInput.value);
-    });
+  nameInput.addEventListener("focus", () => {
+    renderMedDropdown(nameInput.value);
+  });
 
-    nameInput.addEventListener('input', () => {
-        renderMedDropdown(nameInput.value);
-    });
+  nameInput.addEventListener("input", () => {
+    renderMedDropdown(nameInput.value);
+  });
 
-    nameInput.addEventListener('blur', () => {
-        // Small delay so mousedown on dropdown items can fire first
-        setTimeout(() => dropdown.classList.add('hidden'), 150);
-    });
+  nameInput.addEventListener("blur", () => {
+    // Small delay so mousedown on dropdown items can fire first
+    setTimeout(() => dropdown.classList.add("hidden"), 150);
+  });
 
-    dismissBtn.addEventListener('click', () => {
-        resetMedAutocomplete();
-        document.getElementById('med-name-input').focus();
-    });
+  dismissBtn.addEventListener("click", () => {
+    resetMedAutocomplete();
+    document.getElementById("med-name-input").focus();
+  });
 }
 
 async function loadNoteSuggestions(endpoint, containerId, textareaId) {
-    const container = document.getElementById(containerId);
-    container.innerHTML = '';
-    try {
-        // Scoped like the rest of the modal's reads, so a child's note chips
-        // reflect that child's history rather than a sibling's.
-        const entries = await api.get(`${endpoint}?limit=30${childQuery()}`);
-        const uniqueNotes = [];
-        const seen = new Set();
-        for (const e of entries) {
-            if (e.notes && !seen.has(e.notes)) {
-                seen.add(e.notes);
-                uniqueNotes.push(e.notes);
-                if (uniqueNotes.length >= 5) break;
-            }
-        }
-        if (uniqueNotes.length === 0) return;
-        container.innerHTML = uniqueNotes.map(n =>
-            `<span class="note-chip" title="${escapeAttr(n)}">${escapeHtml(n)}</span>`
-        ).join('');
-        container.querySelectorAll('.note-chip').forEach((chip, i) => {
-            chip.addEventListener('click', () => {
-                document.getElementById(textareaId).value = uniqueNotes[i];
-            });
-        });
-    } catch (e) {
-        console.error('Failed to load note suggestions:', e);
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+  try {
+    // Scoped like the rest of the modal's reads, so a child's note chips
+    // reflect that child's history rather than a sibling's.
+    const entries = await api.get(`${endpoint}?limit=30${childQuery()}`);
+    const uniqueNotes = [];
+    const seen = new Set();
+    for (const e of entries) {
+      if (e.notes && !seen.has(e.notes)) {
+        seen.add(e.notes);
+        uniqueNotes.push(e.notes);
+        if (uniqueNotes.length >= 5) break;
+      }
     }
+    if (uniqueNotes.length === 0) return;
+    container.innerHTML = uniqueNotes
+      .map(
+        (n) =>
+          `<span class="note-chip" title="${escapeAttr(n)}">${escapeHtml(n)}</span>`,
+      )
+      .join("");
+    container.querySelectorAll(".note-chip").forEach((chip, i) => {
+      chip.addEventListener("click", () => {
+        document.getElementById(textareaId).value = uniqueNotes[i];
+      });
+    });
+  } catch (e) {
+    console.error("Failed to load note suggestions:", e);
+  }
 }
 
 /* ===== Form Submissions ===== */
 function initForms() {
-    // Diaper form
-    document.getElementById('diaper-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const type = document.getElementById('diaper-type').value;
-        if (!type) { showToast('Please select a diaper type'); return; }
-        const notes = document.getElementById('diaper-notes').value || undefined;
-        const timestampInput = document.getElementById('diaper-timestamp').value;
-        const timestamp = timestampInput ? new Date(timestampInput).toISOString() : undefined;
-        const submitBtn = e.target.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-        try {
-            await api.post('/api/diapers', { type, notes, timestamp, child_id: currentChildId() });
-            closeModal('diaper-modal');
-            showToast('Diaper change logged!');
-            reloadAfterLogChange();
-        } catch (err) {
-            submitBtn.disabled = false;
-            showToast('Error: ' + err.message);
-        }
+  // Diaper form
+  document
+    .getElementById("diaper-form")
+    .addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const type = document.getElementById("diaper-type").value;
+      if (!type) {
+        showToast("Please select a diaper type");
+        return;
+      }
+      const notes = document.getElementById("diaper-notes").value || undefined;
+      const timestampInput = document.getElementById("diaper-timestamp").value;
+      const timestamp = timestampInput
+        ? new Date(timestampInput).toISOString()
+        : undefined;
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      try {
+        await api.post("/api/diapers", {
+          type,
+          notes,
+          timestamp,
+          child_id: currentChildId(),
+        });
+        closeModal("diaper-modal");
+        showToast("Diaper change logged!");
+        reloadAfterLogChange();
+      } catch (err) {
+        submitBtn.disabled = false;
+        showToast("Error: " + err.message);
+      }
     });
 
-    // Feeding form
-    document.getElementById('feeding-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const saveBtn = document.getElementById('feeding-save-btn');
-        const useTimer = document.getElementById('start-timer').checked;
-        const notes = document.getElementById('feeding-notes').value || undefined;
-        const timestampInput = document.getElementById('feeding-timestamp').value;
-        const timestamp = timestampInput ? new Date(timestampInput).toISOString() : undefined;
+  // Feeding form
+  document
+    .getElementById("feeding-form")
+    .addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const saveBtn = document.getElementById("feeding-save-btn");
+      const useTimer = document.getElementById("start-timer").checked;
+      const notes = document.getElementById("feeding-notes").value || undefined;
+      const timestampInput = document.getElementById("feeding-timestamp").value;
+      const timestamp = timestampInput
+        ? new Date(timestampInput).toISOString()
+        : undefined;
 
-        if (useTimer) {
-            // Timer mode — bottle becomes a quick log (no timer), breast starts timer
-            const feedingType = document.getElementById('feeding-type').value;
-            if (!feedingType) { showToast('Please select a feeding type'); return; }
+      if (useTimer) {
+        // Timer mode — bottle becomes a quick log (no timer), breast starts timer
+        const feedingType = document.getElementById("feeding-type").value;
+        if (!feedingType) {
+          showToast("Please select a feeding type");
+          return;
+        }
 
-            if (feedingType === 'bottle') {
-                const amount = document.getElementById('feeding-bottle-timer-input').value;
-                const amountUnit = document.getElementById('feeding-bottle-unit-timer-select').value;
-                if (!amount) { showToast(`Please enter ${amountUnit}`); return; }
-                if (!validateBottleAmountUnit(amount, amountUnit)) return;
-                const bottleType = document.getElementById('feeding-bottle-type-timer-select').value;
-                saveBtn.disabled = true;
-                try {
-                    await api.post('/api/feedings', {
-                        feeding_type: 'bottle',
-                        amount: parseFloat(amount),
-                        amount_unit: amountUnit,
-                        bottle_type: bottleType,
-                        notes,
-                        timestamp,
-                        child_id: currentChildId(),
-                    });
-                    closeModal('feeding-modal');
-                    showToast('Feeding logged!');
-                    reloadAfterLogChange();
-                } catch (err) {
-                    saveBtn.disabled = false;
-                    showToast('Error: ' + err.message);
-                }
-                return;
-            }
-
-            // Breast: start timer (no API call)
-            startTimer(feedingType);
-            closeModal('feeding-modal');
-            showToast('Timer started!');
+        if (feedingType === "bottle") {
+          const amount = document.getElementById(
+            "feeding-bottle-timer-input",
+          ).value;
+          const amountUnit = document.getElementById(
+            "feeding-bottle-unit-timer-select",
+          ).value;
+          if (!amount) {
+            showToast(`Please enter ${amountUnit}`);
             return;
-        }
-
-        // Manual mode: create entries for each non-empty field
-        const leftDur = document.getElementById('feeding-left-duration').value;
-        const rightDur = document.getElementById('feeding-right-duration').value;
-        const bottleAmount = document.getElementById('feeding-bottle').value;
-        const bottleUnit = document.getElementById('feeding-bottle-unit-manual-select').value;
-
-        if (!leftDur && !rightDur && !bottleAmount) {
-            showToast('Please enter at least one value');
-            return;
-        }
-        if (bottleAmount && !validateBottleAmountUnit(bottleAmount, bottleUnit)) return;
-
-        saveBtn.disabled = true;
-        try {
-            const promises = [];
-            let notesAttached = false;
-            // Link paired breast feedings with a shared session_id
-            const manualSessionId = (leftDur && rightDur) ? generateUUID() : null;
-            if (leftDur) {
-                const body = {
-                    feeding_type: 'breast_left',
-                    duration_minutes: parseInt(leftDur),
-                    notes: notesAttached ? undefined : notes,
-                    timestamp,
-                    child_id: currentChildId(),
-                };
-                if (manualSessionId) body.session_id = manualSessionId;
-                promises.push(api.post('/api/feedings', body));
-                notesAttached = true;
-            }
-            if (rightDur) {
-                const body = {
-                    feeding_type: 'breast_right',
-                    duration_minutes: parseInt(rightDur),
-                    notes: notesAttached ? undefined : notes,
-                    timestamp,
-                    child_id: currentChildId(),
-                };
-                if (manualSessionId) body.session_id = manualSessionId;
-                promises.push(api.post('/api/feedings', body));
-                notesAttached = true;
-            }
-            if (bottleAmount) {
-                const bottleType = document.getElementById('feeding-bottle-type-manual-select').value;
-                promises.push(api.post('/api/feedings', {
-                    feeding_type: 'bottle',
-                    amount: parseFloat(bottleAmount),
-                    amount_unit: bottleUnit,
-                    bottle_type: bottleType,
-                    notes: notesAttached ? undefined : notes,
-                    timestamp,
-                    child_id: currentChildId(),
-                }));
-            }
-            await Promise.all(promises);
-            closeModal('feeding-modal');
-            showToast('Feeding logged!');
-            reloadAfterLogChange();
-        } catch (err) {
-            saveBtn.disabled = false;
-            showToast('Error: ' + err.message);
-        }
-    });
-
-    // Medication form
-    document.getElementById('medication-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const name = document.getElementById('med-name').value.trim();
-        if (!name) {
-            showToast('Please select or add a medication name');
-            document.getElementById('med-name-input').focus();
-            return;
-        }
-        const dosageQtyRaw = document.getElementById('med-dosage-qty').value;
-        const dosage_unit = document.getElementById('med-dosage-unit').value;
-        const notes = document.getElementById('med-notes').value || undefined;
-        const timestampInput = document.getElementById('med-timestamp').value;
-        const timestamp = timestampInput ? new Date(timestampInput).toISOString() : undefined;
-        const dosage_quantity = parseFloat(parseFloat(dosageQtyRaw).toFixed(2));
-        if (isNaN(dosage_quantity) || dosage_quantity <= 0) {
-            showToast('Quantity must be a positive number');
-            return;
-        }
-        if (!dosage_unit) {
-            showToast('Please select a unit');
-            return;
-        }
-        const submitBtn = e.target.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-        try {
-            await api.post('/api/medications', { medication_name: name, dosage_quantity, dosage_unit, notes, timestamp, child_id: currentChildId() });
-            closeModal('health-modal');
-            showToast('Medication logged!');
-            reloadAfterLogChange();
-        } catch (err) {
-            submitBtn.disabled = false;
-            showToast('Error: ' + err.message);
-        }
-    });
-
-    // Temperature form
-    document.getElementById('temperature-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const tempValue = parseFloat(document.getElementById('temp-value').value);
-        const unit = document.getElementById('temp-unit').value;
-        const location = document.getElementById('temp-location').value || undefined;
-        const notes = document.getElementById('temp-notes').value || undefined;
-        const timestampInput = document.getElementById('temp-timestamp').value;
-        const timestamp = timestampInput ? new Date(timestampInput).toISOString() : undefined;
-
-        const submitBtn = e.target.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-        try {
-            // Store the value as entered, in the chosen unit — no conversion.
-            await api.post('/api/temperatures', {
-                temperature: Math.round(tempValue * 10) / 10,
-                unit: unit.toUpperCase(),
-                location,
-                notes,
-                timestamp,
-                child_id: currentChildId(),
+          }
+          if (!validateBottleAmountUnit(amount, amountUnit)) return;
+          const bottleType = document.getElementById(
+            "feeding-bottle-type-timer-select",
+          ).value;
+          saveBtn.disabled = true;
+          try {
+            await api.post("/api/feedings", {
+              feeding_type: "bottle",
+              amount: parseFloat(amount),
+              amount_unit: amountUnit,
+              bottle_type: bottleType,
+              notes,
+              timestamp,
+              child_id: currentChildId(),
             });
-            closeModal('health-modal');
-            showToast('Temperature logged!');
+            closeModal("feeding-modal");
+            showToast("Feeding logged!");
             reloadAfterLogChange();
-        } catch (err) {
-            submitBtn.disabled = false;
-            showToast('Error: ' + err.message);
+          } catch (err) {
+            saveBtn.disabled = false;
+            showToast("Error: " + err.message);
+          }
+          return;
         }
+
+        // Breast: start timer (no API call)
+        startTimer(feedingType);
+        closeModal("feeding-modal");
+        showToast("Timer started!");
+        return;
+      }
+
+      // Manual mode: create entries for each non-empty field
+      const leftDur = document.getElementById("feeding-left-duration").value;
+      const rightDur = document.getElementById("feeding-right-duration").value;
+      const bottleAmount = document.getElementById("feeding-bottle").value;
+      const bottleUnit = document.getElementById(
+        "feeding-bottle-unit-manual-select",
+      ).value;
+
+      if (!leftDur && !rightDur && !bottleAmount) {
+        showToast("Please enter at least one value");
+        return;
+      }
+      if (bottleAmount && !validateBottleAmountUnit(bottleAmount, bottleUnit))
+        return;
+
+      saveBtn.disabled = true;
+      try {
+        const promises = [];
+        let notesAttached = false;
+        // Link paired breast feedings with a shared session_id
+        const manualSessionId = leftDur && rightDur ? generateUUID() : null;
+        if (leftDur) {
+          const body = {
+            feeding_type: "breast_left",
+            duration_minutes: parseInt(leftDur),
+            notes: notesAttached ? undefined : notes,
+            timestamp,
+            child_id: currentChildId(),
+          };
+          if (manualSessionId) body.session_id = manualSessionId;
+          promises.push(api.post("/api/feedings", body));
+          notesAttached = true;
+        }
+        if (rightDur) {
+          const body = {
+            feeding_type: "breast_right",
+            duration_minutes: parseInt(rightDur),
+            notes: notesAttached ? undefined : notes,
+            timestamp,
+            child_id: currentChildId(),
+          };
+          if (manualSessionId) body.session_id = manualSessionId;
+          promises.push(api.post("/api/feedings", body));
+          notesAttached = true;
+        }
+        if (bottleAmount) {
+          const bottleType = document.getElementById(
+            "feeding-bottle-type-manual-select",
+          ).value;
+          promises.push(
+            api.post("/api/feedings", {
+              feeding_type: "bottle",
+              amount: parseFloat(bottleAmount),
+              amount_unit: bottleUnit,
+              bottle_type: bottleType,
+              notes: notesAttached ? undefined : notes,
+              timestamp,
+              child_id: currentChildId(),
+            }),
+          );
+        }
+        await Promise.all(promises);
+        closeModal("feeding-modal");
+        showToast("Feeding logged!");
+        reloadAfterLogChange();
+      } catch (err) {
+        saveBtn.disabled = false;
+        showToast("Error: " + err.message);
+      }
+    });
+
+  // Medication form
+  document
+    .getElementById("medication-form")
+    .addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = document.getElementById("med-name").value.trim();
+      if (!name) {
+        showToast("Please select or add a medication name");
+        document.getElementById("med-name-input").focus();
+        return;
+      }
+      const dosageQtyRaw = document.getElementById("med-dosage-qty").value;
+      const dosage_unit = document.getElementById("med-dosage-unit").value;
+      const notes = document.getElementById("med-notes").value || undefined;
+      const timestampInput = document.getElementById("med-timestamp").value;
+      const timestamp = timestampInput
+        ? new Date(timestampInput).toISOString()
+        : undefined;
+      const dosage_quantity = parseFloat(parseFloat(dosageQtyRaw).toFixed(2));
+      if (isNaN(dosage_quantity) || dosage_quantity <= 0) {
+        showToast("Quantity must be a positive number");
+        return;
+      }
+      if (!dosage_unit) {
+        showToast("Please select a unit");
+        return;
+      }
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      try {
+        await api.post("/api/medications", {
+          medication_name: name,
+          dosage_quantity,
+          dosage_unit,
+          notes,
+          timestamp,
+          child_id: currentChildId(),
+        });
+        closeModal("health-modal");
+        showToast("Medication logged!");
+        reloadAfterLogChange();
+      } catch (err) {
+        submitBtn.disabled = false;
+        showToast("Error: " + err.message);
+      }
+    });
+
+  // Temperature form
+  document
+    .getElementById("temperature-form")
+    .addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const tempValue = parseFloat(document.getElementById("temp-value").value);
+      const unit = document.getElementById("temp-unit").value;
+      const location =
+        document.getElementById("temp-location").value || undefined;
+      const notes = document.getElementById("temp-notes").value || undefined;
+      const timestampInput = document.getElementById("temp-timestamp").value;
+      const timestamp = timestampInput
+        ? new Date(timestampInput).toISOString()
+        : undefined;
+
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      try {
+        // Store the value as entered, in the chosen unit — no conversion.
+        await api.post("/api/temperatures", {
+          temperature: Math.round(tempValue * 10) / 10,
+          unit: unit.toUpperCase(),
+          location,
+          notes,
+          timestamp,
+          child_id: currentChildId(),
+        });
+        closeModal("health-modal");
+        showToast("Temperature logged!");
+        reloadAfterLogChange();
+      } catch (err) {
+        submitBtn.disabled = false;
+        showToast("Error: " + err.message);
+      }
     });
 }
 
 /* ===== Edit Modal ===== */
 function toLocalDatetime(isoStr) {
-    const d = new Date(isoStr);
-    const pad = n => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const d = new Date(isoStr);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 async function openEditModal(type, id, secondaryId = null) {
-    const endpoints = {
-        diaper: `/api/diapers/${id}`,
-        feeding: `/api/feedings/${id}`,
-        medication: `/api/medications/${id}`,
-        temperature: `/api/temperatures/${id}`,
-    };
-    try {
-        let data, secondaryData = null;
-        if (type === 'feeding' && secondaryId) {
-            [data, secondaryData] = await Promise.all([
-                api.get(`/api/feedings/${id}`),
-                api.get(`/api/feedings/${secondaryId}`),
-            ]);
-        } else {
-            data = await api.get(endpoints[type]);
-        }
-        const isBottle = type === 'feeding' && data.feeding_type === 'bottle';
-        const titles = {
-            diaper: 'Edit Diaper Change',
-            feeding: isBottle ? 'Edit Bottle' : 'Edit Breastfeed',
-            medication: 'Edit Medication',
-            temperature: 'Edit Temperature',
-        };
-        document.getElementById('edit-modal-title').textContent = titles[type];
-        document.getElementById('edit-form-fields').innerHTML = buildEditFields(type, data, secondaryData);
-        const form = document.getElementById('edit-form');
-        form.dataset.editType = type;
-        form.dataset.editId = id;
-        form.dataset.originalTimestamp = toLocalDatetime(data.timestamp);
-        // The breast form is judged against the session it opened with: which
-        // sides had records, and what each held. Every branch of the save --
-        // flip, pair, unpair -- is a comparison against this snapshot.
-        if (type === 'feeding' && !isBottle) {
-            form.dataset.breastBefore = JSON.stringify(breastSidesOf(data, secondaryData));
-        } else {
-            delete form.dataset.breastBefore;
-        }
-        if (secondaryData) {
-            form.dataset.editSecondaryId = secondaryId;
-        } else {
-            delete form.dataset.editSecondaryId;
-        }
-        initEditOptionButtons();
-        openModal('edit-modal');
-    } catch (err) {
-        showToast('Error loading record: ' + err.message);
+  const endpoints = {
+    diaper: `/api/diapers/${id}`,
+    feeding: `/api/feedings/${id}`,
+    medication: `/api/medications/${id}`,
+    temperature: `/api/temperatures/${id}`,
+  };
+  try {
+    let data,
+      secondaryData = null;
+    if (type === "feeding" && secondaryId) {
+      [data, secondaryData] = await Promise.all([
+        api.get(`/api/feedings/${id}`),
+        api.get(`/api/feedings/${secondaryId}`),
+      ]);
+    } else {
+      data = await api.get(endpoints[type]);
     }
+    const isBottle = type === "feeding" && data.feeding_type === "bottle";
+    const titles = {
+      diaper: "Edit Diaper Change",
+      feeding: isBottle ? "Edit Bottle" : "Edit Breastfeed",
+      medication: "Edit Medication",
+      temperature: "Edit Temperature",
+    };
+    document.getElementById("edit-modal-title").textContent = titles[type];
+    document.getElementById("edit-form-fields").innerHTML = buildEditFields(
+      type,
+      data,
+      secondaryData,
+    );
+    const form = document.getElementById("edit-form");
+    form.dataset.editType = type;
+    form.dataset.editId = id;
+    form.dataset.originalTimestamp = toLocalDatetime(data.timestamp);
+    // The breast form is judged against the session it opened with: which
+    // sides had records, and what each held. Every branch of the save --
+    // flip, pair, unpair -- is a comparison against this snapshot.
+    if (type === "feeding" && !isBottle) {
+      form.dataset.breastBefore = JSON.stringify(
+        breastSidesOf(data, secondaryData),
+      );
+    } else {
+      delete form.dataset.breastBefore;
+    }
+    if (secondaryData) {
+      form.dataset.editSecondaryId = secondaryId;
+    } else {
+      delete form.dataset.editSecondaryId;
+    }
+    initEditOptionButtons();
+    openModal("edit-modal");
+  } catch (err) {
+    showToast("Error loading record: " + err.message);
+  }
 }
 
 /**
@@ -1165,61 +1317,63 @@ async function openEditModal(type, id, secondaryId = null) {
  * values.  Kept free of the DOM so each branch can be tested directly.
  */
 function planBreastEdit(before, after) {
-    const minutes = (v) => {
-        if (v === '' || v === null || v === undefined) return null;
-        const n = parseInt(v, 10);
-        return Number.isFinite(n) && n > 0 ? n : null;
-    };
-    const SIDES = ['breast_left', 'breast_right'];
-    const wanted = {
-        breast_left: minutes(after.breast_left),
-        breast_right: minutes(after.breast_right),
-    };
-    const wantedSides = SIDES.filter((side) => wanted[side] !== null);
-    const heldSides = SIDES.filter((side) => before[side]);
+  const minutes = (v) => {
+    if (v === "" || v === null || v === undefined) return null;
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const SIDES = ["breast_left", "breast_right"];
+  const wanted = {
+    breast_left: minutes(after.breast_left),
+    breast_right: minutes(after.breast_right),
+  };
+  const wantedSides = SIDES.filter((side) => wanted[side] !== null);
+  const heldSides = SIDES.filter((side) => before[side]);
 
-    // Every side cleared. Deleting the whole session through the duration
-    // fields would be a destructive edit disguised as a blank form, so this is
-    // reported back and refused rather than acted on.
-    if (wantedSides.length === 0) return { action: 'empty' };
+  // Every side cleared. Deleting the whole session through the duration
+  // fields would be a destructive edit disguised as a blank form, so this is
+  // reported back and refused rather than acted on.
+  if (wantedSides.length === 0) return { action: "empty" };
 
-    // Durations to write on records that survive on the side they started on.
-    const updates = wantedSides
-        .filter((side) => before[side] && wanted[side] !== before[side].duration_minutes)
-        .map((side) => ({ id: before[side].id, duration_minutes: wanted[side] }));
+  // Durations to write on records that survive on the side they started on.
+  const updates = wantedSides
+    .filter(
+      (side) => before[side] && wanted[side] !== before[side].duration_minutes,
+    )
+    .map((side) => ({ id: before[side].id, duration_minutes: wanted[side] }));
 
-    if (heldSides.length === 2) {
-        if (wantedSides.length === 2) return { action: 'update', updates };
-        const dropped = SIDES.find((side) => wanted[side] === null);
-        return {
-            action: 'unpair',
-            deleteId: before[dropped].id,
-            droppedSide: dropped,
-            droppedMinutes: before[dropped].duration_minutes,
-            updates,
-        };
-    }
-
-    const held = heldSides[0];
-    if (wantedSides.length === 2) {
-        const added = SIDES.find((side) => side !== held);
-        return {
-            action: 'pair',
-            pairId: before[held].id,
-            addedSide: added,
-            addedMinutes: wanted[added],
-            updates,
-        };
-    }
-    if (wantedSides[0] === held) return { action: 'update', updates };
-    // The lone side moved across: the record is flipped in place rather than
-    // deleted and recreated, so its id, timestamp and notes survive the edit.
+  if (heldSides.length === 2) {
+    if (wantedSides.length === 2) return { action: "update", updates };
+    const dropped = SIDES.find((side) => wanted[side] === null);
     return {
-        action: 'flip',
-        id: before[held].id,
-        toSide: wantedSides[0],
-        duration_minutes: wanted[wantedSides[0]],
+      action: "unpair",
+      deleteId: before[dropped].id,
+      droppedSide: dropped,
+      droppedMinutes: before[dropped].duration_minutes,
+      updates,
     };
+  }
+
+  const held = heldSides[0];
+  if (wantedSides.length === 2) {
+    const added = SIDES.find((side) => side !== held);
+    return {
+      action: "pair",
+      pairId: before[held].id,
+      addedSide: added,
+      addedMinutes: wanted[added],
+      updates,
+    };
+  }
+  if (wantedSides[0] === held) return { action: "update", updates };
+  // The lone side moved across: the record is flipped in place rather than
+  // deleted and recreated, so its id, timestamp and notes survive the edit.
+  return {
+    action: "flip",
+    id: before[held].id,
+    toSide: wantedSides[0],
+    duration_minutes: wanted[wantedSides[0]],
+  };
 }
 
 /**
@@ -1230,26 +1384,33 @@ function planBreastEdit(before, after) {
  * yet, which is what makes adding it possible.
  */
 function breastSidesOf(data, secondaryData = null) {
-    const sides = { breast_left: null, breast_right: null };
-    for (const record of [data, secondaryData]) {
-        if (record) sides[record.feeding_type] = record;
-    }
-    return sides;
+  const sides = { breast_left: null, breast_right: null };
+  for (const record of [data, secondaryData]) {
+    if (record) sides[record.feeding_type] = record;
+  }
+  return sides;
 }
 
 function buildEditFields(type, data, secondaryData = null) {
-    let html;
-    switch (type) {
-        case 'diaper': html = buildDiaperEditFields(data); break;
-        case 'feeding':
-            html = data.feeding_type === 'bottle'
-                ? buildBottleEditFields(data)
-                : buildBreastEditFields(breastSidesOf(data, secondaryData));
-            break;
-        case 'medication': html = buildMedicationEditFields(data); break;
-        case 'temperature': html = buildTemperatureEditFields(data); break;
-    }
-    return html + buildChildEditField(data);
+  let html;
+  switch (type) {
+    case "diaper":
+      html = buildDiaperEditFields(data);
+      break;
+    case "feeding":
+      html =
+        data.feeding_type === "bottle"
+          ? buildBottleEditFields(data)
+          : buildBreastEditFields(breastSidesOf(data, secondaryData));
+      break;
+    case "medication":
+      html = buildMedicationEditFields(data);
+      break;
+    case "temperature":
+      html = buildTemperatureEditFields(data);
+      break;
+  }
+  return html + buildChildEditField(data);
 }
 
 /**
@@ -1261,12 +1422,15 @@ function buildEditFields(type, data, secondaryData = null) {
  * wrong child.
  */
 function buildChildEditField(data) {
-    if (!hasProfiles()) return '';
-    const options = childProfiles.map(c =>
-        `<option value="${c.id}" ${data.child_id === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`
-    ).join('');
-    const unassignedSelected = data.child_id == null ? 'selected' : '';
-    return `
+  if (!hasProfiles()) return "";
+  const options = childProfiles
+    .map(
+      (c) =>
+        `<option value="${c.id}" ${data.child_id === c.id ? "selected" : ""}>${escapeHtml(c.name)}</option>`,
+    )
+    .join("");
+  const unassignedSelected = data.child_id == null ? "selected" : "";
+  return `
         <div class="form-group">
             <label for="edit-child">Child</label>
             <select id="edit-child">
@@ -1277,14 +1441,14 @@ function buildChildEditField(data) {
 }
 
 function buildDiaperEditFields(data) {
-    return `
+  return `
         <div class="form-group">
             <label>Type</label>
             <div class="btn-group">
-                <button type="button" class="btn btn-option ${data.type === 'pee' ? 'selected' : ''}" data-value="pee" data-field="edit-diaper-type">💧 Pee</button>
-                <button type="button" class="btn btn-option ${data.type === 'poop' ? 'selected' : ''}" data-value="poop" data-field="edit-diaper-type">💩 Poop</button>
-                <button type="button" class="btn btn-option ${data.type === 'both' ? 'selected' : ''}" data-value="both" data-field="edit-diaper-type">💧💩 Both</button>
-                <button type="button" class="btn btn-option ${data.type === 'dry' ? 'selected' : ''}" data-value="dry" data-field="edit-diaper-type">🧷 Dry</button>
+                <button type="button" class="btn btn-option ${data.type === "pee" ? "selected" : ""}" data-value="pee" data-field="edit-diaper-type">💧 Pee</button>
+                <button type="button" class="btn btn-option ${data.type === "poop" ? "selected" : ""}" data-value="poop" data-field="edit-diaper-type">💩 Poop</button>
+                <button type="button" class="btn btn-option ${data.type === "both" ? "selected" : ""}" data-value="both" data-field="edit-diaper-type">💧💩 Both</button>
+                <button type="button" class="btn btn-option ${data.type === "dry" ? "selected" : ""}" data-value="dry" data-field="edit-diaper-type">🧷 Dry</button>
             </div>
             <input type="hidden" id="edit-diaper-type" value="${data.type}">
         </div>
@@ -1294,27 +1458,27 @@ function buildDiaperEditFields(data) {
         </div>
         <div class="form-group">
             <label for="edit-notes">Notes</label>
-            <textarea id="edit-notes" rows="2">${escapeHtml(data.notes || '')}</textarea>
+            <textarea id="edit-notes" rows="2">${escapeHtml(data.notes || "")}</textarea>
         </div>
     `;
 }
 
 function buildBreastEditFields(before) {
-    const names = getBreastNames();
-    const left = before.breast_left;
-    const right = before.breast_right;
-    // Notes and time belong to the session, so they come from whichever side
-    // carries them rather than from a fixed one.
-    const anchor = left || right;
-    const notes = (left && left.notes) || (right && right.notes) || '';
-    return `
+  const names = getBreastNames();
+  const left = before.breast_left;
+  const right = before.breast_right;
+  // Notes and time belong to the session, so they come from whichever side
+  // carries them rather than from a fixed one.
+  const anchor = left || right;
+  const notes = (left && left.notes) || (right && right.notes) || "";
+  return `
         <div class="form-group">
             <label for="edit-left-duration">🤱 ${escapeHtml(names.left)} (minutes)</label>
-            <input type="number" id="edit-left-duration" min="1" max="120" value="${left ? left.duration_minutes : ''}">
+            <input type="number" id="edit-left-duration" min="1" max="120" value="${left ? left.duration_minutes : ""}">
         </div>
         <div class="form-group">
             <label for="edit-right-duration">🤱 ${escapeHtml(names.right)} (minutes)</label>
-            <input type="number" id="edit-right-duration" min="1" max="120" value="${right ? right.duration_minutes : ''}">
+            <input type="number" id="edit-right-duration" min="1" max="120" value="${right ? right.duration_minutes : ""}">
         </div>
         <p class="hint">Clear a side to remove it from this feeding.</p>
         <div class="form-group">
@@ -1329,24 +1493,24 @@ function buildBreastEditFields(before) {
 }
 
 function buildBottleEditFields(data) {
-    const bottleTypeVal = data.bottle_type || 'breastmilk';
-    const bottleUnitVal = data.amount_unit || getDefaultBottleUnit();
-    return `
+  const bottleTypeVal = data.bottle_type || "breastmilk";
+  const bottleUnitVal = data.amount_unit || getDefaultBottleUnit();
+  return `
         <div class="form-group">
             <label for="edit-amount">Amount</label>
             <div class="input-group">
-                <input type="number" id="edit-amount" min="0.01" step="0.01" value="${data.amount || ''}">
+                <input type="number" id="edit-amount" min="0.01" step="0.01" value="${data.amount || ""}">
                 <select id="edit-amount-unit">
-                    <option value="oz" ${bottleUnitVal === 'oz' ? 'selected' : ''}>oz</option>
-                    <option value="mL" ${bottleUnitVal === 'mL' ? 'selected' : ''}>mL</option>
+                    <option value="oz" ${bottleUnitVal === "oz" ? "selected" : ""}>oz</option>
+                    <option value="mL" ${bottleUnitVal === "mL" ? "selected" : ""}>mL</option>
                 </select>
             </div>
         </div>
         <div class="form-group">
             <label for="edit-bottle-type">Bottle Type</label>
             <select id="edit-bottle-type">
-                <option value="breastmilk" ${bottleTypeVal === 'breastmilk' ? 'selected' : ''}>Breastmilk</option>
-                <option value="formula" ${bottleTypeVal === 'formula' ? 'selected' : ''}>Formula</option>
+                <option value="breastmilk" ${bottleTypeVal === "breastmilk" ? "selected" : ""}>Breastmilk</option>
+                <option value="formula" ${bottleTypeVal === "formula" ? "selected" : ""}>Formula</option>
             </select>
         </div>
         <div class="form-group">
@@ -1355,17 +1519,28 @@ function buildBottleEditFields(data) {
         </div>
         <div class="form-group">
             <label for="edit-notes">Notes</label>
-            <textarea id="edit-notes" rows="2">${escapeHtml(data.notes || '')}</textarea>
+            <textarea id="edit-notes" rows="2">${escapeHtml(data.notes || "")}</textarea>
         </div>
     `;
 }
 
 function buildMedicationEditFields(data) {
-    const units = ['mL', 'tsp(s)', 'tbsp(s)', 'drop(s)', 'spray(s)', 'tablet(s)', 'unit(s)'];
-    const unitOptions = units.map(u =>
-        `<option value="${u}" ${data.dosage_unit === u ? 'selected' : ''}>${u}</option>`
-    ).join('');
-    return `
+  const units = [
+    "mL",
+    "tsp(s)",
+    "tbsp(s)",
+    "drop(s)",
+    "spray(s)",
+    "tablet(s)",
+    "unit(s)",
+  ];
+  const unitOptions = units
+    .map(
+      (u) =>
+        `<option value="${u}" ${data.dosage_unit === u ? "selected" : ""}>${u}</option>`,
+    )
+    .join("");
+  return `
         <div class="form-group">
             <label for="edit-med-name">Medication Name</label>
             <input type="text" id="edit-med-name" value="${escapeAttr(data.medication_name)}" required>
@@ -1385,22 +1560,22 @@ function buildMedicationEditFields(data) {
         </div>
         <div class="form-group">
             <label for="edit-notes">Notes</label>
-            <textarea id="edit-notes" rows="2">${escapeHtml(data.notes || '')}</textarea>
+            <textarea id="edit-notes" rows="2">${escapeHtml(data.notes || "")}</textarea>
         </div>
     `;
 }
 
 function buildTemperatureEditFields(data) {
-    const unit = (data.unit || 'C').toUpperCase();
-    const tempValue = Math.round(data.temperature * 10) / 10;
-    return `
+  const unit = (data.unit || "C").toUpperCase();
+  const tempValue = Math.round(data.temperature * 10) / 10;
+  return `
         <div class="form-group">
             <label for="edit-temp-value">Temperature</label>
             <div class="input-group">
                 <input type="number" id="edit-temp-value" step="0.1" value="${tempValue}" required>
                 <select id="edit-temp-unit">
-                    <option value="f" ${unit === 'F' ? 'selected' : ''}>°F</option>
-                    <option value="c" ${unit === 'C' ? 'selected' : ''}>°C</option>
+                    <option value="f" ${unit === "F" ? "selected" : ""}>°F</option>
+                    <option value="c" ${unit === "C" ? "selected" : ""}>°C</option>
                 </select>
             </div>
         </div>
@@ -1408,10 +1583,10 @@ function buildTemperatureEditFields(data) {
             <label for="edit-temp-location">Location</label>
             <select id="edit-temp-location">
                 <option value="">Select...</option>
-                <option value="rectal" ${data.location === 'rectal' ? 'selected' : ''}>Rectal</option>
-                <option value="oral" ${data.location === 'oral' ? 'selected' : ''}>Oral</option>
-                <option value="axillary" ${data.location === 'axillary' ? 'selected' : ''}>Underarm</option>
-                <option value="temporal" ${data.location === 'temporal' ? 'selected' : ''}>Forehead</option>
+                <option value="rectal" ${data.location === "rectal" ? "selected" : ""}>Rectal</option>
+                <option value="oral" ${data.location === "oral" ? "selected" : ""}>Oral</option>
+                <option value="axillary" ${data.location === "axillary" ? "selected" : ""}>Underarm</option>
+                <option value="temporal" ${data.location === "temporal" ? "selected" : ""}>Forehead</option>
             </select>
         </div>
         <div class="form-group">
@@ -1420,7 +1595,7 @@ function buildTemperatureEditFields(data) {
         </div>
         <div class="form-group">
             <label for="edit-notes">Notes</label>
-            <textarea id="edit-notes" rows="2">${escapeHtml(data.notes || '')}</textarea>
+            <textarea id="edit-notes" rows="2">${escapeHtml(data.notes || "")}</textarea>
         </div>
     `;
 }
@@ -1432,218 +1607,244 @@ function buildTemperatureEditFields(data) {
  * the modal open instead of reporting a success that did not happen.
  */
 async function saveBreastEdit(form) {
-    const before = JSON.parse(form.dataset.breastBefore);
-    const plan = planBreastEdit(before, {
-        breast_left: document.getElementById('edit-left-duration').value,
-        breast_right: document.getElementById('edit-right-duration').value,
+  const before = JSON.parse(form.dataset.breastBefore);
+  const plan = planBreastEdit(before, {
+    breast_left: document.getElementById("edit-left-duration").value,
+    breast_right: document.getElementById("edit-right-duration").value,
+  });
+
+  if (plan.action === "empty") {
+    showToast("Enter a time for at least one side, or use Delete.");
+    return false;
+  }
+
+  // Time, notes and child belong to the session, so they go to every record
+  // it still has. The router keys off model_fields_set, so child_id has to be
+  // sent explicitly -- omitting it silently leaves the association alone.
+  const timestamp = document.getElementById("edit-timestamp").value;
+  const session = { notes: document.getElementById("edit-notes").value };
+  if (timestamp && timestamp !== form.dataset.originalTimestamp) {
+    session.timestamp = new Date(timestamp).toISOString();
+  }
+  const childEl = document.getElementById("edit-child");
+  if (childEl)
+    session.child_id = childEl.value ? parseInt(childEl.value, 10) : null;
+
+  if (plan.action === "unpair" && !(await confirmDroppedSide(plan))) {
+    // Cancelling means the side stays, so the field goes back to what it
+    // held -- leaving it blank would show a removal that did not happen.
+    const field =
+      plan.droppedSide === "breast_left"
+        ? "edit-left-duration"
+        : "edit-right-duration";
+    document.getElementById(field).value = plan.droppedMinutes;
+    return false;
+  }
+
+  const survivors = ["breast_left", "breast_right"]
+    .filter((side) => before[side] && before[side].id !== plan.deleteId)
+    .map((side) => before[side].id);
+
+  // Order matters on a flip: the duration and the side move together, so they
+  // travel in one request rather than leaving the record briefly inconsistent.
+  if (plan.action === "flip") {
+    await api.put(`/api/feedings/${plan.id}`, {
+      ...session,
+      feeding_type: plan.toSide,
+      duration_minutes: plan.duration_minutes,
     });
-
-    if (plan.action === 'empty') {
-        showToast('Enter a time for at least one side, or use Delete.');
-        return false;
-    }
-
-    // Time, notes and child belong to the session, so they go to every record
-    // it still has. The router keys off model_fields_set, so child_id has to be
-    // sent explicitly -- omitting it silently leaves the association alone.
-    const timestamp = document.getElementById('edit-timestamp').value;
-    const session = { notes: document.getElementById('edit-notes').value };
-    if (timestamp && timestamp !== form.dataset.originalTimestamp) {
-        session.timestamp = new Date(timestamp).toISOString();
-    }
-    const childEl = document.getElementById('edit-child');
-    if (childEl) session.child_id = childEl.value ? parseInt(childEl.value, 10) : null;
-
-    if (plan.action === 'unpair' && !(await confirmDroppedSide(plan))) {
-        // Cancelling means the side stays, so the field goes back to what it
-        // held -- leaving it blank would show a removal that did not happen.
-        const field = plan.droppedSide === 'breast_left' ? 'edit-left-duration' : 'edit-right-duration';
-        document.getElementById(field).value = plan.droppedMinutes;
-        return false;
-    }
-
-    const survivors = ['breast_left', 'breast_right']
-        .filter((side) => before[side] && before[side].id !== plan.deleteId)
-        .map((side) => before[side].id);
-
-    // Order matters on a flip: the duration and the side move together, so they
-    // travel in one request rather than leaving the record briefly inconsistent.
-    if (plan.action === 'flip') {
-        await api.put(`/api/feedings/${plan.id}`, {
-            ...session,
-            feeding_type: plan.toSide,
-            duration_minutes: plan.duration_minutes,
-        });
-        return true;
-    }
-
-    for (const update of plan.updates) {
-        await api.put(`/api/feedings/${update.id}`, { ...session, ...update });
-    }
-    // Records the edit did not otherwise touch still need the session fields.
-    for (const id of survivors) {
-        if (!plan.updates.some((u) => u.id === id)) {
-            await api.put(`/api/feedings/${id}`, session);
-        }
-    }
-
-    if (plan.action === 'pair') {
-        await api.post(`/api/feedings/${plan.pairId}/pair`, {
-            duration_minutes: plan.addedMinutes,
-        });
-    } else if (plan.action === 'unpair') {
-        await api.del(`/api/feedings/${plan.deleteId}`);
-    }
     return true;
+  }
+
+  for (const update of plan.updates) {
+    await api.put(`/api/feedings/${update.id}`, { ...session, ...update });
+  }
+  // Records the edit did not otherwise touch still need the session fields.
+  for (const id of survivors) {
+    if (!plan.updates.some((u) => u.id === id)) {
+      await api.put(`/api/feedings/${id}`, session);
+    }
+  }
+
+  if (plan.action === "pair") {
+    await api.post(`/api/feedings/${plan.pairId}/pair`, {
+      duration_minutes: plan.addedMinutes,
+    });
+  } else if (plan.action === "unpair") {
+    await api.del(`/api/feedings/${plan.deleteId}`);
+  }
+  return true;
 }
 
 /** Confirm dropping a side before the record is deleted. */
 function confirmDroppedSide(plan) {
-    const names = getBreastNames();
-    const sideName = plan.droppedSide === 'breast_left' ? names.left : names.right;
-    const minutes = plan.droppedMinutes;
-    const unit = minutes === 1 ? 'minute' : 'minutes';
-    return new Promise((resolve) => {
-        showConfirm({
-            title: 'Remove Side',
-            body: `Really remove ${minutes} ${unit} from ${sideName}?`,
-            primary: 'Confirm',
-            cancel: 'Cancel',
-            onPrimary: () => {
-                closeModal('confirm-modal');
-                resolve(true);
-            },
-            onCancel: () => {
-                closeModal('confirm-modal');
-                resolve(false);
-            },
-        });
+  const names = getBreastNames();
+  const sideName =
+    plan.droppedSide === "breast_left" ? names.left : names.right;
+  const minutes = plan.droppedMinutes;
+  const unit = minutes === 1 ? "minute" : "minutes";
+  return new Promise((resolve) => {
+    showConfirm({
+      title: "Remove Side",
+      body: `Really remove ${minutes} ${unit} from ${sideName}?`,
+      primary: "Confirm",
+      cancel: "Cancel",
+      onPrimary: () => {
+        closeModal("confirm-modal");
+        resolve(true);
+      },
+      onCancel: () => {
+        closeModal("confirm-modal");
+        resolve(false);
+      },
     });
+  });
 }
 
 function buildEditBody(type) {
-    const timestamp = document.getElementById('edit-timestamp').value;
-    const notes = document.getElementById('edit-notes').value;
+  const timestamp = document.getElementById("edit-timestamp").value;
+  const notes = document.getElementById("edit-notes").value;
 
-    const body = {};
-    const originalTimestamp = document.getElementById('edit-form').dataset.originalTimestamp;
-    if (timestamp && timestamp !== originalTimestamp) {
-        body.timestamp = new Date(timestamp).toISOString();
+  const body = {};
+  const originalTimestamp =
+    document.getElementById("edit-form").dataset.originalTimestamp;
+  if (timestamp && timestamp !== originalTimestamp) {
+    body.timestamp = new Date(timestamp).toISOString();
+  }
+  body.notes = notes;
+
+  // Absent when no profiles exist; an empty value means Unassigned, which
+  // must be sent as an explicit null rather than omitted.
+  const childEl = document.getElementById("edit-child");
+  if (childEl)
+    body.child_id = childEl.value ? parseInt(childEl.value, 10) : null;
+
+  switch (type) {
+    case "diaper":
+      body.type = document.getElementById("edit-diaper-type").value;
+      break;
+    // Breast feeds are saved by saveBreastEdit, which handles the pairing
+    // the duration fields imply; only bottles reach buildEditBody.
+    case "feeding": {
+      const amount = document.getElementById("edit-amount").value;
+      const amountUnit = document.getElementById("edit-amount-unit").value;
+      if (!amount) {
+        showToast("Enter an amount");
+        return null;
+      }
+      if (!validateBottleAmountUnit(amount, amountUnit)) return null;
+      body.amount = parseFloat(amount);
+      body.amount_unit = amountUnit;
+      body.bottle_type = document.getElementById("edit-bottle-type").value;
+      break;
     }
-    body.notes = notes;
-
-    // Absent when no profiles exist; an empty value means Unassigned, which
-    // must be sent as an explicit null rather than omitted.
-    const childEl = document.getElementById('edit-child');
-    if (childEl) body.child_id = childEl.value ? parseInt(childEl.value, 10) : null;
-
-    switch (type) {
-        case 'diaper':
-            body.type = document.getElementById('edit-diaper-type').value;
-            break;
-        // Breast feeds are saved by saveBreastEdit, which handles the pairing
-        // the duration fields imply; only bottles reach buildEditBody.
-        case 'feeding': {
-            const amount = document.getElementById('edit-amount').value;
-            const amountUnit = document.getElementById('edit-amount-unit').value;
-            if (!amount) {
-                showToast('Enter an amount');
-                return null;
-            }
-            if (!validateBottleAmountUnit(amount, amountUnit)) return null;
-            body.amount = parseFloat(amount);
-            body.amount_unit = amountUnit;
-            body.bottle_type = document.getElementById('edit-bottle-type').value;
-            break;
-        }
-        case 'medication':
-            body.medication_name = document.getElementById('edit-med-name').value;
-            body.dosage_quantity = parseFloat(parseFloat(document.getElementById('edit-med-dosage-qty').value).toFixed(2));
-            body.dosage_unit = document.getElementById('edit-med-dosage-unit').value;
-            break;
-        case 'temperature': {
-            const tempValue = parseFloat(document.getElementById('edit-temp-value').value);
-            const unit = document.getElementById('edit-temp-unit').value;
-            body.temperature = Math.round(tempValue * 10) / 10;
-            body.unit = unit.toUpperCase();
-            const loc = document.getElementById('edit-temp-location').value;
-            if (loc) body.location = loc;
-            break;
-        }
+    case "medication":
+      body.medication_name = document.getElementById("edit-med-name").value;
+      body.dosage_quantity = parseFloat(
+        parseFloat(
+          document.getElementById("edit-med-dosage-qty").value,
+        ).toFixed(2),
+      );
+      body.dosage_unit = document.getElementById("edit-med-dosage-unit").value;
+      break;
+    case "temperature": {
+      const tempValue = parseFloat(
+        document.getElementById("edit-temp-value").value,
+      );
+      const unit = document.getElementById("edit-temp-unit").value;
+      body.temperature = Math.round(tempValue * 10) / 10;
+      body.unit = unit.toUpperCase();
+      const loc = document.getElementById("edit-temp-location").value;
+      if (loc) body.location = loc;
+      break;
     }
-    return body;
+  }
+  return body;
 }
 
 function initEditOptionButtons() {
-    document.querySelectorAll('#edit-form-fields .btn-option').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const field = btn.dataset.field;
-            const value = btn.dataset.value;
-            btn.closest('.btn-group').querySelectorAll('.btn-option').forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-            document.getElementById(field).value = value;
-        });
+  document.querySelectorAll("#edit-form-fields .btn-option").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const field = btn.dataset.field;
+      const value = btn.dataset.value;
+      btn
+        .closest(".btn-group")
+        .querySelectorAll(".btn-option")
+        .forEach((b) => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      document.getElementById(field).value = value;
     });
+  });
 }
 
 function initEditForm() {
-    document.getElementById('edit-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const form = e.target;
-        const type = form.dataset.editType;
-        const id = form.dataset.editId;
-        const endpoints = {
-            diaper: `/api/diapers/${id}`,
-            feeding: `/api/feedings/${id}`,
-            medication: `/api/medications/${id}`,
-            temperature: `/api/temperatures/${id}`,
-        };
-        try {
-            if (type === 'feeding' && form.dataset.breastBefore) {
-                const saved = await saveBreastEdit(form);
-                if (!saved) return;
-            } else {
-                const body = buildEditBody(type);
-                if (!body) return;
-                await api.put(endpoints[type], body);
-            }
-            closeModal('edit-modal');
-            showToast('Updated!');
-            reloadAfterLogChange();
-        } catch (err) {
-            showToast('Error: ' + err.message);
-        }
-    });
+  document.getElementById("edit-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const type = form.dataset.editType;
+    const id = form.dataset.editId;
+    const endpoints = {
+      diaper: `/api/diapers/${id}`,
+      feeding: `/api/feedings/${id}`,
+      medication: `/api/medications/${id}`,
+      temperature: `/api/temperatures/${id}`,
+    };
+    try {
+      if (type === "feeding" && form.dataset.breastBefore) {
+        const saved = await saveBreastEdit(form);
+        if (!saved) return;
+      } else {
+        const body = buildEditBody(type);
+        if (!body) return;
+        await api.put(endpoints[type], body);
+      }
+      closeModal("edit-modal");
+      showToast("Updated!");
+      reloadAfterLogChange();
+    } catch (err) {
+      showToast("Error: " + err.message);
+    }
+  });
 
-    document.getElementById('edit-delete-btn').addEventListener('click', async () => {
-        const form = document.getElementById('edit-form');
-        const type = form.dataset.editType;
-        const id = form.dataset.editId;
-        const before = form.dataset.breastBefore ? JSON.parse(form.dataset.breastBefore) : null;
-        const sessionIds = before
-            ? ['breast_left', 'breast_right'].filter((side) => before[side]).map((side) => before[side].id)
-            : [];
-        const isBoth = sessionIds.length > 1;
-        const msg = isBoth ? 'Delete both breast feeding records?' : 'Delete this entry?';
-        if (!confirm(msg)) return;
-        const endpoints = {
-            diaper: `/api/diapers/${id}`,
-            feeding: `/api/feedings/${id}`,
-            medication: `/api/medications/${id}`,
-            temperature: `/api/temperatures/${id}`,
-        };
-        try {
-            if (isBoth) {
-                await Promise.all(sessionIds.map((sid) => api.del(`/api/feedings/${sid}`)));
-            } else {
-                await api.del(endpoints[type]);
-            }
-            closeModal('edit-modal');
-            showToast('Deleted!');
-            reloadAfterLogChange();
-        } catch (err) {
-            showToast('Error: ' + err.message);
+  document
+    .getElementById("edit-delete-btn")
+    .addEventListener("click", async () => {
+      const form = document.getElementById("edit-form");
+      const type = form.dataset.editType;
+      const id = form.dataset.editId;
+      const before = form.dataset.breastBefore
+        ? JSON.parse(form.dataset.breastBefore)
+        : null;
+      const sessionIds = before
+        ? ["breast_left", "breast_right"]
+            .filter((side) => before[side])
+            .map((side) => before[side].id)
+        : [];
+      const isBoth = sessionIds.length > 1;
+      const msg = isBoth
+        ? "Delete both breast feeding records?"
+        : "Delete this entry?";
+      if (!confirm(msg)) return;
+      const endpoints = {
+        diaper: `/api/diapers/${id}`,
+        feeding: `/api/feedings/${id}`,
+        medication: `/api/medications/${id}`,
+        temperature: `/api/temperatures/${id}`,
+      };
+      try {
+        if (isBoth) {
+          await Promise.all(
+            sessionIds.map((sid) => api.del(`/api/feedings/${sid}`)),
+          );
+        } else {
+          await api.del(endpoints[type]);
         }
+        closeModal("edit-modal");
+        showToast("Deleted!");
+        reloadAfterLogChange();
+      } catch (err) {
+        showToast("Error: " + err.message);
+      }
     });
 }
 
@@ -1654,33 +1855,40 @@ let currentDate = new Date();
 let lastKnownToday = new Date();
 
 function toDateString(d) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function isSameDay(a, b) {
-    return a.getFullYear() === b.getFullYear() &&
-        a.getMonth() === b.getMonth() &&
-        a.getDate() === b.getDate();
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
 }
 
 function formatDateLabel(d) {
-    const now = new Date();
-    if (isSameDay(d, now)) return 'Today';
-    const yesterday = new Date(now);
-    yesterday.setDate(now.getDate() - 1);
-    if (isSameDay(d, yesterday)) return 'Yesterday';
-    return d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+  const now = new Date();
+  if (isSameDay(d, now)) return "Today";
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (isSameDay(d, yesterday)) return "Yesterday";
+  return d.toLocaleDateString([], {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function updateCalendarUI() {
-    const isToday = isSameDay(currentDate, new Date());
-    document.getElementById('cal-date-label').textContent = formatDateLabel(currentDate);
-    document.getElementById('cal-next').disabled = isToday;
-    const pill = document.getElementById('cal-today-pill');
-    pill.classList.toggle('hidden', isToday);
+  const isToday = isSameDay(currentDate, new Date());
+  document.getElementById("cal-date-label").textContent =
+    formatDateLabel(currentDate);
+  document.getElementById("cal-next").disabled = isToday;
+  const pill = document.getElementById("cal-today-pill");
+  pill.classList.toggle("hidden", isToday);
 }
 
 /**
@@ -1694,114 +1902,126 @@ function updateCalendarUI() {
  * open, so follow the day forward instead.
  */
 function refreshDashboard() {
-    const now = new Date();
-    if (!isSameDay(now, lastKnownToday)) {
-        // Only follow the rollover if the user was actually on "today";
-        // someone reviewing an earlier day should stay where they are.
-        if (isSameDay(currentDate, lastKnownToday)) currentDate = now;
-        lastKnownToday = now;
-        updateCalendarUI();
-    }
-    loadDashboard();
+  const now = new Date();
+  if (!isSameDay(now, lastKnownToday)) {
+    // Only follow the rollover if the user was actually on "today";
+    // someone reviewing an earlier day should stay where they are.
+    if (isSameDay(currentDate, lastKnownToday)) currentDate = now;
+    lastKnownToday = now;
+    updateCalendarUI();
+  }
+  loadDashboard();
 }
 
 function prevDay() {
-    currentDate.setDate(currentDate.getDate() - 1);
-    updateCalendarUI();
-    loadDashboard();
+  currentDate.setDate(currentDate.getDate() - 1);
+  updateCalendarUI();
+  loadDashboard();
 }
 
 function nextDay() {
-    if (isSameDay(currentDate, new Date())) return;
-    currentDate.setDate(currentDate.getDate() + 1);
-    updateCalendarUI();
-    loadDashboard();
+  if (isSameDay(currentDate, new Date())) return;
+  currentDate.setDate(currentDate.getDate() + 1);
+  updateCalendarUI();
+  loadDashboard();
 }
 
 function goToToday() {
-    currentDate = new Date();
-    updateCalendarUI();
-    loadDashboard();
+  currentDate = new Date();
+  updateCalendarUI();
+  loadDashboard();
 }
 
 function initCalendar() {
-    document.getElementById('cal-prev').addEventListener('click', prevDay);
-    document.getElementById('cal-next').addEventListener('click', nextDay);
-    document.getElementById('cal-today-pill').addEventListener('click', goToToday);
+  document.getElementById("cal-prev").addEventListener("click", prevDay);
+  document.getElementById("cal-next").addEventListener("click", nextDay);
+  document
+    .getElementById("cal-today-pill")
+    .addEventListener("click", goToToday);
 
-    // Date picker — hidden <input type="date"> triggered by tapping the date label
-    const picker = document.getElementById('cal-date-picker');
-    document.getElementById('cal-date-btn').addEventListener('click', () => {
-        picker.value = toDateString(currentDate);
-        picker.showPicker();
-    });
-    picker.addEventListener('change', () => {
-        if (!picker.value) return;
-        // Parse as local date
-        const [y, m, d] = picker.value.split('-').map(Number);
-        currentDate = new Date(y, m - 1, d);
-        updateCalendarUI();
-        loadDashboard();
-    });
-
+  // Date picker — hidden <input type="date"> triggered by tapping the date label
+  const picker = document.getElementById("cal-date-picker");
+  document.getElementById("cal-date-btn").addEventListener("click", () => {
+    picker.value = toDateString(currentDate);
+    picker.showPicker();
+  });
+  picker.addEventListener("change", () => {
+    if (!picker.value) return;
+    // Parse as local date
+    const [y, m, d] = picker.value.split("-").map(Number);
+    currentDate = new Date(y, m - 1, d);
     updateCalendarUI();
+    loadDashboard();
+  });
+
+  updateCalendarUI();
 }
 
 async function loadDayActivities() {
-    const timeline = document.getElementById('timeline');
-    try {
-        const dateStr = toDateString(currentDate);
-        const activities = await api.get(`/api/activities?date=${dateStr}${childQuery()}`);
-        if (activities.length === 0) {
-            timeline.innerHTML = '<p class="empty-state">No entries for this day.</p>';
-            return;
-        }
-        timeline.innerHTML = activities.map(a => {
-            const secondaryArg = a.secondary_id != null ? `, ${a.secondary_id}` : '';
-            return `
+  const timeline = document.getElementById("timeline");
+  try {
+    const dateStr = toDateString(currentDate);
+    const activities = await api.get(
+      `/api/activities?date=${dateStr}${childQuery()}`,
+    );
+    if (activities.length === 0) {
+      timeline.innerHTML =
+        '<p class="empty-state">No entries for this day.</p>';
+      return;
+    }
+    timeline.innerHTML = activities
+      .map((a) => {
+        const secondaryArg =
+          a.secondary_id != null ? `, ${a.secondary_id}` : "";
+        return `
             <div class="timeline-item" onclick="openEditModal('${a.type}', ${a.id}${secondaryArg})">
-                <span class="timeline-emoji">${a.emoji || ''}</span>
+                <span class="timeline-emoji">${a.emoji || ""}</span>
                 <span class="timeline-label">${escapeHtml(getActivityLabel(a))}</span>
-                ${a.detail ? `<span class="timeline-detail">${escapeHtml(a.detail)}</span>` : ''}
+                ${a.detail ? `<span class="timeline-detail">${escapeHtml(a.detail)}</span>` : ""}
                 <span class="timeline-time">${formatTime(a.timestamp)}</span>
-                ${a.notes ? `<div class="timeline-notes">${escapeHtml(a.notes)}</div>` : ''}
+                ${a.notes ? `<div class="timeline-notes">${escapeHtml(a.notes)}</div>` : ""}
             </div>
         `;
-        }).join('');
-    } catch (err) {
-        console.error('Failed to load day activities:', err);
-        timeline.innerHTML = '<p class="empty-state">Failed to load activities.</p>';
-    }
+      })
+      .join("");
+  } catch (err) {
+    console.error("Failed to load day activities:", err);
+    timeline.innerHTML =
+      '<p class="empty-state">Failed to load activities.</p>';
+  }
 }
 
 /* ===== Dashboard Loading ===== */
 function formatTime(isoStr) {
-    if (!isoStr) return '—';
-    const d = new Date(isoStr);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (!isoStr) return "—";
+  const d = new Date(isoStr);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function formatShortDate(isoStr) {
-    return new Date(isoStr).toLocaleDateString([], { month: 'short', day: 'numeric' });
+  return new Date(isoStr).toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function timeAgo(isoStr) {
-    if (!isoStr) return '';
-    const diff = Date.now() - new Date(isoStr).getTime();
-    // Future timestamp: a bare clock time reads as "today at HH:MM"; show the
-    // date so a mistyped or scheduled entry is legible.
-    if (diff < 0) return `${formatShortDate(isoStr)} ${formatTime(isoStr)}`;
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ${mins % 60}m ago`;
-    // Past 24h a bare clock time is indistinguishable from earlier today
-    // (a three-day-old change reading "08:32"), so switch to a day count and,
-    // beyond a week, a short date.
-    const days = Math.floor(hrs / 24);
-    if (days < 7) return `${days}d ago`;
-    return formatShortDate(isoStr);
+  if (!isoStr) return "";
+  const diff = Date.now() - new Date(isoStr).getTime();
+  // Future timestamp: a bare clock time reads as "today at HH:MM"; show the
+  // date so a mistyped or scheduled entry is legible.
+  if (diff < 0) return `${formatShortDate(isoStr)} ${formatTime(isoStr)}`;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ${mins % 60}m ago`;
+  // Past 24h a bare clock time is indistinguishable from earlier today
+  // (a three-day-old change reading "08:32"), so switch to a day count and,
+  // beyond a week, a short date.
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return formatShortDate(isoStr);
 }
 
 /**
@@ -1814,172 +2034,193 @@ function timeAgo(isoStr) {
  * always show everything, since there is no profile to configure.
  */
 function applyQuickAddVisibility() {
-    const enabled = getEnabledQuickAddTypes(currentChildId());
-    QUICK_ADD_TYPES.forEach(t => {
-        const on = enabled.includes(t.key);
-        const btn = document.querySelector(`.quick-actions [data-modal="${t.modal}"]`);
-        if (btn) btn.classList.toggle('hidden', !on);
-        const card = document.querySelector(`.summary-cards .${t.cardClass}`);
-        if (card) card.classList.toggle('hidden', !on);
-    });
-    // Collapse the grids to the visible count so the survivors fill the row
-    // rather than leaving the hidden columns as gaps. The mobile media query
-    // still forces a single column underneath this.
-    const actions = document.querySelector('.quick-actions');
-    const cards = document.querySelector('.summary-cards');
-    if (actions) actions.style.setProperty('--qa-cols', enabled.length);
-    if (cards) cards.style.setProperty('--sc-cols', enabled.length);
+  const enabled = getEnabledQuickAddTypes(currentChildId());
+  QUICK_ADD_TYPES.forEach((t) => {
+    const on = enabled.includes(t.key);
+    const btn = document.querySelector(
+      `.quick-actions [data-modal="${t.modal}"]`,
+    );
+    if (btn) btn.classList.toggle("hidden", !on);
+    const card = document.querySelector(`.summary-cards .${t.cardClass}`);
+    if (card) card.classList.toggle("hidden", !on);
+  });
+  // Collapse the grids to the visible count so the survivors fill the row
+  // rather than leaving the hidden columns as gaps. The mobile media query
+  // still forces a single column underneath this.
+  const actions = document.querySelector(".quick-actions");
+  const cards = document.querySelector(".summary-cards");
+  if (actions) actions.style.setProperty("--qa-cols", enabled.length);
+  if (cards) cards.style.setProperty("--sc-cols", enabled.length);
 }
 
 async function loadDashboard() {
-    try {
-        // Runs before the fetch so the visible set matches the selected child
-        // immediately, even if the request is slow or fails.
-        applyQuickAddVisibility();
-        const dateStr = toDateString(currentDate);
-        const data = await api.get(`/api/dashboard?date=${dateStr}${childQuery()}`);
+  try {
+    // Runs before the fetch so the visible set matches the selected child
+    // immediately, even if the request is slow or fails.
+    applyQuickAddVisibility();
+    const dateStr = toDateString(currentDate);
+    const data = await api.get(`/api/dashboard?date=${dateStr}${childQuery()}`);
 
-        // Summary card titles reflect the displayed day
-        const isToday = isSameDay(currentDate, new Date());
-        document.getElementById('diaper-title').textContent = isToday ? 'Diapers Today' : 'Diapers';
-        document.getElementById('feeding-title').textContent = isToday ? 'Feedings Today' : 'Feedings';
-        document.getElementById('med-title').textContent = isToday ? 'Meds Today' : 'Meds';
+    // Summary card titles reflect the displayed day
+    const isToday = isSameDay(currentDate, new Date());
+    document.getElementById("diaper-title").textContent = isToday
+      ? "Diapers Today"
+      : "Diapers";
+    document.getElementById("feeding-title").textContent = isToday
+      ? "Feedings Today"
+      : "Feedings";
+    document.getElementById("med-title").textContent = isToday
+      ? "Meds Today"
+      : "Meds";
 
-        // Summary cards
-        document.getElementById('diaper-count').textContent = data.diaper_stats.today;
-        document.getElementById('feeding-count').textContent = data.feeding_stats.today;
-        document.getElementById('med-count').textContent = data.medication_count_today;
+    // Summary cards
+    document.getElementById("diaper-count").textContent =
+      data.diaper_stats.today;
+    document.getElementById("feeding-count").textContent =
+      data.feeding_stats.today;
+    document.getElementById("med-count").textContent =
+      data.medication_count_today;
 
-        document.getElementById('last-diaper').textContent =
-            data.last_diaper ? `Last: ${timeAgo(data.last_diaper.timestamp)}` : 'No records';
-        document.getElementById('last-feeding').textContent =
-            data.last_feeding ? `Last: ${timeAgo(data.last_feeding.timestamp)}` : 'No records';
-        // Show the most recent reading for the viewed day in the unit it was
-        // recorded in. When the day has no reading, leave the detail line blank
-        // (not removed) so the card keeps its height — see .card-detail in CSS.
-        const tempEl = document.getElementById('last-temp');
-        const lastTemp = data.last_temperature;
-        if (lastTemp) {
-            const unit = (lastTemp.unit || 'C').toUpperCase();
-            const value = Math.round(lastTemp.temperature * 10) / 10;
-            tempEl.textContent = `Last temp: ${value}°${unit}`;
-        } else {
-            tempEl.textContent = '';
-        }
-
-        // Refresh the calendar day view
-        loadDayActivities();
-    } catch (err) {
-        console.error('Failed to load dashboard:', err);
+    document.getElementById("last-diaper").textContent = data.last_diaper
+      ? `Last: ${timeAgo(data.last_diaper.timestamp)}`
+      : "No records";
+    document.getElementById("last-feeding").textContent = data.last_feeding
+      ? `Last: ${timeAgo(data.last_feeding.timestamp)}`
+      : "No records";
+    // Show the most recent reading for the viewed day in the unit it was
+    // recorded in. When the day has no reading, leave the detail line blank
+    // (not removed) so the card keeps its height — see .card-detail in CSS.
+    const tempEl = document.getElementById("last-temp");
+    const lastTemp = data.last_temperature;
+    if (lastTemp) {
+      const unit = (lastTemp.unit || "C").toUpperCase();
+      const value = Math.round(lastTemp.temperature * 10) / 10;
+      tempEl.textContent = `Last temp: ${value}°${unit}`;
+    } else {
+      tempEl.textContent = "";
     }
+
+    // Refresh the calendar day view
+    loadDayActivities();
+  } catch (err) {
+    console.error("Failed to load dashboard:", err);
+  }
 }
 
 function getActivityLabel(a) {
-    if (a.type === 'feeding') {
-        const names = getBreastNames();
-        if (a.subtype === 'breast_left') return `${names.left} Breast`;
-        if (a.subtype === 'breast_right') return `${names.right} Breast`;
-    }
-    return a.label || a.summary;
+  if (a.type === "feeding") {
+    const names = getBreastNames();
+    if (a.subtype === "breast_left") return `${names.left} Breast`;
+    if (a.subtype === "breast_right") return `${names.right} Breast`;
+  }
+  return a.label || a.summary;
 }
 
-
 /* ===== Export Modal ===== */
-const EXPORT_ALL_CHILDREN = 'all';
+const EXPORT_ALL_CHILDREN = "all";
 
 /** Export defaults to the child on screen, with an explicit all-children option. */
 function renderExportChildOptions() {
-    const group = document.getElementById('export-child-group');
-    const select = document.getElementById('export-child');
-    group.classList.toggle('hidden', !hasProfiles());
-    if (!hasProfiles()) {
-        select.innerHTML = '';
-        return;
-    }
-    select.innerHTML = childOptionsHtml()
-        + (unassignedCount > 0 ? `<option value="${UNASSIGNED_VIEW}">Unassigned logs</option>` : '')
-        + `<option value="${EXPORT_ALL_CHILDREN}">All children</option>`;
-    select.value = selectedChild === null ? EXPORT_ALL_CHILDREN : String(selectedChild);
+  const group = document.getElementById("export-child-group");
+  const select = document.getElementById("export-child");
+  group.classList.toggle("hidden", !hasProfiles());
+  if (!hasProfiles()) {
+    select.innerHTML = "";
+    return;
+  }
+  select.innerHTML =
+    childOptionsHtml() +
+    (unassignedCount > 0
+      ? `<option value="${UNASSIGNED_VIEW}">Unassigned logs</option>`
+      : "") +
+    `<option value="${EXPORT_ALL_CHILDREN}">All children</option>`;
+  select.value =
+    selectedChild === null ? EXPORT_ALL_CHILDREN : String(selectedChild);
 }
 
 function initExport() {
-    document.getElementById('export-btn').addEventListener('click', () => {
-        renderExportChildOptions();
-        openModal('export-modal');
-    });
+  document.getElementById("export-btn").addEventListener("click", () => {
+    renderExportChildOptions();
+    openModal("export-modal");
+  });
 
-    document.getElementById('export-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const fmt = document.getElementById('export-format').value || 'csv';
-        const start = document.getElementById('export-start-date').value;
-        const end = document.getElementById('export-end-date').value;
+  document.getElementById("export-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fmt = document.getElementById("export-format").value || "csv";
+    const start = document.getElementById("export-start-date").value;
+    const end = document.getElementById("export-end-date").value;
 
-        let url = `/api/export?format=${encodeURIComponent(fmt)}`;
-        if (start) url += `&start_date=${encodeURIComponent(start + 'T00:00:00')}`;
-        // end_date is an exclusive bound, so send the following midnight rather
-        // than 23:59:59 — the latter silently dropped anything logged in the
-        // final second of the chosen day.
-        if (end) {
-            const endExclusive = new Date(end + 'T00:00:00');
-            endExclusive.setDate(endExclusive.getDate() + 1);
-            url += `&end_date=${encodeURIComponent(toDateString(endExclusive) + 'T00:00:00')}`;
-        }
+    let url = `/api/export?format=${encodeURIComponent(fmt)}`;
+    if (start) url += `&start_date=${encodeURIComponent(start + "T00:00:00")}`;
+    // end_date is an exclusive bound, so send the following midnight rather
+    // than 23:59:59 — the latter silently dropped anything logged in the
+    // final second of the chosen day.
+    if (end) {
+      const endExclusive = new Date(end + "T00:00:00");
+      endExclusive.setDate(endExclusive.getDate() + 1);
+      url += `&end_date=${encodeURIComponent(toDateString(endExclusive) + "T00:00:00")}`;
+    }
 
-        const childEl = document.getElementById('export-child');
-        if (hasProfiles() && childEl.value !== EXPORT_ALL_CHILDREN) {
-            url += childEl.value === UNASSIGNED_VIEW
-                ? '&unassigned=true'
-                : `&child_id=${encodeURIComponent(childEl.value)}`;
-        }
+    const childEl = document.getElementById("export-child");
+    if (hasProfiles() && childEl.value !== EXPORT_ALL_CHILDREN) {
+      url +=
+        childEl.value === UNASSIGNED_VIEW
+          ? "&unassigned=true"
+          : `&child_id=${encodeURIComponent(childEl.value)}`;
+    }
 
-        window.location.href = url;
-        closeModal('export-modal');
-    });
+    window.location.href = url;
+    closeModal("export-modal");
+  });
 }
 
 /* ===== Event Listeners ===== */
-document.addEventListener('DOMContentLoaded', () => {
-    initTheme();
-    initOptionButtons();
-    initTabs();
-    initTimer();
-    initFeedingForm();
-    initForms();
-    initMedAutocomplete();
-    initEditForm();
-    initCalendar();
-    initExport();
-    initChildDashboard();
-    updateBreastLabels();
-    updateBottleTypeLabels();
-    updateBottleUnitLabels();
-    // Resolves the selected child before the first dashboard fetch, so the
-    // counts are never briefly wrong for a multi-child install.
-    loadChildren().then(() => {
-        loadDashboard();
-    });
+document.addEventListener("DOMContentLoaded", () => {
+  initTheme();
+  initOptionButtons();
+  initTabs();
+  initTimer();
+  initFeedingForm();
+  initForms();
+  initMedAutocomplete();
+  initEditForm();
+  initCalendar();
+  initExport();
+  initChildDashboard();
+  updateBreastLabels();
+  updateBottleTypeLabels();
+  updateBottleUnitLabels();
+  // Resolves the selected child before the first dashboard fetch, so the
+  // counts are never briefly wrong for a multi-child install.
+  loadChildren().then(() => {
+    loadDashboard();
+  });
 
-    // Theme toggle
-    document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+  // Theme toggle
+  document
+    .getElementById("theme-toggle")
+    .addEventListener("click", toggleTheme);
 
-    // Quick action buttons → open modals
-    document.querySelectorAll('[data-modal]').forEach(btn => {
-        btn.addEventListener('click', () => openModal(btn.dataset.modal));
-    });
+  // Quick action buttons → open modals
+  document.querySelectorAll("[data-modal]").forEach((btn) => {
+    btn.addEventListener("click", () => openModal(btn.dataset.modal));
+  });
 
-    // Close modal via backdrop or cancel button.  Static backdrops opt out:
-    // dismissing a two-step confirmation by clicking away would strand a
-    // half-created profile.
-    document.querySelectorAll('.modal-backdrop:not(.modal-backdrop-static)').forEach(el => {
-        el.addEventListener('click', closeAllModals);
+  // Close modal via backdrop or cancel button.  Static backdrops opt out:
+  // dismissing a two-step confirmation by clicking away would strand a
+  // half-created profile.
+  document
+    .querySelectorAll(".modal-backdrop:not(.modal-backdrop-static)")
+    .forEach((el) => {
+      el.addEventListener("click", closeAllModals);
     });
-    document.querySelectorAll('.modal-close').forEach(el => {
-        el.addEventListener('click', () => {
-            const modal = el.closest('.modal');
-            if (modal) closeModal(modal.id);
-        });
+  document.querySelectorAll(".modal-close").forEach((el) => {
+    el.addEventListener("click", () => {
+      const modal = el.closest(".modal");
+      if (modal) closeModal(modal.id);
     });
+  });
 
-    // Auto-refresh dashboard every 60 seconds
-    setInterval(refreshDashboard, 60000);
+  // Auto-refresh dashboard every 60 seconds
+  setInterval(refreshDashboard, 60000);
 });
