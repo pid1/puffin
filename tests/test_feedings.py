@@ -321,7 +321,8 @@ def test_migration_adds_session_id_column(setup_db):
         poolclass=StaticPool,
     )
     with old_engine.connect() as conn:
-        conn.execute(text("""
+        conn.execute(
+            text("""
             CREATE TABLE feedings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp DATETIME NOT NULL,
@@ -331,7 +332,8 @@ def test_migration_adds_session_id_column(setup_db):
                 notes TEXT,
                 created_at DATETIME
             )
-            """))
+            """)
+        )
         conn.commit()
 
     # Confirm the column is absent before migration
