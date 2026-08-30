@@ -53,9 +53,7 @@ def _jitter(minutes: int) -> timedelta:
     return timedelta(minutes=random.randint(-minutes, minutes))
 
 
-def generate_feedings(
-    day_offset: int, base_date: datetime, now: datetime
-) -> list[Feeding]:
+def generate_feedings(day_offset: int, base_date: datetime, now: datetime) -> list[Feeding]:
     """Generate feedings for a single day.
 
     Breast sessions may produce paired left/right entries to simulate the
@@ -97,9 +95,7 @@ def generate_feedings(
                 # demo data stays reproducible.
                 session_id = f"seed-{random.getrandbits(64):016x}"
                 first_side = random.choice(["breast_left", "breast_right"])
-                second_side = (
-                    "breast_right" if first_side == "breast_left" else "breast_left"
-                )
+                second_side = "breast_right" if first_side == "breast_left" else "breast_left"
 
                 half = base_duration // 2
                 first_dur = random.randint(max(3, half - 3), half + 4)
@@ -147,9 +143,7 @@ def generate_feedings(
     return feedings
 
 
-def generate_diapers(
-    day_offset: int, base_date: datetime, now: datetime
-) -> list[DiaperChange]:
+def generate_diapers(day_offset: int, base_date: datetime, now: datetime) -> list[DiaperChange]:
     """Generate diaper changes for a single day."""
     diapers = []
     day_start = base_date + timedelta(days=day_offset)
@@ -176,9 +170,7 @@ def generate_diapers(
     return diapers
 
 
-def generate_medications(
-    day_offset: int, base_date: datetime, now: datetime
-) -> list[Medication]:
+def generate_medications(day_offset: int, base_date: datetime, now: datetime) -> list[Medication]:
     """Generate medication records for a single day."""
     meds = []
     day_start = base_date + timedelta(days=day_offset)
@@ -265,9 +257,7 @@ def seed():
     db = SessionLocal()
 
     now = datetime.now(UTC)
-    birth_date = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(
-        days=14
-    )
+    birth_date = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=14)
 
     try:
         # Check if data already exists

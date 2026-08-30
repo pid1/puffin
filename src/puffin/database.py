@@ -157,9 +157,7 @@ def _run_migrations(bind=None) -> None:
             conn.execute(text("DROP TABLE feedings"))
             conn.execute(text("ALTER TABLE feedings_new RENAME TO feedings"))
             conn.execute(
-                text(
-                    "CREATE INDEX IF NOT EXISTS idx_feeding_timestamp ON feedings (timestamp)"
-                )
+                text("CREATE INDEX IF NOT EXISTS idx_feeding_timestamp ON feedings (timestamp)")
             )
             conn.execute(text("PRAGMA foreign_keys=on"))
             conn.commit()
@@ -182,9 +180,7 @@ def _run_migrations(bind=None) -> None:
             if "child_id" not in {c["name"] for c in insp.get_columns(table)}:
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN child_id INTEGER"))
                 conn.commit()
-            conn.execute(
-                text(f"CREATE INDEX IF NOT EXISTS {index} ON {table} (child_id)")
-            )
+            conn.execute(text(f"CREATE INDEX IF NOT EXISTS {index} ON {table} (child_id)"))
             conn.commit()
 
         # Temperature readings gain a ``unit`` column recording how each reading
@@ -213,11 +209,7 @@ def _run_migrations(bind=None) -> None:
         if insp.has_table("temperature_readings"):
             temp_cols = {c["name"] for c in insp.get_columns("temperature_readings")}
             if "temperature_celsius" in temp_cols and "temperature" not in temp_cols:
-                conn.execute(
-                    text(
-                        "ALTER TABLE temperature_readings ADD COLUMN temperature FLOAT"
-                    )
-                )
+                conn.execute(text("ALTER TABLE temperature_readings ADD COLUMN temperature FLOAT"))
                 conn.execute(
                     text(
                         "UPDATE temperature_readings SET temperature = CASE "
@@ -226,9 +218,7 @@ def _run_migrations(bind=None) -> None:
                     )
                 )
                 conn.execute(
-                    text(
-                        "ALTER TABLE temperature_readings DROP COLUMN temperature_celsius"
-                    )
+                    text("ALTER TABLE temperature_readings DROP COLUMN temperature_celsius")
                 )
                 conn.commit()
 
@@ -238,9 +228,7 @@ def _run_migrations(bind=None) -> None:
         med_cols = {c["name"] for c in insp.get_columns("medications")}
         if "dosage_quantity" not in med_cols:
             conn.execute(
-                text(
-                    "ALTER TABLE medications ADD COLUMN dosage_quantity REAL NOT NULL DEFAULT 0.0"
-                )
+                text("ALTER TABLE medications ADD COLUMN dosage_quantity REAL NOT NULL DEFAULT 0.0")
             )
             conn.execute(
                 text(
@@ -271,14 +259,10 @@ def _run_migrations(bind=None) -> None:
 
         # Seed saved_medications from existing medication log entries (first casing wins)
         if insp.has_table("saved_medications"):
-            saved_count = conn.execute(
-                text("SELECT COUNT(*) FROM saved_medications")
-            ).scalar()
+            saved_count = conn.execute(text("SELECT COUNT(*) FROM saved_medications")).scalar()
             if saved_count == 0:
                 rows = conn.execute(
-                    text(
-                        "SELECT medication_name FROM medications ORDER BY timestamp ASC, id ASC"
-                    )
+                    text("SELECT medication_name FROM medications ORDER BY timestamp ASC, id ASC")
                 ).fetchall()
                 seen_lower: set[str] = set()
                 now = datetime.now(UTC)

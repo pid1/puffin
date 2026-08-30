@@ -140,9 +140,7 @@ def test_migration_leaves_existing_logs_unassigned(legacy_engine):
     """
     with legacy_engine.connect() as conn:
         for table in ("feedings", "medications"):
-            rows = conn.execute(
-                text(f"SELECT child_id FROM {table}")
-            ).fetchall()  # noqa: S608
+            rows = conn.execute(text(f"SELECT child_id FROM {table}")).fetchall()  # noqa: S608
             assert rows, f"expected seeded rows in {table}"
             assert all(child_id is None for (child_id,) in rows)
 
@@ -197,9 +195,7 @@ def test_migration_adds_amount_unit_to_current_amount_schema(tmp_path):
         with engine.connect() as conn:
             cols = {c["name"] for c in inspect(conn).get_columns("feedings")}
             rows = conn.execute(
-                text(
-                    "SELECT feeding_type, amount, amount_unit FROM feedings ORDER BY id"
-                )
+                text("SELECT feeding_type, amount, amount_unit FROM feedings ORDER BY id")
             ).fetchall()
     finally:
         engine.dispose()
@@ -257,9 +253,7 @@ def test_migration_backfills_temperature_unit_as_celsius(tmp_path):
         _run_migrations(bind=engine)
         _run_migrations(bind=engine)
         with engine.connect() as conn:
-            cols = {
-                c["name"] for c in inspect(conn).get_columns("temperature_readings")
-            }
+            cols = {c["name"] for c in inspect(conn).get_columns("temperature_readings")}
             rows = conn.execute(
                 text("SELECT unit, temperature FROM temperature_readings ORDER BY id")
             ).all()
@@ -320,9 +314,7 @@ def test_migration_reconstructs_entered_fahrenheit(tmp_path):
         _run_migrations(bind=engine)
         _run_migrations(bind=engine)
         with engine.connect() as conn:
-            cols = {
-                c["name"] for c in inspect(conn).get_columns("temperature_readings")
-            }
+            cols = {c["name"] for c in inspect(conn).get_columns("temperature_readings")}
             rows = conn.execute(
                 text("SELECT unit, temperature FROM temperature_readings ORDER BY id")
             ).all()
@@ -360,9 +352,7 @@ def test_migration_seeds_saved_medications(legacy_engine):
     with legacy_engine.connect() as conn:
         names = [
             r[0]
-            for r in conn.execute(
-                text("SELECT name FROM saved_medications ORDER BY id")
-            ).fetchall()
+            for r in conn.execute(text("SELECT name FROM saved_medications ORDER BY id")).fetchall()
         ]
     # "tylenol" should be deduped against "Tylenol" (first casing wins)
     assert names == ["Tylenol", "Vitamin D"]

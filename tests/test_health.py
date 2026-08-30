@@ -148,9 +148,7 @@ def test_update_medication(client):
         },
     )
     mid = create_resp.json()["id"]
-    resp = client.put(
-        f"/api/medications/{mid}", json={"dosage_quantity": 5.0, "dosage_unit": "mL"}
-    )
+    resp = client.put(f"/api/medications/{mid}", json={"dosage_quantity": 5.0, "dosage_unit": "mL"})
     assert resp.status_code == 200
     assert resp.json()["dosage_quantity"] == 5.0
     assert resp.json()["dosage_unit"] == "mL"
@@ -225,9 +223,7 @@ def test_list_temperatures(client):
 
 
 def test_update_temperature(client):
-    create_resp = client.post(
-        "/api/temperatures", json={"temperature": 37.0, "unit": "C"}
-    )
+    create_resp = client.post("/api/temperatures", json={"temperature": 37.0, "unit": "C"})
     tid = create_resp.json()["id"]
     resp = client.put(f"/api/temperatures/{tid}", json={"temperature": 38.0})
     assert resp.status_code == 200
@@ -235,9 +231,7 @@ def test_update_temperature(client):
 
 
 def test_delete_temperature(client):
-    create_resp = client.post(
-        "/api/temperatures", json={"temperature": 37.0, "unit": "C"}
-    )
+    create_resp = client.post("/api/temperatures", json={"temperature": 37.0, "unit": "C"})
     tid = create_resp.json()["id"]
     assert client.delete(f"/api/temperatures/{tid}").status_code == 204
 
@@ -265,9 +259,7 @@ def test_create_temperature_persists_explicit_unit(client):
 
 def test_temperature_range_is_unit_aware(client):
     def post(temp, unit):
-        return client.post(
-            "/api/temperatures", json={"temperature": temp, "unit": unit}
-        )
+        return client.post("/api/temperatures", json={"temperature": temp, "unit": unit})
 
     # 98.6 F is a normal reading; 50 F (10 C) is below the plausible range.
     assert post(98.6, "F").status_code == 201
@@ -278,12 +270,8 @@ def test_temperature_range_is_unit_aware(client):
 
 
 def test_update_temperature_value_and_unit(client):
-    tid = client.post(
-        "/api/temperatures", json={"temperature": 98.6, "unit": "F"}
-    ).json()["id"]
-    resp = client.put(
-        f"/api/temperatures/{tid}", json={"temperature": 37.0, "unit": "C"}
-    )
+    tid = client.post("/api/temperatures", json={"temperature": 98.6, "unit": "F"}).json()["id"]
+    resp = client.put(f"/api/temperatures/{tid}", json={"temperature": 37.0, "unit": "C"})
     assert resp.status_code == 200
     body = resp.json()
     assert body["temperature"] == 37.0
@@ -292,9 +280,7 @@ def test_update_temperature_value_and_unit(client):
 
 def test_update_temperature_unit_only_out_of_range_is_rejected(client):
     # Relabelling 37.0 C as 37.0 F would mean 2.8 C — out of range, so rejected.
-    tid = client.post(
-        "/api/temperatures", json={"temperature": 37.0, "unit": "C"}
-    ).json()["id"]
+    tid = client.post("/api/temperatures", json={"temperature": 37.0, "unit": "C"}).json()["id"]
     resp = client.put(f"/api/temperatures/{tid}", json={"unit": "F"})
     assert resp.status_code == 422
 
@@ -455,12 +441,8 @@ def test_export_invalid_format(client):
 
 
 def test_export_csv_with_date_range(client):
-    client.post(
-        "/api/diapers", json={"type": "pee", "timestamp": "2026-01-01T10:00:00Z"}
-    )
-    client.post(
-        "/api/diapers", json={"type": "poop", "timestamp": "2026-01-15T10:00:00Z"}
-    )
+    client.post("/api/diapers", json={"type": "pee", "timestamp": "2026-01-01T10:00:00Z"})
+    client.post("/api/diapers", json={"type": "poop", "timestamp": "2026-01-15T10:00:00Z"})
     url = "/api/export?format=csv&start_date=2026-01-10T00:00:00&end_date=2026-01-20T00:00:00"
     resp = client.get(url)
     assert resp.status_code == 200
@@ -470,12 +452,8 @@ def test_export_csv_with_date_range(client):
 
 
 def test_export_json_with_date_range(client):
-    client.post(
-        "/api/diapers", json={"type": "pee", "timestamp": "2026-01-01T10:00:00Z"}
-    )
-    client.post(
-        "/api/diapers", json={"type": "poop", "timestamp": "2026-01-15T10:00:00Z"}
-    )
+    client.post("/api/diapers", json={"type": "pee", "timestamp": "2026-01-01T10:00:00Z"})
+    client.post("/api/diapers", json={"type": "poop", "timestamp": "2026-01-15T10:00:00Z"})
     url = "/api/export?format=json&start_date=2026-01-10T00:00:00&end_date=2026-01-20T00:00:00"
     resp = client.get(url)
     assert resp.status_code == 200
@@ -485,9 +463,7 @@ def test_export_json_with_date_range(client):
 
 
 def test_export_pdf_with_date_range(client):
-    client.post(
-        "/api/diapers", json={"type": "pee", "timestamp": "2026-01-01T10:00:00Z"}
-    )
+    client.post("/api/diapers", json={"type": "pee", "timestamp": "2026-01-01T10:00:00Z"})
     url = "/api/export?format=pdf&start_date=2026-01-10T00:00:00&end_date=2026-01-20T00:00:00"
     resp = client.get(url)
     assert resp.status_code == 200
@@ -588,9 +564,7 @@ def test_implausible_temperature_is_rejected(client):
     -500 C was accepted and rendered as -868.0 F in the PDF/CSV export.
     """
     for celsius in (-500, 500, 0, 60):
-        resp = client.post(
-            "/api/temperatures", json={"temperature": celsius, "unit": "C"}
-        )
+        resp = client.post("/api/temperatures", json={"temperature": celsius, "unit": "C"})
         assert resp.status_code == 422, f"{celsius} C was accepted"
 
     # A real fever must still go through.

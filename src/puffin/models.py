@@ -63,18 +63,14 @@ def _child_fk() -> Mapped[int | None]:
     of logs whose profile was deleted, and of logs explicitly set back to
     unassigned by editing them.
     """
-    return mapped_column(
-        Integer, ForeignKey("children.id", ondelete="SET NULL"), nullable=True
-    )
+    return mapped_column(Integer, ForeignKey("children.id", ondelete="SET NULL"), nullable=True)
 
 
 class DiaperChange(Base):
     __tablename__ = "diaper_changes"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(
-        _TZ_DATETIME, nullable=False, default=_utcnow
-    )
+    timestamp: Mapped[datetime] = mapped_column(_TZ_DATETIME, nullable=False, default=_utcnow)
     type: Mapped[str] = mapped_column(String, nullable=False)  # pee, poop, both
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     child_id: Mapped[int | None] = _child_fk()
@@ -90,9 +86,7 @@ class Feeding(Base):
     __tablename__ = "feedings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(
-        _TZ_DATETIME, nullable=False, default=_utcnow
-    )
+    timestamp: Mapped[datetime] = mapped_column(_TZ_DATETIME, nullable=False, default=_utcnow)
     feeding_type: Mapped[str] = mapped_column(
         String, nullable=False
     )  # breast_left, breast_right, bottle
@@ -101,9 +95,7 @@ class Feeding(Base):
     amount_unit: Mapped[str | None] = mapped_column(String, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     session_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    bottle_type: Mapped[str | None] = mapped_column(
-        String, nullable=True
-    )  # breastmilk, formula
+    bottle_type: Mapped[str | None] = mapped_column(String, nullable=True)  # breastmilk, formula
     child_id: Mapped[int | None] = _child_fk()
     created_at: Mapped[datetime] = mapped_column(_TZ_DATETIME, default=_utcnow)
 
@@ -117,9 +109,7 @@ class Medication(Base):
     __tablename__ = "medications"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(
-        _TZ_DATETIME, nullable=False, default=_utcnow
-    )
+    timestamp: Mapped[datetime] = mapped_column(_TZ_DATETIME, nullable=False, default=_utcnow)
     medication_name: Mapped[str] = mapped_column(String, nullable=False)
     dosage_quantity: Mapped[float] = mapped_column(Float, nullable=False)
     dosage_unit: Mapped[str] = mapped_column(String, nullable=False)
@@ -137,9 +127,7 @@ class TemperatureReading(Base):
     __tablename__ = "temperature_readings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(
-        _TZ_DATETIME, nullable=False, default=_utcnow
-    )
+    timestamp: Mapped[datetime] = mapped_column(_TZ_DATETIME, nullable=False, default=_utcnow)
     # The temperature exactly as the user entered it, in the unit recorded
     # below — no normalization to Celsius. Interpret it together with ``unit``.
     temperature: Mapped[float] = mapped_column(Float, nullable=False)

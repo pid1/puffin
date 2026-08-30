@@ -152,20 +152,16 @@ def export_data(
 
         data = {
             "diapers": [
-                DiaperChangeResponse.model_validate(d).model_dump(mode="json")
-                for d in diapers
+                DiaperChangeResponse.model_validate(d).model_dump(mode="json") for d in diapers
             ],
             "feedings": [
-                FeedingResponse.model_validate(f).model_dump(mode="json")
-                for f in feedings
+                FeedingResponse.model_validate(f).model_dump(mode="json") for f in feedings
             ],
             "medications": [
-                MedicationResponse.model_validate(m).model_dump(mode="json")
-                for m in medications
+                MedicationResponse.model_validate(m).model_dump(mode="json") for m in medications
             ],
             "temperatures": [
-                TemperatureResponse.model_validate(t).model_dump(mode="json")
-                for t in temperatures
+                TemperatureResponse.model_validate(t).model_dump(mode="json") for t in temperatures
             ],
         }
         if include_child:
@@ -255,11 +251,7 @@ def export_data(
                     [
                         _fmt_ts(f.timestamp, local_tz),
                         _feeding_type_label(f.feeding_type, f.bottle_type),
-                        (
-                            str(f.duration_minutes)
-                            if f.duration_minutes is not None
-                            else ""
-                        ),
+                        (str(f.duration_minutes) if f.duration_minutes is not None else ""),
                         _format_bottle_amount(f.amount, f.amount_unit),
                         f.notes or "",
                     ]
@@ -330,9 +322,7 @@ def export_data(
     writer.writerow(["--- Diaper Changes ---"])
     writer.writerow(header(["id", "timestamp", "type", "notes", "created_at"]))
     for d in diapers:
-        writer.writerow(
-            row([d.id, ts(d.timestamp), d.type, d.notes, ts(d.created_at)], d)
-        )
+        writer.writerow(row([d.id, ts(d.timestamp), d.type, d.notes, ts(d.created_at)], d))
 
     writer.writerow([])
     writer.writerow(["--- Feedings ---"])

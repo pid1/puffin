@@ -75,9 +75,7 @@ def update_feeding(feeding_id: int, data: FeedingUpdate, db: Session = Depends(g
     existing = crud.get_feeding(db, feeding_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Feeding not found")
-    target_type = (
-        data.feeding_type.value if data.feeding_type else existing.feeding_type
-    )
+    target_type = data.feeding_type.value if data.feeding_type else existing.feeding_type
     if target_type == "bottle" and (data.amount is None) != (data.amount_unit is None):
         raise HTTPException(
             status_code=422,

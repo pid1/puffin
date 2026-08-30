@@ -65,9 +65,7 @@ def get_diaper(diaper_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{diaper_id}", response_model=DiaperChangeResponse)
-def update_diaper(
-    diaper_id: int, data: DiaperChangeUpdate, db: Session = Depends(get_db)
-):
+def update_diaper(diaper_id: int, data: DiaperChangeUpdate, db: Session = Depends(get_db)):
     updates = {}
     if data.timestamp is not None:
         updates["timestamp"] = data.timestamp

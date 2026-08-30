@@ -54,9 +54,7 @@ def _prune(backups: Path, stem: str, keep: int) -> None:
         old.unlink(missing_ok=True)
 
 
-def backup_database(
-    db_path, *, reason: str = "manual", keep: int | None = None
-) -> Path | None:
+def backup_database(db_path, *, reason: str = "manual", keep: int | None = None) -> Path | None:
     """Write a consistent snapshot of *db_path* into its ``backups/`` dir.
 
     Returns the snapshot path, or ``None`` when there is nothing to back up
