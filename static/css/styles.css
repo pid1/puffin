@@ -773,7 +773,7 @@ body {
 
 /* ===== Utility ===== */
 .hidden {
-  display: none !important;
+  display: none;
 }
 
 /* Secondary explanatory text under a form field or in a dialog body.  The

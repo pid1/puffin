@@ -78,16 +78,16 @@ const BOTTLE_UNIT_KEY = "defaultBottleUnit";
 const DEFAULT_BOTTLE_TYPE = "breastmilk";
 const DEFAULT_BOTTLE_UNIT = "oz";
 
-function getDefaultBottleType() {
+function _getDefaultBottleType() {
   return localStorage.getItem(BOTTLE_TYPE_KEY) || DEFAULT_BOTTLE_TYPE;
 }
 
-function getDefaultBottleUnit() {
+function _getDefaultBottleUnit() {
   const unit = localStorage.getItem(BOTTLE_UNIT_KEY) || DEFAULT_BOTTLE_UNIT;
   return unit === "mL" ? "mL" : "oz";
 }
 
-function validateBottleAmountUnit(amount, unit) {
+function _validateBottleAmountUnit(amount, unit) {
   if (unit === "mL" && !Number.isInteger(Number(amount))) {
     showToast("mL amounts must be whole numbers");
     return false;
@@ -95,7 +95,7 @@ function validateBottleAmountUnit(amount, unit) {
   return true;
 }
 
-function getBreastNames() {
+function _getBreastNames() {
   return {
     left: localStorage.getItem(BREAST_LEFT_KEY) || DEFAULT_LEFT_NAME,
     right: localStorage.getItem(BREAST_RIGHT_KEY) || DEFAULT_RIGHT_NAME,
@@ -195,7 +195,7 @@ let selectedChild = null;
  * share. The dashboard refreshes its export options and timeline; the settings
  * page has neither and leaves this as the no-op.
  */
-let onChildDataChanged = () => {};
+const onChildDataChanged = () => {};
 
 function hasProfiles() {
   return childProfiles.length > 0;
@@ -215,7 +215,7 @@ function storeSelectedChild(value) {
 }
 
 /** The current scope as a query fragment appended to dashboard/activity calls. */
-function childQuery() {
+function _childQuery() {
   if (selectedChild === UNASSIGNED_VIEW) return "&unassigned=true";
   if (typeof selectedChild === "number") return `&child_id=${selectedChild}`;
   return "";
@@ -227,7 +227,7 @@ function childQuery() {
  * Returns null in the unassigned view so a log created while looking at
  * unassigned logs stays unassigned, matching what is on screen.
  */
-function currentChildId() {
+function _currentChildId() {
   return typeof selectedChild === "number" ? selectedChild : null;
 }
 
@@ -383,7 +383,7 @@ async function addChild() {
   try {
     created = await api.post("/api/children", { name });
   } catch (err) {
-    showToast("Error: " + err.message);
+    showToast(`Error: ${err.message}`);
     return;
   }
   input.value = "";
@@ -477,7 +477,7 @@ async function runBulkAssign(child) {
     const plural = result.assigned === 1 ? "" : "s";
     showToast(`Moved ${result.assigned} log${plural} to ${child.name}`);
   } catch (err) {
-    showToast("Error: " + err.message);
+    showToast(`Error: ${err.message}`);
   }
 }
 
@@ -570,7 +570,7 @@ async function saveChildRename(childId) {
     await refreshChildUI();
     showToast("Child renamed");
   } catch (err) {
-    showToast("Error: " + err.message);
+    showToast(`Error: ${err.message}`);
   }
 }
 
@@ -594,7 +594,7 @@ function confirmChildDelete(childId) {
         await refreshChildUI();
         showToast(`${child.name} deleted — their logs are now unassigned`);
       } catch (err) {
-        showToast("Error: " + err.message);
+        showToast(`Error: ${err.message}`);
       }
     },
     onCancel: () => closeModal("confirm-modal"),
@@ -602,7 +602,7 @@ function confirmChildDelete(childId) {
 }
 
 /** Wires the Children section. Only the settings page has this markup. */
-function initChildSettings() {
+function _initChildSettings() {
   document.getElementById("child-add-btn").addEventListener("click", addChild);
   document.getElementById("child-new-name").addEventListener("keydown", (e) => {
     // The Children section lives inside the settings form; Enter here must
@@ -631,14 +631,14 @@ function initChildSettings() {
   // the Children section.
   document.getElementById("child-list").addEventListener("change", (e) => {
     const box = e.target;
-    if (box.matches && box.matches("input[data-quick-add]")) {
+    if (box.matches?.("input[data-quick-add]")) {
       persistQuickAddToggle(parseInt(box.dataset.quickAdd, 10), box);
     }
   });
 }
 
 /* ===== Dark Mode ===== */
-function initTheme() {
+function _initTheme() {
   const saved = localStorage.getItem("puffin-theme");
   if (saved) {
     document.documentElement.setAttribute("data-theme", saved);
@@ -646,7 +646,7 @@ function initTheme() {
   updateThemeIcon();
 }
 
-function toggleTheme() {
+function _toggleTheme() {
   const current = document.documentElement.getAttribute("data-theme");
   const isDark =
     current === "dark" ||
@@ -672,8 +672,8 @@ function updateThemeIcon() {
 // and reset their own contents; it registers that through these hooks rather
 // than teaching the shared layer about feeding, diaper, and health markup that
 // only exists on one page.
-let onModalOpen = () => {};
-let onModalClose = () => {};
+const onModalOpen = () => {};
+const onModalClose = () => {};
 
 function openModal(id) {
   document.getElementById(id).classList.remove("hidden");
@@ -697,6 +697,6 @@ function closeModal(id) {
   onModalClose(id);
 }
 
-function closeAllModals() {
+function _closeAllModals() {
   document.querySelectorAll(".modal").forEach((m) => m.classList.add("hidden"));
 }

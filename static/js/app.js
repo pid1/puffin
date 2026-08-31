@@ -23,9 +23,9 @@ function updateBottleUnitLabels() {
   for (const sel of selects) {
     if (!sel) continue;
     sel.querySelector('option[value="oz"]').textContent =
-      "oz" + (defaultUnit === "oz" ? " (default)" : "");
+      `oz${defaultUnit === "oz" ? " (default)" : ""}`;
     sel.querySelector('option[value="mL"]').textContent =
-      "mL" + (defaultUnit === "mL" ? " (default)" : "");
+      `mL${defaultUnit === "mL" ? " (default)" : ""}`;
     sel.value = defaultUnit;
   }
 }
@@ -39,9 +39,9 @@ function updateBottleTypeLabels() {
   for (const sel of selects) {
     if (!sel) continue;
     sel.querySelector('option[value="breastmilk"]').textContent =
-      "Breastmilk" + (defaultType === "breastmilk" ? " (default)" : "");
+      `Breastmilk${defaultType === "breastmilk" ? " (default)" : ""}`;
     sel.querySelector('option[value="formula"]').textContent =
-      "Formula" + (defaultType === "formula" ? " (default)" : "");
+      `Formula${defaultType === "formula" ? " (default)" : ""}`;
     sel.value = defaultType;
   }
 }
@@ -259,7 +259,7 @@ function startTimer(side) {
   // Reaching Start with a timer already running means a mis-tap, not an
   // intent to discard a feed in progress.
   const existing = getTimerState();
-  if (existing && existing.active) {
+  if (existing?.active) {
     showTimerUI();
     showToast("A feeding is already in progress");
     return;
@@ -279,7 +279,7 @@ function startTimer(side) {
 
 function switchBreast() {
   const state = getTimerState();
-  if (!state || !state.active) return;
+  if (!state?.active) return;
 
   const current = state.segments[state.segments.length - 1];
   if (current.side !== "breast_left" && current.side !== "breast_right") return;
@@ -336,7 +336,7 @@ function openRunningSegment(state, side, now) {
 
 function pauseTimer() {
   const state = getTimerState();
-  if (!state || !state.active || state.paused) return;
+  if (!state?.active || state.paused) return;
 
   closeRunningSegment(state, new Date().toISOString());
   state.paused = true;
@@ -347,7 +347,7 @@ function pauseTimer() {
 
 function resumeTimer() {
   const state = getTimerState();
-  if (!state || !state.active || !state.paused) return;
+  if (!state?.active || !state.paused) return;
 
   const lastSeg = state.segments[state.segments.length - 1];
   openRunningSegment(state, lastSeg.side, new Date().toISOString());
@@ -363,7 +363,7 @@ function resumeTimer() {
 // restore the exact prior state (running vs. already-paused).
 function beginEndConfirmation() {
   const state = getTimerState();
-  if (!state || !state.active) return;
+  if (!state?.active) return;
 
   state.resumeOnCancel = !state.paused;
   if (!state.paused) {
@@ -378,7 +378,7 @@ function beginEndConfirmation() {
 // already paused when End was pressed, leave it paused.
 function cancelEndConfirmation() {
   const state = getTimerState();
-  if (!state || !state.active) return;
+  if (!state?.active) return;
 
   if (state.resumeOnCancel) {
     const lastSeg = state.segments[state.segments.length - 1];
@@ -410,7 +410,7 @@ function formatDurationShort(ms) {
 
 function showTimerUI() {
   const state = getTimerState();
-  if (!state || !state.active) {
+  if (!state?.active) {
     document.getElementById("timer-section").classList.add("hidden");
     if (timerInterval) {
       clearInterval(timerInterval);
@@ -585,7 +585,7 @@ async function endTimer() {
     reloadAfterLogChange();
   } catch (e) {
     confirmBtn.disabled = false;
-    showToast("Error saving feeding: " + e.message);
+    showToast(`Error saving feeding: ${e.message}`);
   }
 }
 
@@ -683,8 +683,8 @@ async function loadLastBreastFeeding() {
     // Find the most recent breast feeding session. Feedings sharing a session_id
     // were recorded together and belong to the same session; feedings with no
     // session_id are each their own standalone session.
-    let lastSessionId = undefined;
-    let lastSessionFeedings = [];
+    let lastSessionId;
+    const lastSessionFeedings = [];
     for (const f of feedings) {
       if (new Date(f.timestamp).getTime() > now) continue;
       if (f.feeding_type !== "breast_left" && f.feeding_type !== "breast_right")
@@ -1016,7 +1016,7 @@ function initForms() {
         reloadAfterLogChange();
       } catch (err) {
         submitBtn.disabled = false;
-        showToast("Error: " + err.message);
+        showToast(`Error: ${err.message}`);
       }
     });
 
@@ -1072,7 +1072,7 @@ function initForms() {
             reloadAfterLogChange();
           } catch (err) {
             saveBtn.disabled = false;
-            showToast("Error: " + err.message);
+            showToast(`Error: ${err.message}`);
           }
           return;
         }
@@ -1108,7 +1108,7 @@ function initForms() {
         if (leftDur) {
           const body = {
             feeding_type: "breast_left",
-            duration_minutes: parseInt(leftDur),
+            duration_minutes: parseInt(leftDur, 10),
             notes: notesAttached ? undefined : notes,
             timestamp,
             child_id: currentChildId(),
@@ -1120,7 +1120,7 @@ function initForms() {
         if (rightDur) {
           const body = {
             feeding_type: "breast_right",
-            duration_minutes: parseInt(rightDur),
+            duration_minutes: parseInt(rightDur, 10),
             notes: notesAttached ? undefined : notes,
             timestamp,
             child_id: currentChildId(),
@@ -1151,7 +1151,7 @@ function initForms() {
         reloadAfterLogChange();
       } catch (err) {
         saveBtn.disabled = false;
-        showToast("Error: " + err.message);
+        showToast(`Error: ${err.message}`);
       }
     });
 
@@ -1174,7 +1174,7 @@ function initForms() {
         ? new Date(timestampInput).toISOString()
         : undefined;
       const dosage_quantity = parseFloat(parseFloat(dosageQtyRaw).toFixed(2));
-      if (isNaN(dosage_quantity) || dosage_quantity <= 0) {
+      if (Number.isNaN(dosage_quantity) || dosage_quantity <= 0) {
         showToast("Quantity must be a positive number");
         return;
       }
@@ -1198,7 +1198,7 @@ function initForms() {
         reloadAfterLogChange();
       } catch (err) {
         submitBtn.disabled = false;
-        showToast("Error: " + err.message);
+        showToast(`Error: ${err.message}`);
       }
     });
 
@@ -1234,7 +1234,7 @@ function initForms() {
         reloadAfterLogChange();
       } catch (err) {
         submitBtn.disabled = false;
-        showToast("Error: " + err.message);
+        showToast(`Error: ${err.message}`);
       }
     });
 }
@@ -1246,7 +1246,7 @@ function toLocalDatetime(isoStr) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-async function openEditModal(type, id, secondaryId = null) {
+async function _openEditModal(type, id, secondaryId = null) {
   const endpoints = {
     diaper: `/api/diapers/${id}`,
     feeding: `/api/feedings/${id}`,
@@ -1299,7 +1299,7 @@ async function openEditModal(type, id, secondaryId = null) {
     initEditOptionButtons();
     openModal("edit-modal");
   } catch (err) {
-    showToast("Error loading record: " + err.message);
+    showToast(`Error loading record: ${err.message}`);
   }
 }
 
@@ -1470,7 +1470,7 @@ function buildBreastEditFields(before) {
   // Notes and time belong to the session, so they come from whichever side
   // carries them rather than from a fixed one.
   const anchor = left || right;
-  const notes = (left && left.notes) || (right && right.notes) || "";
+  const notes = left?.notes || right?.notes || "";
   return `
         <div class="form-group">
             <label for="edit-left-duration">🤱 ${escapeHtml(names.left)} (minutes)</label>
@@ -1802,7 +1802,7 @@ function initEditForm() {
       showToast("Updated!");
       reloadAfterLogChange();
     } catch (err) {
-      showToast("Error: " + err.message);
+      showToast(`Error: ${err.message}`);
     }
   });
 
@@ -1843,7 +1843,7 @@ function initEditForm() {
         showToast("Deleted!");
         reloadAfterLogChange();
       } catch (err) {
-        showToast("Error: " + err.message);
+        showToast(`Error: ${err.message}`);
       }
     });
 }
@@ -2151,14 +2151,14 @@ function initExport() {
     const end = document.getElementById("export-end-date").value;
 
     let url = `/api/export?format=${encodeURIComponent(fmt)}`;
-    if (start) url += `&start_date=${encodeURIComponent(start + "T00:00:00")}`;
+    if (start) url += `&start_date=${encodeURIComponent(`${start}T00:00:00`)}`;
     // end_date is an exclusive bound, so send the following midnight rather
     // than 23:59:59 — the latter silently dropped anything logged in the
     // final second of the chosen day.
     if (end) {
-      const endExclusive = new Date(end + "T00:00:00");
+      const endExclusive = new Date(`${end}T00:00:00`);
       endExclusive.setDate(endExclusive.getDate() + 1);
-      url += `&end_date=${encodeURIComponent(toDateString(endExclusive) + "T00:00:00")}`;
+      url += `&end_date=${encodeURIComponent(`${toDateString(endExclusive)}T00:00:00`)}`;
     }
 
     const childEl = document.getElementById("export-child");
