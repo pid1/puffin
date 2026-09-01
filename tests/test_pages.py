@@ -5,6 +5,38 @@ a partial and each pulls a different pair of scripts, so a rename or a dropped
 `<script>` tag would otherwise only surface in the browser.
 """
 
+from html.parser import HTMLParser
+
+
+class _ElementById(HTMLParser):
+    """Records the tag name and attributes of the element carrying an id."""
+
+    def __init__(self, target_id):
+        super().__init__(convert_charrefs=True)
+        self.target_id = target_id
+        self.tag = None
+        self.attrs = {}
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if attrs.get("id") == self.target_id:
+            self.tag = tag
+            self.attrs = attrs
+
+
+def element_by_id(html, target_id):
+    """Find one element by id, as (tag, attrs); (None, {}) when absent.
+
+    Matching a literal slice of the markup couples a test to attribute order
+    and line breaks, so a formatter reflowing a tag breaks the suite without
+    changing anything the page does -- which is exactly what happened to the
+    gear-link test below. Parsing asks what the test actually means: which
+    element carries this id, and what are its attributes?
+    """
+    parser = _ElementById(target_id)
+    parser.feed(html)
+    return parser.tag, parser.attrs
+
 
 def test_index_renders(client):
     res = client.get("/")
@@ -46,12 +78,13 @@ def test_gear_navigates_from_the_dashboard_but_marks_position_on_settings(client
     A self-link on /settings would reload the page and drop unsaved preference
     edits, so there it is a current-page marker instead.
     """
-    dashboard = client.get("/").text
-    assert '<a href="/settings" id="settings-btn"' in dashboard
+    tag, attrs = element_by_id(client.get("/").text, "settings-btn")
+    assert tag == "a"
+    assert attrs.get("href") == "/settings"
 
-    settings = client.get("/settings").text
-    assert 'id="settings-btn"' in settings
-    assert 'aria-current="page"' in settings
+    tag, attrs = element_by_id(client.get("/settings").text, "settings-btn")
+    assert tag is not None
+    assert attrs.get("aria-current") == "page"
 
 
 def test_settings_page_has_no_cancel_and_offers_a_way_back(client):
