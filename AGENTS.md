@@ -14,23 +14,23 @@ dev          # start FastAPI dev server on port 8000
 
 ### Commands
 
-| Command | Description |
-|---------|-------------|
-| `setup` | Initialize repo (runs: install-deps) |
-| `dev` | Start FastAPI dev server on port 8000 (interactive) |
-| `dev-start` | Start dev server in background (non-interactive) |
-| `dev-stop` | Stop background dev server |
-| `dev-status` | Check status of background processes |
-| `dev-logs` | View last 50 lines of dev logs |
-| `lint` | Run ruff linter |
-| `lint-fix` | Run ruff linter with auto-fix |
-| `format` | Run ruff formatter |
-| `test` | Run all tests (Python + JS) |
-| `test-py` | Run pytest only |
-| `test-js` | Run JS tests only (Node's built-in `node:test`) |
-| `install-deps` | Install dependencies with uv |
-| `seed` | Generate 14 days of demo data |
-| `backup` | Snapshot the database into `<db-dir>/backups` |
+| Command        | Description                                         |
+| -------------- | --------------------------------------------------- |
+| `setup`        | Initialize repo (runs: install-deps)                |
+| `dev`          | Start FastAPI dev server on port 8000 (interactive) |
+| `dev-start`    | Start dev server in background (non-interactive)    |
+| `dev-stop`     | Stop background dev server                          |
+| `dev-status`   | Check status of background processes                |
+| `dev-logs`     | View last 50 lines of dev logs                      |
+| `lint`         | Run ruff linter                                     |
+| `lint-fix`     | Run ruff linter with auto-fix                       |
+| `format`       | Run ruff formatter                                  |
+| `test`         | Run all tests (Python + JS)                         |
+| `test-py`      | Run pytest only                                     |
+| `test-js`      | Run JS tests only (Node's built-in `node:test`)     |
+| `install-deps` | Install dependencies with uv                        |
+| `seed`         | Generate 14 days of demo data                       |
+| `backup`       | Snapshot the database into `<db-dir>/backups`       |
 
 ### For AI Agents
 

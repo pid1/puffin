@@ -45,7 +45,12 @@ def list_feedings(
     db: Session = Depends(get_db),
 ):
     return crud.get_feedings(
-        db, start_date=start_date, end_date=end_date, limit=limit, offset=offset, child=child
+        db,
+        start_date=start_date,
+        end_date=end_date,
+        limit=limit,
+        offset=offset,
+        child=child,
     )
 
 

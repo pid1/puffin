@@ -35,7 +35,11 @@ def test_create_medication_with_timestamp(client):
 def test_create_medication_integer_quantity(client):
     resp = client.post(
         "/api/medications",
-        json={"medication_name": "Vitamin D", "dosage_quantity": 1, "dosage_unit": "tablet(s)"},
+        json={
+            "medication_name": "Vitamin D",
+            "dosage_quantity": 1,
+            "dosage_unit": "tablet(s)",
+        },
     )
     assert resp.status_code == 201
     assert resp.json()["dosage_quantity"] == 1.0
@@ -44,7 +48,11 @@ def test_create_medication_integer_quantity(client):
 def test_create_medication_two_decimal_quantity(client):
     resp = client.post(
         "/api/medications",
-        json={"medication_name": "Ibuprofen", "dosage_quantity": 2.25, "dosage_unit": "mL"},
+        json={
+            "medication_name": "Ibuprofen",
+            "dosage_quantity": 2.25,
+            "dosage_unit": "mL",
+        },
     )
     assert resp.status_code == 201
     assert resp.json()["dosage_quantity"] == 2.25
@@ -53,7 +61,11 @@ def test_create_medication_two_decimal_quantity(client):
 def test_create_medication_invalid_quantity_too_many_decimals(client):
     resp = client.post(
         "/api/medications",
-        json={"medication_name": "Tylenol", "dosage_quantity": 1.555, "dosage_unit": "mL"},
+        json={
+            "medication_name": "Tylenol",
+            "dosage_quantity": 1.555,
+            "dosage_unit": "mL",
+        },
     )
     assert resp.status_code == 422
 
@@ -69,7 +81,11 @@ def test_create_medication_invalid_quantity_zero(client):
 def test_create_medication_invalid_quantity_negative(client):
     resp = client.post(
         "/api/medications",
-        json={"medication_name": "Tylenol", "dosage_quantity": -1.5, "dosage_unit": "mL"},
+        json={
+            "medication_name": "Tylenol",
+            "dosage_quantity": -1.5,
+            "dosage_unit": "mL",
+        },
     )
     assert resp.status_code == 422
 
@@ -77,16 +93,32 @@ def test_create_medication_invalid_quantity_negative(client):
 def test_create_medication_invalid_unit(client):
     resp = client.post(
         "/api/medications",
-        json={"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "oz"},
+        json={
+            "medication_name": "Tylenol",
+            "dosage_quantity": 2.5,
+            "dosage_unit": "oz",
+        },
     )
     assert resp.status_code == 422
 
 
 def test_create_medication_all_valid_units(client):
-    for unit in ["mL", "tsp(s)", "tbsp(s)", "drop(s)", "spray(s)", "tablet(s)", "unit(s)"]:
+    for unit in [
+        "mL",
+        "tsp(s)",
+        "tbsp(s)",
+        "drop(s)",
+        "spray(s)",
+        "tablet(s)",
+        "unit(s)",
+    ]:
         resp = client.post(
             "/api/medications",
-            json={"medication_name": "Med", "dosage_quantity": 1.0, "dosage_unit": unit},
+            json={
+                "medication_name": "Med",
+                "dosage_quantity": 1.0,
+                "dosage_unit": unit,
+            },
         )
         assert resp.status_code == 201, f"Failed for unit: {unit}"
         assert resp.json()["dosage_unit"] == unit
@@ -95,7 +127,11 @@ def test_create_medication_all_valid_units(client):
 def test_list_medications(client):
     client.post(
         "/api/medications",
-        json={"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"},
+        json={
+            "medication_name": "Tylenol",
+            "dosage_quantity": 2.5,
+            "dosage_unit": "mL",
+        },
     )
     resp = client.get("/api/medications")
     assert resp.status_code == 200
@@ -121,7 +157,11 @@ def test_update_medication(client):
 def test_update_medication_unit_only(client):
     create_resp = client.post(
         "/api/medications",
-        json={"medication_name": "Tylenol", "dosage_quantity": 1.0, "dosage_unit": "mL"},
+        json={
+            "medication_name": "Tylenol",
+            "dosage_quantity": 1.0,
+            "dosage_unit": "mL",
+        },
     )
     mid = create_resp.json()["id"]
     resp = client.put(f"/api/medications/{mid}", json={"dosage_unit": "tsp(s)"})
@@ -317,7 +357,11 @@ def test_dashboard_empty(client):
 def test_medication_detail_in_activities(client):
     client.post(
         "/api/medications",
-        json={"medication_name": "Vitamin D", "dosage_quantity": 1.5, "dosage_unit": "mL"},
+        json={
+            "medication_name": "Vitamin D",
+            "dosage_quantity": 1.5,
+            "dosage_unit": "mL",
+        },
     )
     resp = client.get("/api/dashboard")
     assert resp.status_code == 200
@@ -352,7 +396,11 @@ def test_export_csv_feeding_amount_columns(client):
 def test_export_csv_medication_columns(client):
     client.post(
         "/api/medications",
-        json={"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"},
+        json={
+            "medication_name": "Tylenol",
+            "dosage_quantity": 2.5,
+            "dosage_unit": "mL",
+        },
     )
     resp = client.get("/api/export?format=csv")
     assert resp.status_code == 200
@@ -434,7 +482,11 @@ def test_saved_names_empty(client):
 def test_saved_names_added_on_create(client):
     client.post(
         "/api/medications",
-        json={"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"},
+        json={
+            "medication_name": "Tylenol",
+            "dosage_quantity": 2.5,
+            "dosage_unit": "mL",
+        },
     )
     resp = client.get("/api/medications/saved-names")
     assert resp.status_code == 200
@@ -456,7 +508,11 @@ def test_saved_names_no_case_insensitive_duplicates(client):
     for name in ["Vitamin D", "vitamin d", "VITAMIN D"]:
         client.post(
             "/api/medications",
-            json={"medication_name": name, "dosage_quantity": 1.0, "dosage_unit": "tablet(s)"},
+            json={
+                "medication_name": name,
+                "dosage_quantity": 1.0,
+                "dosage_unit": "tablet(s)",
+            },
         )
     resp = client.get("/api/medications/saved-names")
     assert resp.status_code == 200
@@ -469,7 +525,11 @@ def test_saved_names_no_case_insensitive_duplicates(client):
 def test_saved_names_preserves_original_casing(client):
     client.post(
         "/api/medications",
-        json={"medication_name": "vitamin C", "dosage_quantity": 1.0, "dosage_unit": "tablet(s)"},
+        json={
+            "medication_name": "vitamin C",
+            "dosage_quantity": 1.0,
+            "dosage_unit": "tablet(s)",
+        },
     )
     resp = client.get("/api/medications/saved-names")
     assert resp.json() == ["vitamin C"]
@@ -491,7 +551,9 @@ def test_nan_dosage_is_rejected_not_a_500(client):
             + ', "dosage_unit": "mL"}'
         )
         resp = client.post(
-            "/api/medications", content=body, headers={"Content-Type": "application/json"}
+            "/api/medications",
+            content=body,
+            headers={"Content-Type": "application/json"},
         )
         assert resp.status_code == 422, f"{literal} did not validate cleanly"
 
@@ -525,7 +587,11 @@ def test_saved_medication_survives_a_lost_race(client, monkeypatch):
     """
     from puffin import crud
 
-    payload = {"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"}
+    payload = {
+        "medication_name": "Tylenol",
+        "dosage_quantity": 2.5,
+        "dosage_unit": "mL",
+    }
     assert client.post("/api/medications", json=payload).status_code == 201
 
     monkeypatch.setattr(crud, "_saved_medication_exists", lambda db, name: False)

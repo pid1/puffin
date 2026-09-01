@@ -55,7 +55,12 @@ def list_medications(
     db: Session = Depends(get_db),
 ):
     return crud.get_medications(
-        db, start_date=start_date, end_date=end_date, limit=limit, offset=offset, child=child
+        db,
+        start_date=start_date,
+        end_date=end_date,
+        limit=limit,
+        offset=offset,
+        child=child,
     )
 
 
@@ -132,7 +137,12 @@ def list_temperatures(
     db: Session = Depends(get_db),
 ):
     return crud.get_temperatures(
-        db, start_date=start_date, end_date=end_date, limit=limit, offset=offset, child=child
+        db,
+        start_date=start_date,
+        end_date=end_date,
+        limit=limit,
+        offset=offset,
+        child=child,
     )
 
 

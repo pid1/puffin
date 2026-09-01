@@ -100,7 +100,11 @@ def test_unassigned_count_spans_every_log_type(client):
     client.post("/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": 15})
     client.post(
         "/api/medications",
-        json={"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"},
+        json={
+            "medication_name": "Tylenol",
+            "dosage_quantity": 2.5,
+            "dosage_unit": "mL",
+        },
     )
     client.post("/api/temperatures", json={"temperature": 37.0, "unit": "C"})
 
@@ -110,7 +114,10 @@ def test_unassigned_count_spans_every_log_type(client):
 def test_bulk_assign_moves_every_unassigned_log(client, child):
     """The one-time migration offer and the later bulk re-assign share this."""
     client.post("/api/diapers", json={"type": "pee"})
-    client.post("/api/feedings", json={"feeding_type": "bottle", "amount": 3, "amount_unit": "oz"})
+    client.post(
+        "/api/feedings",
+        json={"feeding_type": "bottle", "amount": 3, "amount_unit": "oz"},
+    )
     client.post("/api/temperatures", json={"temperature": 37.0, "unit": "C"})
 
     resp = client.post(f"/api/children/{child['id']}/assign-unassigned")
@@ -198,11 +205,20 @@ def test_dashboard_last_activity_is_scoped(client, two_children):
     maya, theo = two_children
     client.post(
         "/api/feedings",
-        json={"feeding_type": "breast_left", "duration_minutes": 15, "child_id": maya["id"]},
+        json={
+            "feeding_type": "breast_left",
+            "duration_minutes": 15,
+            "child_id": maya["id"],
+        },
     )
     theos = client.post(
         "/api/feedings",
-        json={"feeding_type": "bottle", "amount": 3, "amount_unit": "oz", "child_id": theo["id"]},
+        json={
+            "feeding_type": "bottle",
+            "amount": 3,
+            "amount_unit": "oz",
+            "child_id": theo["id"],
+        },
     ).json()
 
     last = client.get(f"/api/dashboard?child_id={theo['id']}").json()["last_feeding"]
@@ -332,7 +348,10 @@ def test_create_rejects_nonexistent_child_id(client):
     """
     for path, payload in (
         ("/api/diapers", {"type": "pee"}),
-        ("/api/feedings", {"feeding_type": "bottle", "amount": 3.0, "amount_unit": "oz"}),
+        (
+            "/api/feedings",
+            {"feeding_type": "bottle", "amount": 3.0, "amount_unit": "oz"},
+        ),
         (
             "/api/medications",
             {"medication_name": "Tylenol", "dosage_quantity": 2.5, "dosage_unit": "mL"},

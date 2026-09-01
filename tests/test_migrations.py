@@ -59,7 +59,13 @@ def legacy_engine(tmp_path):
         "VALUES (?, ?, ?, ?, ?)",
         [
             ("2026-04-01 10:00:00", "Tylenol", "2.5 ml", None, "2026-04-01 10:00:00"),
-            ("2026-04-02 10:00:00", "Vitamin D", "400 IU (1 drop)", None, "2026-04-02 10:00:00"),
+            (
+                "2026-04-02 10:00:00",
+                "Vitamin D",
+                "400 IU (1 drop)",
+                None,
+                "2026-04-02 10:00:00",
+            ),
             ("2026-04-03 10:00:00", "tylenol", "2.5 ml", None, "2026-04-03 10:00:00"),
         ],
     )
@@ -69,7 +75,14 @@ def legacy_engine(tmp_path):
         "VALUES (?, ?, ?, ?, ?, ?)",
         [
             ("2026-04-01 09:00:00", "bottle", None, 3.5, None, "2026-04-01 09:00:00"),
-            ("2026-04-01 10:00:00", "breast_left", 12, None, None, "2026-04-01 10:00:00"),
+            (
+                "2026-04-01 10:00:00",
+                "breast_left",
+                12,
+                None,
+                None,
+                "2026-04-01 10:00:00",
+            ),
         ],
     )
     raw.commit()
@@ -150,8 +163,7 @@ def test_migration_is_idempotent_for_child_id(legacy_engine):
 def test_migration_adds_amount_unit_to_current_amount_schema(tmp_path):
     db_path = tmp_path / "amount_without_unit.db"
     raw = sqlite3.connect(db_path)
-    raw.executescript(
-        """
+    raw.executescript("""
         CREATE TABLE feedings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp DATETIME NOT NULL,
@@ -168,8 +180,7 @@ def test_migration_adds_amount_unit_to_current_amount_schema(tmp_path):
         VALUES
             ('2026-04-01 09:00:00', 'bottle', NULL, 120, NULL, '2026-04-01 09:00:00'),
             ('2026-04-01 10:00:00', 'breast_left', 12, NULL, NULL, '2026-04-01 10:00:00');
-        """
-    )
+        """)
     raw.commit()
     raw.close()
 
@@ -203,8 +214,7 @@ def test_migration_backfills_temperature_unit_as_celsius(tmp_path):
     """
     db_path = tmp_path / "temps_without_unit.db"
     raw = sqlite3.connect(db_path)
-    raw.executescript(
-        """
+    raw.executescript("""
         CREATE TABLE feedings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp DATETIME NOT NULL,
@@ -230,8 +240,7 @@ def test_migration_backfills_temperature_unit_as_celsius(tmp_path):
         VALUES
             ('2026-04-01 09:00:00', 37.0, NULL, NULL, '2026-04-01 09:00:00'),
             ('2026-04-02 09:00:00', 38.2, 'oral', NULL, '2026-04-02 09:00:00');
-        """
-    )
+        """)
     raw.commit()
     raw.close()
 
@@ -265,8 +274,7 @@ def test_migration_reconstructs_entered_fahrenheit(tmp_path):
     """
     db_path = tmp_path / "temps_celsius_with_unit.db"
     raw = sqlite3.connect(db_path)
-    raw.executescript(
-        """
+    raw.executescript("""
         CREATE TABLE feedings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp DATETIME NOT NULL,
@@ -293,8 +301,7 @@ def test_migration_reconstructs_entered_fahrenheit(tmp_path):
         VALUES
             ('2026-04-01 09:00:00', 37.0, 'C', NULL, NULL, '2026-04-01 09:00:00'),
             ('2026-04-02 09:00:00', 37.0, 'F', NULL, NULL, '2026-04-02 09:00:00');
-        """
-    )
+        """)
     raw.commit()
     raw.close()
 

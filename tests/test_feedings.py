@@ -182,11 +182,19 @@ def test_feeding_stats_paired_session_counts_as_one(client):
     session_id = "test-session-abc"
     client.post(
         "/api/feedings",
-        json={"feeding_type": "breast_left", "duration_minutes": 8, "session_id": session_id},
+        json={
+            "feeding_type": "breast_left",
+            "duration_minutes": 8,
+            "session_id": session_id,
+        },
     )
     client.post(
         "/api/feedings",
-        json={"feeding_type": "breast_right", "duration_minutes": 6, "session_id": session_id},
+        json={
+            "feeding_type": "breast_right",
+            "duration_minutes": 6,
+            "session_id": session_id,
+        },
     )
     resp = client.get("/api/feedings/stats")
     assert resp.status_code == 200
@@ -199,11 +207,19 @@ def test_feeding_stats_mixed_sessions(client):
     # One paired breast session
     client.post(
         "/api/feedings",
-        json={"feeding_type": "breast_left", "duration_minutes": 8, "session_id": session_id},
+        json={
+            "feeding_type": "breast_left",
+            "duration_minutes": 8,
+            "session_id": session_id,
+        },
     )
     client.post(
         "/api/feedings",
-        json={"feeding_type": "breast_right", "duration_minutes": 6, "session_id": session_id},
+        json={
+            "feeding_type": "breast_right",
+            "duration_minutes": 6,
+            "session_id": session_id,
+        },
     )
     # One individual bottle feed
     client.post(
@@ -306,8 +322,7 @@ def test_migration_adds_session_id_column(setup_db):
     )
     with old_engine.connect() as conn:
         conn.execute(
-            text(
-                """
+            text("""
             CREATE TABLE feedings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp DATETIME NOT NULL,
@@ -317,8 +332,7 @@ def test_migration_adds_session_id_column(setup_db):
                 notes TEXT,
                 created_at DATETIME
             )
-            """
-            )
+            """)
         )
         conn.commit()
 
@@ -401,7 +415,8 @@ def test_paired_edit_reassigns_both_records(client):
     base = {"notes": "", "child_id": theo}
     for feeding, duration in ((left, 10), (right, 8)):
         resp = client.put(
-            f"/api/feedings/{feeding['id']}", json={**base, "duration_minutes": duration}
+            f"/api/feedings/{feeding['id']}",
+            json={**base, "duration_minutes": duration},
         )
         assert resp.status_code == 200
 
@@ -413,7 +428,8 @@ def test_negative_duration_and_amount_are_rejected(client):
     """Negative durations and amounts must not reach the log or the export."""
     assert (
         client.post(
-            "/api/feedings", json={"feeding_type": "breast_left", "duration_minutes": -600}
+            "/api/feedings",
+            json={"feeding_type": "breast_left", "duration_minutes": -600},
         ).status_code
         == 422
     )

@@ -1,362 +1,578 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Puffin - Baby Tracker</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐦</text></svg>">
-    <link rel="stylesheet" href="/static/css/styles.css">
-</head>
-<body>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐦</text></svg>"
+    />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body>
     <header class="app-header">
-        <h1 class="logo">🐧 Puffin</h1>
-        <div class="header-actions">
-            <a href="/settings" id="settings-btn" class="btn btn-icon" aria-label="Settings">⚙️</a>
-            <button id="theme-toggle" class="btn btn-icon" aria-label="Toggle dark mode">🌙</button>
-        </div>
+      <h1 class="logo">🐧 Puffin</h1>
+      <div class="header-actions">
+        <a
+          href="/settings"
+          id="settings-btn"
+          class="btn btn-icon"
+          aria-label="Settings"
+          >⚙️</a
+        >
+        <button
+          id="theme-toggle"
+          class="btn btn-icon"
+          aria-label="Toggle dark mode"
+        >
+          🌙
+        </button>
+      </div>
     </header>
 
     <main class="container">
-        <!-- Child Switcher (hidden until at least one profile exists) -->
-        <section id="child-switcher-section" class="child-switcher-section hidden">
-            <label class="sr-only" for="child-switcher">Switch child</label>
-            <select id="child-switcher" class="child-switcher"></select>
-        </section>
+      <!-- Child Switcher (hidden until at least one profile exists) -->
+      <section
+        id="child-switcher-section"
+        class="child-switcher-section hidden"
+      >
+        <label class="sr-only" for="child-switcher">Switch child</label>
+        <select id="child-switcher" class="child-switcher"></select>
+      </section>
 
-        <!-- Active Feeding Timer -->
-        <section id="timer-section" class="timer-section hidden">
-            <div class="timer-display">
-                <div class="timer-digits" id="timer-digits">00:00:00</div>
-                <div class="timer-side" id="timer-side"></div>
-                <div class="timer-breast-times hidden" id="timer-breast-times"></div>
-            </div>
-            <div class="timer-actions">
-                <button id="timer-switch-btn" class="btn btn-primary btn-lg hidden">Switch</button>
-                <button id="timer-pause-btn" class="btn btn-secondary btn-lg hidden">Pause</button>
-                <button id="timer-end-btn" class="btn btn-warning btn-lg">End Feeding</button>
-                <button id="timer-confirm-btn" class="btn btn-danger btn-lg hidden">Confirm End</button>
-                <button id="timer-cancel-btn" class="btn btn-secondary hidden">Cancel</button>
-                <button id="timer-discard-btn" class="btn btn-secondary hidden">Cancel Session</button>
-                <button id="timer-discard-confirm-btn" class="btn btn-danger hidden">Confirm Cancel</button>
-                <button id="timer-discard-back-btn" class="btn btn-secondary hidden">Keep Session</button>
-            </div>
-        </section>
+      <!-- Active Feeding Timer -->
+      <section id="timer-section" class="timer-section hidden">
+        <div class="timer-display">
+          <div class="timer-digits" id="timer-digits">00:00:00</div>
+          <div class="timer-side" id="timer-side"></div>
+          <div class="timer-breast-times hidden" id="timer-breast-times"></div>
+        </div>
+        <div class="timer-actions">
+          <button id="timer-switch-btn" class="btn btn-primary btn-lg hidden">
+            Switch
+          </button>
+          <button id="timer-pause-btn" class="btn btn-secondary btn-lg hidden">
+            Pause
+          </button>
+          <button id="timer-end-btn" class="btn btn-warning btn-lg">
+            End Feeding
+          </button>
+          <button id="timer-confirm-btn" class="btn btn-danger btn-lg hidden">
+            Confirm End
+          </button>
+          <button id="timer-cancel-btn" class="btn btn-secondary hidden">
+            Cancel
+          </button>
+          <button id="timer-discard-btn" class="btn btn-secondary hidden">
+            Cancel Session
+          </button>
+          <button id="timer-discard-confirm-btn" class="btn btn-danger hidden">
+            Confirm Cancel
+          </button>
+          <button id="timer-discard-back-btn" class="btn btn-secondary hidden">
+            Keep Session
+          </button>
+        </div>
+      </section>
 
-        <!-- Quick Add Buttons -->
-        <section class="quick-actions">
-            <button class="btn btn-quick btn-diaper" data-modal="diaper-modal">Diaper 🧷</button>
-            <button class="btn btn-quick btn-feeding" data-modal="feeding-modal">Feeding 🍼</button>
-            <button class="btn btn-quick btn-health" data-modal="health-modal">Health 💊</button>
-        </section>
+      <!-- Quick Add Buttons -->
+      <section class="quick-actions">
+        <button class="btn btn-quick btn-diaper" data-modal="diaper-modal">
+          Diaper 🧷
+        </button>
+        <button class="btn btn-quick btn-feeding" data-modal="feeding-modal">
+          Feeding 🍼
+        </button>
+        <button class="btn btn-quick btn-health" data-modal="health-modal">
+          Health 💊
+        </button>
+      </section>
 
-        <!-- Dashboard Summary Cards -->
-        <section class="summary-cards" id="summary-cards">
-            <div class="card card-diaper">
-                <h3 id="diaper-title">Diapers Today</h3>
-                <div class="card-value" id="diaper-count">-</div>
-                <div class="card-detail" id="last-diaper">—</div>
-            </div>
-            <div class="card card-feeding">
-                <h3 id="feeding-title">Feedings Today</h3>
-                <div class="card-value" id="feeding-count">-</div>
-                <div class="card-detail" id="last-feeding">—</div>
-            </div>
-            <div class="card card-health">
-                <h3 id="med-title">Meds Today</h3>
-                <div class="card-value" id="med-count">-</div>
-                <div class="card-detail" id="last-temp">—</div>
-            </div>
-        </section>
+      <!-- Dashboard Summary Cards -->
+      <section class="summary-cards" id="summary-cards">
+        <div class="card card-diaper">
+          <h3 id="diaper-title">Diapers Today</h3>
+          <div class="card-value" id="diaper-count">-</div>
+          <div class="card-detail" id="last-diaper">—</div>
+        </div>
+        <div class="card card-feeding">
+          <h3 id="feeding-title">Feedings Today</h3>
+          <div class="card-value" id="feeding-count">-</div>
+          <div class="card-detail" id="last-feeding">—</div>
+        </div>
+        <div class="card card-health">
+          <h3 id="med-title">Meds Today</h3>
+          <div class="card-value" id="med-count">-</div>
+          <div class="card-detail" id="last-temp">—</div>
+        </div>
+      </section>
 
-        <!-- Calendar Day View -->
-        <section class="calendar-section">
-            <h2 id="child-log-title" class="child-log-title hidden"></h2>
-            <div id="unassigned-bar" class="unassigned-bar hidden">
-                <span id="unassigned-bar-count" class="unassigned-bar-count"></span>
-                <div class="unassigned-bar-actions">
-                    <button type="button" id="unassigned-assign-btn" class="btn btn-sm btn-primary">Assign all to…</button>
-                    <label class="sr-only" for="unassigned-assign-target">Assign all to</label>
-                    <select id="unassigned-assign-target"></select>
-                </div>
-            </div>
-            <div class="calendar-nav">
-                <button id="cal-prev" class="btn btn-icon calendar-arrow" aria-label="Previous day">&lsaquo;</button>
-                <button id="cal-date-btn" class="calendar-date" aria-label="Pick a date">
-                    <span id="cal-date-label">Today</span>
-                </button>
-                <button id="cal-next" class="btn btn-icon calendar-arrow" aria-label="Next day">&rsaquo;</button>
-                <input type="date" id="cal-date-picker" class="hidden">
-            </div>
-<button id="cal-today-pill" class="btn btn-sm btn-secondary hidden">Jump back to today</button>
-            <div id="timeline" class="timeline">
-                <p class="empty-state">No entries for this day.</p>
-            </div>
-            <div class="export-buttons">
-                <button id="export-btn" class="btn btn-sm btn-secondary">⬇️ Export</button>
-            </div>
-        </section>
+      <!-- Calendar Day View -->
+      <section class="calendar-section">
+        <h2 id="child-log-title" class="child-log-title hidden"></h2>
+        <div id="unassigned-bar" class="unassigned-bar hidden">
+          <span id="unassigned-bar-count" class="unassigned-bar-count"></span>
+          <div class="unassigned-bar-actions">
+            <button
+              type="button"
+              id="unassigned-assign-btn"
+              class="btn btn-sm btn-primary"
+            >
+              Assign all to…
+            </button>
+            <label class="sr-only" for="unassigned-assign-target"
+              >Assign all to</label
+            >
+            <select id="unassigned-assign-target"></select>
+          </div>
+        </div>
+        <div class="calendar-nav">
+          <button
+            id="cal-prev"
+            class="btn btn-icon calendar-arrow"
+            aria-label="Previous day"
+          >
+            &lsaquo;
+          </button>
+          <button
+            id="cal-date-btn"
+            class="calendar-date"
+            aria-label="Pick a date"
+          >
+            <span id="cal-date-label">Today</span>
+          </button>
+          <button
+            id="cal-next"
+            class="btn btn-icon calendar-arrow"
+            aria-label="Next day"
+          >
+            &rsaquo;
+          </button>
+          <input type="date" id="cal-date-picker" class="hidden" />
+        </div>
+        <button id="cal-today-pill" class="btn btn-sm btn-secondary hidden">
+          Jump back to today
+        </button>
+        <div id="timeline" class="timeline">
+          <p class="empty-state">No entries for this day.</p>
+        </div>
+        <div class="export-buttons">
+          <button id="export-btn" class="btn btn-sm btn-secondary">
+            ⬇️ Export
+          </button>
+        </div>
+      </section>
     </main>
 
     <!-- Diaper Modal -->
     <div id="diaper-modal" class="modal hidden">
-        <div class="modal-backdrop"></div>
-        <div class="modal-content">
-            <h2>Log Diaper Change</h2>
-            <form id="diaper-form">
-                <div class="form-group">
-                    <label>Type</label>
-                    <div class="btn-group">
-                        <button type="button" class="btn btn-option" data-value="pee" data-field="diaper-type">💧 Pee</button>
-                        <button type="button" class="btn btn-option" data-value="poop" data-field="diaper-type">💩 Poop</button>
-                        <button type="button" class="btn btn-option" data-value="both" data-field="diaper-type">💧💩 Both</button>
-                        <button type="button" class="btn btn-option" data-value="dry" data-field="diaper-type">🧷 Dry</button>
-                    </div>
-                    <input type="hidden" name="type" id="diaper-type" required>
-                </div>
-                <div class="form-group">
-                    <label for="diaper-timestamp">Time (optional)</label>
-                    <input type="datetime-local" id="diaper-timestamp">
-                </div>
-                <div class="form-group">
-                    <label for="diaper-notes">Notes (optional)</label>
-                    <div class="note-suggestions" id="diaper-note-suggestions"></div>
-                    <textarea name="notes" id="diaper-notes" rows="2"></textarea>
-                </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary btn-lg">Save</button>
-                    <button type="button" class="btn btn-secondary modal-close">Cancel</button>
-                </div>
-            </form>
-        </div>
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <h2>Log Diaper Change</h2>
+        <form id="diaper-form">
+          <div class="form-group">
+            <label>Type</label>
+            <div class="btn-group">
+              <button
+                type="button"
+                class="btn btn-option"
+                data-value="pee"
+                data-field="diaper-type"
+              >
+                💧 Pee
+              </button>
+              <button
+                type="button"
+                class="btn btn-option"
+                data-value="poop"
+                data-field="diaper-type"
+              >
+                💩 Poop
+              </button>
+              <button
+                type="button"
+                class="btn btn-option"
+                data-value="both"
+                data-field="diaper-type"
+              >
+                💧💩 Both
+              </button>
+              <button
+                type="button"
+                class="btn btn-option"
+                data-value="dry"
+                data-field="diaper-type"
+              >
+                🧷 Dry
+              </button>
+            </div>
+            <input type="hidden" name="type" id="diaper-type" required />
+          </div>
+          <div class="form-group">
+            <label for="diaper-timestamp">Time (optional)</label>
+            <input type="datetime-local" id="diaper-timestamp" />
+          </div>
+          <div class="form-group">
+            <label for="diaper-notes">Notes (optional)</label>
+            <div class="note-suggestions" id="diaper-note-suggestions"></div>
+            <textarea name="notes" id="diaper-notes" rows="2"></textarea>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-lg">Save</button>
+            <button type="button" class="btn btn-secondary modal-close">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <!-- Feeding Modal -->
     <div id="feeding-modal" class="modal hidden">
-        <div class="modal-backdrop"></div>
-        <div class="modal-content">
-            <h2>Log Feeding</h2>
-            <div id="last-feeding-info" class="last-feeding-info hidden"></div>
-            <form id="feeding-form">
-                <div class="form-group" id="timer-toggle-row">
-                    <label>
-                        <input type="checkbox" id="start-timer" checked> Start timer
-                    </label>
-                </div>
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <h2>Log Feeding</h2>
+        <div id="last-feeding-info" class="last-feeding-info hidden"></div>
+        <form id="feeding-form">
+          <div class="form-group" id="timer-toggle-row">
+            <label>
+              <input type="checkbox" id="start-timer" checked /> Start timer
+            </label>
+          </div>
 
-                <!-- Timer mode: pick type (bottle will disable timer and prompt ounces) -->
-                <div id="feeding-timer-mode">
-                    <div class="form-group">
-                        <label>Type</label>
-                        <div class="btn-group">
-                            <button type="button" class="btn btn-option" data-value="breast_left" data-field="feeding-type">🤱 Left</button>
-                            <button type="button" class="btn btn-option" data-value="breast_right" data-field="feeding-type">🤱 Right</button>
-                            <button type="button" class="btn btn-option" data-value="bottle" data-field="feeding-type">🍼 Bottle</button>
-                        </div>
-                        <input type="hidden" id="feeding-type">
-                    </div>
-                    <div id="feeding-bottle-timer" class="form-group hidden">
-                        <label>Amount</label>
-                        <div class="input-group">
-                            <input type="number" id="feeding-bottle-timer-input" min="0.01" step="0.01">
-                            <select id="feeding-bottle-unit-timer-select">
-                                <option value="oz">oz</option>
-                                <option value="mL">mL</option>
-                            </select>
-                            <select id="feeding-bottle-type-timer-select">
-                                <option value="breastmilk">Breastmilk (default)</option>
-                                <option value="formula">Formula</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
+          <!-- Timer mode: pick type (bottle will disable timer and prompt ounces) -->
+          <div id="feeding-timer-mode">
+            <div class="form-group">
+              <label>Type</label>
+              <div class="btn-group">
+                <button
+                  type="button"
+                  class="btn btn-option"
+                  data-value="breast_left"
+                  data-field="feeding-type"
+                >
+                  🤱 Left
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-option"
+                  data-value="breast_right"
+                  data-field="feeding-type"
+                >
+                  🤱 Right
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-option"
+                  data-value="bottle"
+                  data-field="feeding-type"
+                >
+                  🍼 Bottle
+                </button>
+              </div>
+              <input type="hidden" id="feeding-type" />
+            </div>
+            <div id="feeding-bottle-timer" class="form-group hidden">
+              <label>Amount</label>
+              <div class="input-group">
+                <input
+                  type="number"
+                  id="feeding-bottle-timer-input"
+                  min="0.01"
+                  step="0.01"
+                />
+                <select id="feeding-bottle-unit-timer-select">
+                  <option value="oz">oz</option>
+                  <option value="mL">mL</option>
+                </select>
+                <select id="feeding-bottle-type-timer-select">
+                  <option value="breastmilk">Breastmilk (default)</option>
+                  <option value="formula">Formula</option>
+                </select>
+              </div>
+            </div>
+          </div>
 
-                <!-- Manual mode: per-type durations + bottle ounces -->
-                <div id="feeding-manual-mode" class="hidden">
-                    <div class="form-group">
-                        <label for="feeding-left-duration">🤱 Left breast (minutes)</label>
-                        <input type="number" id="feeding-left-duration" min="1" max="120">
-                    </div>
-                    <div class="form-group">
-                        <label for="feeding-right-duration">🤱 Right breast (minutes)</label>
-                        <input type="number" id="feeding-right-duration" min="1" max="120">
-                    </div>
-                    <div class="form-group">
-                        <label>🍼 Bottle</label>
-                        <div class="input-group">
-                            <input type="number" id="feeding-bottle" min="0.01" step="0.01">
-                            <select id="feeding-bottle-unit-manual-select">
-                                <option value="oz">oz</option>
-                                <option value="mL">mL</option>
-                            </select>
-                            <select id="feeding-bottle-type-manual-select">
-                                <option value="breastmilk">Breastmilk (default)</option>
-                                <option value="formula">Formula</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
+          <!-- Manual mode: per-type durations + bottle ounces -->
+          <div id="feeding-manual-mode" class="hidden">
+            <div class="form-group">
+              <label for="feeding-left-duration"
+                >🤱 Left breast (minutes)</label
+              >
+              <input
+                type="number"
+                id="feeding-left-duration"
+                min="1"
+                max="120"
+              />
+            </div>
+            <div class="form-group">
+              <label for="feeding-right-duration"
+                >🤱 Right breast (minutes)</label
+              >
+              <input
+                type="number"
+                id="feeding-right-duration"
+                min="1"
+                max="120"
+              />
+            </div>
+            <div class="form-group">
+              <label>🍼 Bottle</label>
+              <div class="input-group">
+                <input
+                  type="number"
+                  id="feeding-bottle"
+                  min="0.01"
+                  step="0.01"
+                />
+                <select id="feeding-bottle-unit-manual-select">
+                  <option value="oz">oz</option>
+                  <option value="mL">mL</option>
+                </select>
+                <select id="feeding-bottle-type-manual-select">
+                  <option value="breastmilk">Breastmilk (default)</option>
+                  <option value="formula">Formula</option>
+                </select>
+              </div>
+            </div>
+          </div>
 
-                <div class="form-group">
-                    <label for="feeding-timestamp">Time (optional)</label>
-                    <input type="datetime-local" id="feeding-timestamp">
-                </div>
+          <div class="form-group">
+            <label for="feeding-timestamp">Time (optional)</label>
+            <input type="datetime-local" id="feeding-timestamp" />
+          </div>
 
-                <div class="form-group">
-                    <label for="feeding-notes">Notes (optional)</label>
-                    <div class="note-suggestions" id="feeding-note-suggestions"></div>
-                    <textarea name="notes" id="feeding-notes" rows="2"></textarea>
-                </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary btn-lg" id="feeding-save-btn" disabled>Start</button>
-                    <button type="button" class="btn btn-secondary modal-close">Cancel</button>
-                </div>
-            </form>
-        </div>
+          <div class="form-group">
+            <label for="feeding-notes">Notes (optional)</label>
+            <div class="note-suggestions" id="feeding-note-suggestions"></div>
+            <textarea name="notes" id="feeding-notes" rows="2"></textarea>
+          </div>
+          <div class="form-actions">
+            <button
+              type="submit"
+              class="btn btn-primary btn-lg"
+              id="feeding-save-btn"
+              disabled
+            >
+              Start
+            </button>
+            <button type="button" class="btn btn-secondary modal-close">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <!-- Health Modal -->
     <div id="health-modal" class="modal hidden">
-        <div class="modal-backdrop"></div>
-        <div class="modal-content">
-            <h2>Log Health</h2>
-            <div class="tab-bar">
-                <button class="tab active" data-tab="med-tab">💊 Medication</button>
-                <button class="tab" data-tab="temp-tab">🌡️ Temperature</button>
-            </div>
-            <div id="med-tab" class="tab-content active">
-                <form id="medication-form">
-                    <div class="form-group">
-                        <label>Medication Name</label>
-                        <div class="med-autocomplete" id="med-autocomplete">
-                            <div class="med-chip-display hidden" id="med-chip-display">
-                                <span class="med-chip-text" id="med-chip-text"></span>
-                                <button type="button" class="med-chip-dismiss" id="med-chip-dismiss" aria-label="Clear">×</button>
-                            </div>
-                            <input type="text" id="med-name-input" class="med-name-input" autocomplete="off" placeholder="Type medication name…">
-                            <div class="med-dropdown hidden" id="med-dropdown" role="listbox"></div>
-                        </div>
-                        <input type="hidden" id="med-name" name="medication_name">
-                    </div>
-                    <div class="form-group">
-                        <label>Dosage</label>
-                        <div class="input-group">
-                            <input type="number" name="dosage_quantity" id="med-dosage-qty" step="0.01" min="0.01" placeholder="e.g. 1.5" required>
-                            <select name="dosage_unit" id="med-dosage-unit" required>
-                                <option value="">Unit...</option>
-                                <option value="mL">mL</option>
-                                <option value="tsp(s)">tsp(s)</option>
-                                <option value="tbsp(s)">tbsp(s)</option>
-                                <option value="drop(s)">drop(s)</option>
-                                <option value="spray(s)">spray(s)</option>
-                                <option value="tablet(s)">tablet(s)</option>
-                                <option value="unit(s)">unit(s)</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="med-timestamp">Time (optional)</label>
-                        <input type="datetime-local" id="med-timestamp">
-                    </div>
-                    <div class="form-group">
-                        <label for="med-notes">Notes (optional)</label>
-                        <div class="note-suggestions" id="med-note-suggestions"></div>
-                        <textarea name="notes" id="med-notes" rows="2"></textarea>
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-primary btn-lg">Save</button>
-                        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
-                    </div>
-                </form>
-            </div>
-            <div id="temp-tab" class="tab-content">
-                <form id="temperature-form">
-                    <div class="form-group">
-                        <label for="temp-value">Temperature</label>
-                        <div class="input-group">
-                            <input type="number" name="temperature" id="temp-value" step="0.1" required>
-                            <select id="temp-unit">
-                                <option value="f">°F</option>
-                                <option value="c">°C</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="temp-location">Location</label>
-                        <select name="location" id="temp-location">
-                            <option value="">Select...</option>
-                            <option value="rectal">Rectal</option>
-                            <option value="oral">Oral</option>
-                            <option value="axillary">Underarm</option>
-                            <option value="temporal">Forehead</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="temp-timestamp">Time (optional)</label>
-                        <input type="datetime-local" id="temp-timestamp">
-                    </div>
-                    <div class="form-group">
-                        <label for="temp-notes">Notes (optional)</label>
-                        <div class="note-suggestions" id="temp-note-suggestions"></div>
-                        <textarea name="notes" id="temp-notes" rows="2"></textarea>
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-primary btn-lg">Save</button>
-                        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
-                    </div>
-                </form>
-            </div>
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <h2>Log Health</h2>
+        <div class="tab-bar">
+          <button class="tab active" data-tab="med-tab">💊 Medication</button>
+          <button class="tab" data-tab="temp-tab">🌡️ Temperature</button>
         </div>
+        <div id="med-tab" class="tab-content active">
+          <form id="medication-form">
+            <div class="form-group">
+              <label>Medication Name</label>
+              <div class="med-autocomplete" id="med-autocomplete">
+                <div class="med-chip-display hidden" id="med-chip-display">
+                  <span class="med-chip-text" id="med-chip-text"></span>
+                  <button
+                    type="button"
+                    class="med-chip-dismiss"
+                    id="med-chip-dismiss"
+                    aria-label="Clear"
+                  >
+                    ×
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  id="med-name-input"
+                  class="med-name-input"
+                  autocomplete="off"
+                  placeholder="Type medication name…"
+                />
+                <div
+                  class="med-dropdown hidden"
+                  id="med-dropdown"
+                  role="listbox"
+                ></div>
+              </div>
+              <input type="hidden" id="med-name" name="medication_name" />
+            </div>
+            <div class="form-group">
+              <label>Dosage</label>
+              <div class="input-group">
+                <input
+                  type="number"
+                  name="dosage_quantity"
+                  id="med-dosage-qty"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="e.g. 1.5"
+                  required
+                />
+                <select name="dosage_unit" id="med-dosage-unit" required>
+                  <option value="">Unit...</option>
+                  <option value="mL">mL</option>
+                  <option value="tsp(s)">tsp(s)</option>
+                  <option value="tbsp(s)">tbsp(s)</option>
+                  <option value="drop(s)">drop(s)</option>
+                  <option value="spray(s)">spray(s)</option>
+                  <option value="tablet(s)">tablet(s)</option>
+                  <option value="unit(s)">unit(s)</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="med-timestamp">Time (optional)</label>
+              <input type="datetime-local" id="med-timestamp" />
+            </div>
+            <div class="form-group">
+              <label for="med-notes">Notes (optional)</label>
+              <div class="note-suggestions" id="med-note-suggestions"></div>
+              <textarea name="notes" id="med-notes" rows="2"></textarea>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary btn-lg">Save</button>
+              <button type="button" class="btn btn-secondary modal-close">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+        <div id="temp-tab" class="tab-content">
+          <form id="temperature-form">
+            <div class="form-group">
+              <label for="temp-value">Temperature</label>
+              <div class="input-group">
+                <input
+                  type="number"
+                  name="temperature"
+                  id="temp-value"
+                  step="0.1"
+                  required
+                />
+                <select id="temp-unit">
+                  <option value="f">°F</option>
+                  <option value="c">°C</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="temp-location">Location</label>
+              <select name="location" id="temp-location">
+                <option value="">Select...</option>
+                <option value="rectal">Rectal</option>
+                <option value="oral">Oral</option>
+                <option value="axillary">Underarm</option>
+                <option value="temporal">Forehead</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="temp-timestamp">Time (optional)</label>
+              <input type="datetime-local" id="temp-timestamp" />
+            </div>
+            <div class="form-group">
+              <label for="temp-notes">Notes (optional)</label>
+              <div class="note-suggestions" id="temp-note-suggestions"></div>
+              <textarea name="notes" id="temp-notes" rows="2"></textarea>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary btn-lg">Save</button>
+              <button type="button" class="btn btn-secondary modal-close">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
 
     <!-- Edit Modal -->
     <div id="edit-modal" class="modal hidden">
-        <div class="modal-backdrop"></div>
-        <div class="modal-content">
-            <h2 id="edit-modal-title">Edit</h2>
-            <form id="edit-form">
-                <div id="edit-form-fields"></div>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary btn-lg">Save</button>
-                    <button type="button" class="btn btn-danger" id="edit-delete-btn">Delete</button>
-                    <button type="button" class="btn btn-secondary modal-close">Cancel</button>
-                </div>
-            </form>
-        </div>
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <h2 id="edit-modal-title">Edit</h2>
+        <form id="edit-form">
+          <div id="edit-form-fields"></div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-lg">Save</button>
+            <button type="button" class="btn btn-danger" id="edit-delete-btn">
+              Delete
+            </button>
+            <button type="button" class="btn btn-secondary modal-close">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <!-- Export Modal -->
     <div id="export-modal" class="modal hidden">
-        <div class="modal-backdrop"></div>
-        <div class="modal-content">
-            <h2>Export Data</h2>
-            <form id="export-form">
-                <div class="form-group">
-                    <label>Format</label>
-                    <div class="btn-group">
-                        <button type="button" class="btn btn-option selected" data-value="csv" data-field="export-format">CSV</button>
-                        <button type="button" class="btn btn-option" data-value="json" data-field="export-format">JSON</button>
-                        <button type="button" class="btn btn-option" data-value="pdf" data-field="export-format">PDF</button>
-                    </div>
-                    <input type="hidden" id="export-format" value="csv">
-                </div>
-                <div class="form-group">
-                    <label for="export-start-date">Start Date (optional)</label>
-                    <input type="date" id="export-start-date">
-                </div>
-                <div class="form-group">
-                    <label for="export-end-date">End Date (optional)</label>
-                    <input type="date" id="export-end-date">
-                </div>
-                <div class="form-group hidden" id="export-child-group">
-                    <label for="export-child">Child</label>
-                    <select id="export-child"></select>
-                </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary btn-lg">Download</button>
-                    <button type="button" class="btn btn-secondary modal-close">Cancel</button>
-                </div>
-            </form>
-        </div>
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <h2>Export Data</h2>
+        <form id="export-form">
+          <div class="form-group">
+            <label>Format</label>
+            <div class="btn-group">
+              <button
+                type="button"
+                class="btn btn-option selected"
+                data-value="csv"
+                data-field="export-format"
+              >
+                CSV
+              </button>
+              <button
+                type="button"
+                class="btn btn-option"
+                data-value="json"
+                data-field="export-format"
+              >
+                JSON
+              </button>
+              <button
+                type="button"
+                class="btn btn-option"
+                data-value="pdf"
+                data-field="export-format"
+              >
+                PDF
+              </button>
+            </div>
+            <input type="hidden" id="export-format" value="csv" />
+          </div>
+          <div class="form-group">
+            <label for="export-start-date">Start Date (optional)</label>
+            <input type="date" id="export-start-date" />
+          </div>
+          <div class="form-group">
+            <label for="export-end-date">End Date (optional)</label>
+            <input type="date" id="export-end-date" />
+          </div>
+          <div class="form-group hidden" id="export-child-group">
+            <label for="export-child">Child</label>
+            <select id="export-child"></select>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-lg">
+              Download
+            </button>
+            <button type="button" class="btn btn-secondary modal-close">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
 
     {% include "_confirm_modal.html" %}
@@ -366,5 +582,5 @@
 
     <script src="/static/js/common.js"></script>
     <script src="/static/js/app.js"></script>
-</body>
+  </body>
 </html>

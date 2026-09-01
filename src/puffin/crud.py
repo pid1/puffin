@@ -1,8 +1,9 @@
 import logging
 import os
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC
 from datetime import date as date_type
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import String, cast, func, select
@@ -134,7 +135,10 @@ def create_diaper(
     child_id: int | None = None,
 ) -> DiaperChange:
     obj = DiaperChange(
-        timestamp=timestamp or datetime.now(UTC), type=type_, notes=notes, child_id=child_id
+        timestamp=timestamp or datetime.now(UTC),
+        type=type_,
+        notes=notes,
+        child_id=child_id,
     )
     db.add(obj)
     db.commit()
@@ -361,7 +365,12 @@ def _feeding_session_count(db: Session, start: datetime, child: ChildFilter = No
 
 
 def _count_range(
-    db: Session, model, timestamp_col, start: datetime, end: datetime, child: ChildFilter = None
+    db: Session,
+    model,
+    timestamp_col,
+    start: datetime,
+    end: datetime,
+    child: ChildFilter = None,
 ) -> int:
     stmt = (
         select(func.count()).select_from(model).where(timestamp_col >= start, timestamp_col < end)
@@ -801,11 +810,15 @@ def get_activities(
                 "id": first.id,
                 "secondary_id": group[1].id if paired else None,
                 "emoji": "\U0001f931",
-                "label": "Both Breasts"
-                if paired
-                else _FEEDING_LABELS.get(first.feeding_type, first.feeding_type),
+                "label": (
+                    "Both Breasts"
+                    if paired
+                    else _FEEDING_LABELS.get(first.feeding_type, first.feeding_type)
+                ),
                 "detail": detail,
-                "summary": "Feeding: Both Breasts" if paired else f"Feeding: {first.feeding_type}",
+                "summary": (
+                    "Feeding: Both Breasts" if paired else f"Feeding: {first.feeding_type}"
+                ),
                 "notes": notes,
             }
         )
