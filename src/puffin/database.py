@@ -178,6 +178,9 @@ def _run_migrations(bind=None) -> None:
             if not insp.has_table(table):
                 continue
             if "child_id" not in {c["name"] for c in insp.get_columns(table)}:
+                # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
+                # `table` comes from the hardcoded tuple immediately above; DDL cannot
+                # take a bound parameter for an identifier.
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN child_id INTEGER"))
                 conn.commit()
             conn.execute(text(f"CREATE INDEX IF NOT EXISTS {index} ON {table} (child_id)"))
