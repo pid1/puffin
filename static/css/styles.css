@@ -495,6 +495,33 @@ body {
     font-family: inherit;
 }
 
+/* iOS Safari renders datetime-local as a native control that sizes itself, and
+   that intrinsic size beats the width: 100% above -- inside the modal on a
+   phone the field spills past its form group and runs wider and taller than
+   every other input. min-width: 0 does not reach it (the control is not a flex
+   item) and neither does max-width; the native appearance has to go before the
+   declared width applies at all. Tapping still opens the system picker.
+
+   Dropping the appearance costs the control its intrinsic height, and an empty
+   datetime-local has no inner text to replace it, so the content box collapses
+   and the field renders about half height -- the state the modal opens in.
+   Pinning it to one line keeps empty and filled identical: 10px + 10px of
+   padding, 1px + 1px of border, and a 20px line.
+
+   Scoped to narrow viewports on purpose. The overflow only happens when the
+   modal is too narrow to hold the native control; from the breakpoint up the
+   form group is wide enough, so the field is left completely alone rather than
+   restyled on viewports where it was never broken. The .98 pairs this with the
+   min-width: 640px block below without leaving a gap on fractional widths. */
+@media (max-width: 639.98px) {
+    .form-group input[type="datetime-local"] {
+        -webkit-appearance: none;
+        appearance: none;
+        min-width: 0;
+        min-height: calc(20px + 2px + 1.25rem);
+    }
+}
+
 .form-group textarea { resize: vertical; }
 
 /* Note suggestion chips */
@@ -629,6 +656,16 @@ body {
 .input-group input { flex: 1; }
 .input-group select { width: auto; }
 
+/* The bottle amount row is the only .input-group carrying two selects — a unit
+   picker and a milk-type picker, both of which render a "(default)" suffix at
+   runtime. Side by side they consume the whole row, and the input is the only
+   flex: 1 item, so it absorbs the shortfall and collapses to an unreadable
+   sliver on a phone. Give the amount its own row and let the selects share the
+   next; the single-line layout returns at the modal breakpoint below. */
+.input-group-bottle { flex-wrap: wrap; }
+.input-group-bottle input { flex-basis: 100%; }
+.input-group-bottle select { flex: 1; min-width: 0; }
+
 .form-actions {
     display: flex;
     gap: 12px;
@@ -710,6 +747,10 @@ body {
     .modal {
         align-items: center;
     }
+    /* Room for all three controls on one line again. */
+    .input-group-bottle { flex-wrap: nowrap; }
+    .input-group-bottle input { flex-basis: auto; }
+    .input-group-bottle select { flex: 0 1 auto; }
 }
 
 @media (max-width: 400px) {
