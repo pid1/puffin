@@ -183,6 +183,9 @@ def _run_migrations(bind=None) -> None:
                 # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN child_id INTEGER"))
                 conn.commit()
+            # `index` and `table` come from the hardcoded tuple above; DDL cannot bind
+            # an identifier.
+            # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
             conn.execute(text(f"CREATE INDEX IF NOT EXISTS {index} ON {table} (child_id)"))
             conn.commit()
 
