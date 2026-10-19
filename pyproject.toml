@@ -2,7 +2,7 @@
 name = "puffin"
 version = "0.1.0"
 description = "Puffin - Baby care activity tracking dashboard"
-requires-python = ">=3.11"
+requires-python = ">=3.15"
 dependencies = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
@@ -35,7 +35,7 @@ build-backend = "hatchling.build"
 # would disagree on every line between 88 and 100 characters.
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py315"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]

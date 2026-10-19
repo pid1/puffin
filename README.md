@@ -103,7 +103,7 @@ See `AGENTS.md` for the complete command reference including background/agent-fr
 
 ## Tech Stack
 
-- **Backend**: Python 3.13 / FastAPI / SQLAlchemy / SQLite
+- **Backend**: Python 3.15 / FastAPI / SQLAlchemy / SQLite
 - **Frontend**: Vanilla HTML/CSS/JS
 - **Dev Environment**: Nix + devenv
 - **Package Manager**: uv
