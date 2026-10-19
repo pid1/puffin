@@ -279,13 +279,15 @@ def _run_migrations(bind=None) -> None:
                         # ``created_at`` is NOT NULL at the SQL level but only has
                         # a Python-side default, so raw INSERTs must populate it
                         # explicitly — without it, INSERT OR IGNORE would silently
-                        # skip every row.
+                        # skip every row. The value is formatted here as the
+                        # default sqlite3 datetime adapter did (deprecated since
+                        # Python 3.12), so stored rows are unchanged.
                         conn.execute(
                             text(
                                 "INSERT OR IGNORE INTO saved_medications (name, created_at) "
                                 "VALUES (:name, :created_at)"
                             ),
-                            {"name": name, "created_at": now},
+                            {"name": name, "created_at": now.isoformat(" ")},
                         )
                 if seen_lower:
                     conn.commit()
