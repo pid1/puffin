@@ -26,6 +26,12 @@ dev = [
 # so a hijacked or malicious release is usually pulled before it can land here.
 [tool.uv]
 exclude-newer = "7 days"
+# Cooldown exception (factory 2026-10-22): keep pillow 13.0.0 (published
+# 2026-10-16), the fix release for the pillow advisories Semgrep reports
+# against 12.x. Without it the cooldown downgrades pillow (via fpdf2) to
+# 12.3.0 and reopens them. The cap admits 13.0.0 but no later release.
+# Remove next run, once 13.0.0 is outside the 7-day window.
+exclude-newer-package = { pillow = "2026-10-17T00:00:00Z" }
 
 [build-system]
 requires = ["hatchling"]
