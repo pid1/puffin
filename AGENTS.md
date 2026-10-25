@@ -63,3 +63,16 @@ dev          # start FastAPI dev server on port 8000
 - **Linter/Formatter**: ruff
 - **Tests**: pytest with httpx TestClient (backend); Node's built-in
   `node:test` runner (frontend, no npm dependencies)
+
+## Sadr
+
+### Build and test
+- Run the checks inside devenv: `devenv shell -- test-py` (pytest, 197 tests on 2026-10-25), then `devenv shell -- test-js` (node:test, 64 tests), then `devenv shell -- lint`.
+- Call `test-py` and `test-js` by name inside `bash -c`, because `test` there is the shell builtin, not the devenv script.
+- `lint` runs the ruff from nixpkgs (0.17.2 on 2026-10-25), not the ruff in `uv.lock` (0.17.1), so the two can disagree.
+- The app check is `dev-start`, then `GET /` and `GET /settings` on port 8000 return 200, then `dev-stop`.
+- CI runs no tests and no lint. `container.yml` builds the image, and `semgrep.yml` runs the required `semgrep/ci` check.
+
+### Toolchain
+- `.gitignore` excludes `devenv.lock`, so devenv's Python, Node, uv and ruff float with nixpkgs-unstable.
+- The container image installs from `uv.lock` with `uv sync --frozen`, so the lockfile is what ships.
