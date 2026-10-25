@@ -33,6 +33,20 @@ build-backend = "hatchling.build"
 # Keep this in mind before adding a second formatter: ruff reads line-length
 # from here, but black does not and would wrap at its default 88, so the two
 # would disagree on every line between 88 and 100 characters.
+[tool.uv]
+# sadr: install only releases that have been public for at least 7 days
+exclude-newer = "7 days"
+
+[tool.uv.exclude-newer-package]
+# sadr: already merged inside the cooldown
+fastapi = "2026-10-19T12:27:00Z"
+# sadr: already merged inside the cooldown
+httpcore2 = "2026-10-18T16:30:00Z"
+# sadr: already merged inside the cooldown
+httpx2 = "2026-10-18T16:30:00Z"
+# sadr: already merged inside the cooldown
+starlette = "2026-10-18T15:51:00Z"
+
 [tool.ruff]
 line-length = 100
 target-version = "py315"
