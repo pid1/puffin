@@ -4,11 +4,11 @@ version = "0.1.0"
 description = "Puffin - Baby care activity tracking dashboard"
 requires-python = ">=3.15"
 dependencies = [
-    "fastapi>=0.148.0",
+    "fastapi>=0.162.0",
     "uvicorn[standard]>=0.54.0",
-    "sqlalchemy>=2.1.5",
+    "sqlalchemy>=2.1.6",
     "pydantic>=2.14.1",
-    "pydantic-settings>=2.16.0",
+    "pydantic-settings>=2.16.1",
     "python-multipart>=0.0.32",
     "jinja2>=3.1.6",
     "fpdf2>=2.8.9",
@@ -18,8 +18,8 @@ dependencies = [
 dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
-    "httpx2>=2.14.0",
-    "ruff>=0.17.1",
+    "httpx2>=2.16.0",
+    "ruff>=0.17.2",
 ]
 
 [build-system]
@@ -36,16 +36,6 @@ build-backend = "hatchling.build"
 [tool.uv]
 # sadr: install only releases that have been public for at least 7 days
 exclude-newer = "7 days"
-
-[tool.uv.exclude-newer-package]
-# sadr: already merged inside the cooldown
-fastapi = "2026-10-19T12:27:00Z"
-# sadr: already merged inside the cooldown
-httpcore2 = "2026-10-18T16:30:00Z"
-# sadr: already merged inside the cooldown
-httpx2 = "2026-10-18T16:30:00Z"
-# sadr: already merged inside the cooldown
-starlette = "2026-10-18T15:51:00Z"
 
 [tool.ruff]
 line-length = 100
