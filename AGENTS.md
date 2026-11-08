@@ -69,7 +69,7 @@ dev          # start FastAPI dev server on port 8000
 ### Build and test
 - Run the checks inside devenv: `devenv shell -- test-py` (pytest, 197 tests on 2026-10-25), then `devenv shell -- test-js` (node:test, 64 tests), then `devenv shell -- lint`.
 - Call `test-py` and `test-js` by name inside `bash -c`, because `test` there is the shell builtin, not the devenv script.
-- `lint` runs the ruff from nixpkgs (0.17.3 on 2026-11-08), not the ruff in `uv.lock` (0.17.2 on main on 2026-11-08), so the two can disagree.
+- `lint` runs the ruff from nixpkgs, not the ruff in `uv.lock`, so the two can disagree. Both were 0.17.3 on 2026-11-08.
 - The app check is `dev-start`, then `GET /` and `GET /settings` on port 8000 return 200, then `dev-stop`.
 - CI runs no tests and no lint. `container.yml` builds the image, and `semgrep.yml` runs the required `semgrep/ci` check.
 
